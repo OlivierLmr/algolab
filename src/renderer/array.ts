@@ -1,4 +1,4 @@
-import type { TrackedArray, Highlight } from '../types.ts'
+import type { TrackedArray, Highlight, DimRange } from '../types.ts'
 import { getHighlightColor } from './colors.ts'
 
 export const CELL_SIZE = 48
@@ -10,6 +10,7 @@ export function drawArray(
   ctx: CanvasRenderingContext2D,
   array: TrackedArray,
   highlights: Highlight[],
+  dimRanges: DimRange[],
   yOffset: number,
 ): void {
   const { name, values } = array
@@ -24,20 +25,24 @@ export function drawArray(
     const x = startX + i * (CELL_SIZE + CELL_GAP)
     const y = yOffset
 
-    // Highlight background
-    const hl = highlights.find(h => h.arrayName === name && h.indices.includes(i))
-    if (hl) {
-      ctx.fillStyle = getHighlightColor(hl.type)
-      ctx.fillRect(x - 2, y - 2, CELL_SIZE + 4, CELL_SIZE + 4)
-    }
+    // Check if this cell is dimmed
+    const isDimmed = dimRanges.some(
+      d => d.arrayName === name && i >= d.from && i <= d.to
+    )
+
+    if (isDimmed) ctx.globalAlpha = 0.3
+
+    const hl = !isDimmed
+      ? highlights.find(h => h.arrayName === name && h.indices.includes(i))
+      : undefined
 
     // Cell background
-    ctx.fillStyle = '#fff'
+    ctx.fillStyle = hl ? getHighlightColor(hl.type) : '#fff'
     ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE)
 
     // Cell border
-    ctx.strokeStyle = '#999'
-    ctx.lineWidth = 1.5
+    ctx.strokeStyle = hl ? getHighlightColor(hl.type) : '#999'
+    ctx.lineWidth = hl ? 3 : 1.5
     ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE)
 
     // Value
@@ -51,6 +56,8 @@ export function drawArray(
     ctx.fillStyle = '#999'
     ctx.font = '11px monospace'
     ctx.fillText(String(i), x + CELL_SIZE / 2, y + CELL_SIZE + 14)
+
+    if (isDimmed) ctx.globalAlpha = 1.0
   }
 
   ctx.textAlign = 'start'

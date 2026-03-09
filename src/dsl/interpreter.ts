@@ -1,8 +1,8 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
   Expr, IndexExpr,
 } from './ast.ts'
-import type { Step, TrackedArray, Pointer, Highlight } from '../types.ts'
+import type { Step, TrackedArray, Pointer, Highlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 
 interface Env {
@@ -63,11 +63,30 @@ function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
       case 'assign': scanExpr(node.target); scanExpr(node.value); break
       case 'swap': scanExpr(node.left); scanExpr(node.right); break
       case 'exprStmt': scanExpr(node.expr); break
+      case 'dim': break
+      case 'pointer': break
     }
   }
 
   nodes.forEach(scanNode)
   return pointers
+}
+
+/** Collect directive pointer labels from AST. */
+function collectDirectivePointerLabels(nodes: ASTNode[]): string[] {
+  const labels: string[] = []
+  function scan(node: ASTNode): void {
+    switch (node.type) {
+      case 'pointer': labels.push(node.label); break
+      case 'algo': node.body.forEach(scan); break
+      case 'for': node.body.forEach(scan); break
+      case 'while': node.body.forEach(scan); break
+      case 'if': node.body.forEach(scan); node.elseBody.forEach(scan); break
+      default: break
+    }
+  }
+  nodes.forEach(scan)
+  return labels
 }
 
 /**
@@ -80,12 +99,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
   for (const vars of pointerMap.values()) {
     for (const v of vars) allPointerVars.add(v)
   }
+  const directiveLabels = collectDirectivePointerLabels(algo.body)
+  for (const label of directiveLabels) allPointerVars.add(label)
   const colorMap = assignPointerColors([...allPointerVars])
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
     const env: Env = { arrays: new Map(), vars: new Map() }
     let currentHighlights: Highlight[] = []
+    const dimRanges = new Map<string, { from: number; to: number }>()
+    const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
 
     for (const [name, values] of input) {
       env.arrays.set(name, [...values])
@@ -111,15 +134,31 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
       }
 
+      for (const [label, def] of directivePointers) {
+        const index = evalExpr(def.expr)
+        pointers.push({
+          name: label,
+          arrayName: def.arrayName,
+          index,
+          color: colorMap.get(label) || '#888',
+        })
+      }
+
       const variables: Record<string, number> = {}
       for (const [k, v] of env.vars) {
         variables[k] = v
+      }
+
+      const dimRangeList: DimRange[] = []
+      for (const [arrayName, range] of dimRanges) {
+        dimRangeList.push({ arrayName, from: range.from, to: range.to })
       }
 
       steps.push({
         arrays,
         pointers,
         highlights: [...currentHighlights],
+        dimRanges: dimRangeList,
         variables,
         currentLine: line,
         description,
@@ -224,6 +263,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'let': execLet(node); break
         case 'assign': execAssign(node); break
         case 'swap': execSwap(node); break
+        case 'dim': execDim(node); break
+        case 'pointer': execPointer(node); break
         case 'exprStmt':
           evalExpr(node.expr)
           snapshot(node.line, '')
@@ -302,6 +343,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         currentHighlights = [{ arrayName, indices: [idx], type: 'active' }]
         snapshot(node.line, `Set ${arrayName}[${idx}] = ${val}`)
       }
+    }
+
+    function execDim(node: DimNode): void {
+      const from = evalExpr(node.from)
+      const to = evalExpr(node.to)
+      dimRanges.set(node.arrayName, { from, to })
+    }
+
+    function execPointer(node: PointerNode): void {
+      directivePointers.set(node.label, { arrayName: node.arrayName, expr: node.at })
     }
 
     function execSwap(node: SwapNode): void {

@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
   Expr, BinaryExpr, IndexExpr, CallExpr,
 } from './ast.ts'
 
@@ -83,6 +83,8 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'if': return parseIf()
         case 'let': return parseLet()
         case 'swap': return parseSwap()
+        case 'dim': return parseDim()
+        case 'pointer': return parsePointer()
       }
     }
 
@@ -142,6 +144,33 @@ export function parse(tokens: Token[]): AlgoNode {
     const right = parseExpr()
     expectNewline()
     return { type: 'swap', left, right, line: tok.line }
+  }
+
+  function parseDim(): DimNode {
+    const tok = expect('keyword', 'dim')
+    const arrayName = expect('ident').value
+    expect('keyword', 'from')
+    const from = parseExpr()
+    expect('keyword', 'to')
+    const to = parseExpr()
+    expectNewline()
+    return { type: 'dim', arrayName, from, to, line: tok.line }
+  }
+
+  function parsePointer(): PointerNode {
+    const tok = expect('keyword', 'pointer')
+    const labelTok = peek()
+    if (labelTok.type !== 'ident' && labelTok.type !== 'string') {
+      throw new Error(`Expected identifier or string for pointer label but got ${labelTok.type} '${labelTok.value}' at line ${labelTok.line + 1}`)
+    }
+    advance()
+    const label = labelTok.value
+    expect('keyword', 'on')
+    const arrayName = expect('ident').value
+    expect('keyword', 'at')
+    const at = parseExpr()
+    expectNewline()
+    return { type: 'pointer', label, arrayName, at, line: tok.line }
   }
 
   function parseAssignOrExpr(): ASTNode {

@@ -11,8 +11,10 @@ export function App() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'ArrowRight') nextStep()
-      else if (e.key === 'ArrowLeft') prevStep()
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'ArrowRight') { e.preventDefault(); nextStep() }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep() }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

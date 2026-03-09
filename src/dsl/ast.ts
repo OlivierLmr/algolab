@@ -7,6 +7,8 @@ export type ASTNode =
   | AssignNode
   | SwapNode
   | ExprStmtNode
+  | DimNode
+  | PointerNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -64,6 +66,22 @@ export interface SwapNode {
 export interface ExprStmtNode {
   type: 'exprStmt'
   expr: Expr
+  line: number
+}
+
+export interface DimNode {
+  type: 'dim'
+  arrayName: string
+  from: Expr
+  to: Expr
+  line: number
+}
+
+export interface PointerNode {
+  type: 'pointer'
+  label: string
+  arrayName: string
+  at: Expr
   line: number
 }
 

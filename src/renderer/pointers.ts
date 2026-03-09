@@ -13,7 +13,6 @@ export function drawPointers(
   // Group pointers by array, sort by index for label stacking
   const grouped = new Map<string, Pointer[]>()
   for (const p of pointers) {
-    if (p.index < 0) continue // skip out-of-bounds pointers
     if (!grouped.has(p.arrayName)) grouped.set(p.arrayName, [])
     grouped.get(p.arrayName)!.push(p)
   }

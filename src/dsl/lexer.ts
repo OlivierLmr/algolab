@@ -15,11 +15,13 @@ export type TokenType =
   | 'colon'
   | 'indent'
   | 'dedent'
+  | 'string'
   | 'newline'
   | 'eof'
 
 const KEYWORDS = new Set([
   'algo', 'let', 'for', 'from', 'to', 'while', 'if', 'else', 'swap', 'and', 'or', 'not',
+  'dim', 'pointer', 'on', 'at',
 ])
 
 const OPERATORS = ['<=', '>=', '==', '!=', '<', '>', '+', '-', '*', '/', '%', '=']
@@ -59,6 +61,17 @@ export function lex(source: string): Token[] {
       // Skip whitespace
       if (line[pos] === ' ') {
         pos++
+        continue
+      }
+
+      // String literal
+      if (line[pos] === '"') {
+        pos++
+        let start = pos
+        while (pos < line.length && line[pos] !== '"') pos++
+        if (pos >= line.length) throw new Error(`Unterminated string at line ${lineNum + 1}`)
+        tokens.push({ type: 'string', value: line.slice(start, pos), line: lineNum })
+        pos++ // skip closing quote
         continue
       }
 
