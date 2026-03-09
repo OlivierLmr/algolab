@@ -4,7 +4,8 @@
       "WebSearch",
       "Bash(which pnpm:*)",
       "Bash(pnpm build:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git add:*)"
     ]
   }
 }
