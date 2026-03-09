@@ -129,7 +129,18 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           if (val === undefined) throw new Error(`Undefined variable: ${expr.name}`)
           return val
         }
-        case 'binary': return evalBinary(expr.op, evalExpr(expr.left), evalExpr(expr.right))
+        case 'binary': {
+          // Short-circuit for and/or
+          if (expr.op === 'and') {
+            const left = evalExpr(expr.left)
+            return left === 0 ? 0 : (evalExpr(expr.right) !== 0 ? 1 : 0)
+          }
+          if (expr.op === 'or') {
+            const left = evalExpr(expr.left)
+            return left !== 0 ? 1 : (evalExpr(expr.right) !== 0 ? 1 : 0)
+          }
+          return evalBinary(expr.op, evalExpr(expr.left), evalExpr(expr.right))
+        }
         case 'unary':
           if (expr.op === '-') return -evalExpr(expr.operand)
           if (expr.op === 'not') return evalExpr(expr.operand) === 0 ? 1 : 0

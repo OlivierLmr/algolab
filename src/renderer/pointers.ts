@@ -13,6 +13,7 @@ export function drawPointers(
   // Group pointers by array, sort by index for label stacking
   const grouped = new Map<string, Pointer[]>()
   for (const p of pointers) {
+    if (p.index < 0) continue // skip out-of-bounds pointers
     if (!grouped.has(p.arrayName)) grouped.set(p.arrayName, [])
     grouped.get(p.arrayName)!.push(p)
   }
@@ -38,12 +39,12 @@ export function drawPointers(
       ctx.lineTo(x, arrowTop)
       ctx.stroke()
 
-      // Arrow head
+      // Arrow head (pointing down into the array)
       ctx.fillStyle = p.color
       ctx.beginPath()
-      ctx.moveTo(x, arrowTop + 2)
-      ctx.lineTo(x - 5, arrowTop - 6)
-      ctx.lineTo(x + 5, arrowTop - 6)
+      ctx.moveTo(x, arrowTop)
+      ctx.lineTo(x - 5, arrowTop - 8)
+      ctx.lineTo(x + 5, arrowTop - 8)
       ctx.closePath()
       ctx.fill()
 
