@@ -111,10 +111,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
       }
 
+      const variables: Record<string, number> = {}
+      for (const [k, v] of env.vars) {
+        variables[k] = v
+      }
+
       steps.push({
         arrays,
         pointers,
         highlights: [...currentHighlights],
+        variables,
         currentLine: line,
         description,
       })

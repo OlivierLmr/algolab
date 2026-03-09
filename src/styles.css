@@ -77,6 +77,27 @@ body {
   user-select: none;
 }
 
+.variables-section {
+  border-top: 1px solid #444;
+  margin-top: 12px;
+  padding-top: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #d4d4d4;
+}
+
+.variables-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.variable-entry {
+  padding: 1px 0;
+}
+
 .canvas-container {
   flex: 1;
   background: #fff;

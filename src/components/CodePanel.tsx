@@ -116,6 +116,9 @@ export function CodePanel() {
     return assignPointerColors(varNames)
   }, [algo.source])
 
+  const variables = step?.variables ?? {}
+  const varEntries = Object.entries(variables)
+
   return (
     <div class="code-panel">
       <pre>
@@ -129,6 +132,20 @@ export function CodePanel() {
           </div>
         ))}
       </pre>
+      {varEntries.length > 0 && (
+        <div class="variables-section">
+          <div class="variables-title">Variables</div>
+          {varEntries.map(([name, value]) => (
+            <div key={name} class="variable-entry">
+              <span style={colorMap.has(name) ? { color: colorMap.get(name), fontWeight: 'bold' } : undefined}>
+                {name}
+              </span>
+              {' = '}
+              {value}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -20,6 +20,7 @@ export interface Step {
   arrays: TrackedArray[]
   pointers: Pointer[]
   highlights: Highlight[]
+  variables: Record<string, number>
   currentLine: number
   description: string
 }
