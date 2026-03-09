@@ -1,0 +1,140 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  font-size: 1.4rem;
+}
+
+.header select {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.main-layout {
+  display: flex;
+  gap: 20px;
+}
+
+.code-panel {
+  flex: 0 0 auto;
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  min-width: 320px;
+}
+
+.code-panel pre {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.code-line {
+  padding: 1px 8px;
+  border-radius: 3px;
+  white-space: pre;
+  color: #d4d4d4;
+}
+
+.code-line-active {
+  background: rgba(255, 255, 100, 0.15);
+  border-left: 3px solid #f0c040;
+  padding-left: 5px;
+}
+
+.line-number {
+  display: inline-block;
+  width: 24px;
+  text-align: right;
+  margin-right: 12px;
+  color: #666;
+  user-select: none;
+}
+
+.canvas-container {
+  flex: 1;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  min-height: 300px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.controls button {
+  padding: 6px 16px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.controls button:hover:not(:disabled) {
+  background: #e8e8e8;
+}
+
+.controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.controls input[type="range"] {
+  flex: 1;
+}
+
+.step-counter {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.description {
+  margin-top: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #555;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  min-height: 36px;
+}
