@@ -8,7 +8,6 @@ export type ASTNode =
   | SwapNode
   | ExprStmtNode
   | DimNode
-  | FocusNode
   | PointerNode
   | CommentNode
   | AllocNode
@@ -75,14 +74,6 @@ export interface ExprStmtNode {
 
 export interface DimNode {
   type: 'dim'
-  arrayName: string
-  from: Expr
-  to: Expr
-  line: number
-}
-
-export interface FocusNode {
-  type: 'focus'
   arrayName: string
   from: Expr
   to: Expr

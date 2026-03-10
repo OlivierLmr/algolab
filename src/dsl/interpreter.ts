@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, FocusNode, PointerNode, CommentNode, AllocNode, DefNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode, DefNode,
   Expr,
 } from './ast.ts'
 import { lex } from './lexer.ts'
@@ -47,8 +47,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
-    const dimRanges = new Map<string, { from: number; to: number }>()
-    const focusRanges = new Map<string, { from: number; to: number }>()
+    let dimRanges: DimRange[] = []
     const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
     const activePointerStack: ScopePointer[][] = []
     let pendingComment: string | null = null
@@ -196,16 +195,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
 
       // Collect all dim ranges
-      const allDimRanges: DimRange[] = []
-      for (const [arrayName, range] of dimRanges) {
-        allDimRanges.push({ arrayName, from: range.from, to: range.to })
-      }
-
-      // Collect all focus ranges
-      const allFocusRanges: DimRange[] = []
-      for (const [arrayName, range] of focusRanges) {
-        allFocusRanges.push({ arrayName, from: range.from, to: range.to })
-      }
+      const allDimRanges: DimRange[] = [...dimRanges]
 
       // Build call stack frames
       const frameArrayNames = new Set<string>()
@@ -253,8 +243,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
             : []
           // Filter dim ranges for this frame's arrays
           const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
-          // Filter focus ranges for this frame's arrays
-          const frameFocusRanges = allFocusRanges.filter(d => af.allocatedArrays.has(d.arrayName))
 
           callStackFrames.push({
             label,
@@ -265,7 +253,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
             highlights: frameHighlights,
             varHighlights: frameVarHighlights,
             dimRanges: frameDimRanges,
-            focusRanges: frameFocusRanges,
           })
         }
       }
@@ -293,7 +280,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const globalHighlights = currentHighlights.filter(h => !frameArrayNames.has(h.arrayName))
       const globalVarHighlights = currentVarHighlights.filter(h => !frameVarNames.has(h.varName))
       const globalDimRanges = allDimRanges.filter(d => !frameArrayNames.has(d.arrayName))
-      const globalFocusRanges = allFocusRanges.filter(d => !frameArrayNames.has(d.arrayName))
 
       steps.push({
         arrays: globalArrays,
@@ -301,7 +287,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         highlights: globalHighlights,
         varHighlights: globalVarHighlights,
         dimRanges: globalDimRanges,
-        focusRanges: globalFocusRanges,
         variables: globalVars,
         callStack: callStackFrames,
         currentLine: line,
@@ -414,18 +399,17 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           setVar(binding.name, binding.value)
         }
 
-        // Save pointer stack and focus ranges before call body
+        // Save pointer stack and dim ranges before call body
         const savedPointerStack = activePointerStack.splice(0)
-        const savedFocusRanges = new Map(focusRanges)
+        const savedDimRanges = [...dimRanges]
 
         // Execute body
         for (const stmt of proc.body) execNode(stmt)
 
-        // Restore pointer stack and focus ranges after return
+        // Restore pointer stack and dim ranges after return
         activePointerStack.splice(0)
         activePointerStack.push(...savedPointerStack)
-        focusRanges.clear()
-        for (const [k, v] of savedFocusRanges) focusRanges.set(k, v)
+        dimRanges = savedDimRanges
 
         // Cleanup
         popPointers()
@@ -505,7 +489,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'assign': execAssign(node); break
         case 'swap': execSwap(node); break
         case 'dim': execDim(node); break
-        case 'focus': execFocus(node); break
         case 'pointer': execPointer(node); break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
@@ -629,13 +612,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execDim(node: DimNode): void {
       const from = evalExpr(node.from)
       const to = evalExpr(node.to)
-      dimRanges.set(resolveArrayName(node.arrayName), { from, to })
-    }
-
-    function execFocus(node: FocusNode): void {
-      const from = evalExpr(node.from)
-      const to = evalExpr(node.to)
-      focusRanges.set(resolveArrayName(node.arrayName), { from, to })
+      dimRanges.push({ arrayName: resolveArrayName(node.arrayName), from, to })
     }
 
     function execPointer(node: PointerNode): void {

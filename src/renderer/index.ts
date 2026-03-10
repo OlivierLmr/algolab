@@ -52,7 +52,7 @@ export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: num
   // Draw global arrays
   for (const array of step.arrays) {
     arrayYPositions.set(array.name, yOffset)
-    drawArray(ctx, array, step.highlights, step.dimRanges, yOffset, 40, step.focusRanges)
+    drawArray(ctx, array, step.highlights, step.dimRanges, yOffset, 40)
     yOffset += getArrayHeight()
   }
 
