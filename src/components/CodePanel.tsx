@@ -3,15 +3,20 @@ import { assignPointerColors } from '../renderer/colors.ts'
 import { lex } from '../dsl/lexer.ts'
 import { parse } from '../dsl/parser.ts'
 import { stripDirectivePrefix, getDisplayInfo } from '../dsl/preprocess.ts'
-import { getPointerVarNames } from '../dsl/analysis.ts'
+import { collectAllPointerLabels, collectDirectivePointerLabels } from '../dsl/analysis.ts'
 import { useMemo } from 'preact/hooks'
 
-/** Extract pointer variable names from the algorithm source. */
-function extractPointerVarNames(source: string): string[] {
+/** Extract all pointer labels from the algorithm source. */
+function extractPointerLabels(source: string): string[] {
   try {
     const tokens = lex(stripDirectivePrefix(source))
     const ast = parse(tokens)
-    return getPointerVarNames(ast.body)
+    const labels = collectAllPointerLabels(ast.body)
+    const dirLabels = collectDirectivePointerLabels(ast.body)
+    for (const label of dirLabels) {
+      if (!labels.includes(label)) labels.push(label)
+    }
+    return labels
   } catch {
     return []
   }
@@ -56,7 +61,7 @@ export function CodePanel() {
 
   const { displayLines, lineMap, colorMap } = useMemo(() => {
     const info = getDisplayInfo(algo.source)
-    const varNames = extractPointerVarNames(algo.source)
+    const varNames = extractPointerLabels(algo.source)
     return {
       displayLines: info.lines,
       lineMap: info.lineMap,

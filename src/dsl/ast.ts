@@ -152,3 +152,36 @@ export interface CallExpr {
   callee: string
   args: Expr[]
 }
+
+export function exprToString(expr: Expr): string {
+  switch (expr.type) {
+    case 'number': return String(expr.value)
+    case 'identifier': return expr.name
+    case 'binary': {
+      const l = exprToString(expr.left)
+      const r = exprToString(expr.right)
+      const needParensL = expr.left.type === 'binary' && precedence(expr.left.op) < precedence(expr.op)
+      const needParensR = expr.right.type === 'binary' && precedence(expr.right.op) < precedence(expr.op)
+      const ls = needParensL ? `(${l})` : l
+      const rs = needParensR ? `(${r})` : r
+      return `${ls} ${expr.op} ${rs}`
+    }
+    case 'unary':
+      if (expr.op === '-') return `-${exprToString(expr.operand)}`
+      return `${expr.op} ${exprToString(expr.operand)}`
+    case 'index': return `${exprToString(expr.array)}[${exprToString(expr.index)}]`
+    case 'call': return `${expr.callee}(${expr.args.map(exprToString).join(', ')})`
+  }
+}
+
+function precedence(op: string): number {
+  switch (op) {
+    case 'or': return 1
+    case 'and': return 2
+    case '==': case '!=': return 3
+    case '<': case '>': case '<=': case '>=': return 4
+    case '+': case '-': return 5
+    case '*': case '/': case '%': return 6
+    default: return 0
+  }
+}

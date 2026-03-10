@@ -1,42 +1,72 @@
 import type { ASTNode, Expr } from './ast.ts'
+import { exprToString } from './ast.ts'
 
-/** Scan AST for arr[x] patterns to identify pointer variables per array. */
-export function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
-  const pointers = new Map<string, Set<string>>()
+export interface ScopePointer {
+  arrayName: string
+  expr: Expr
+  label: string
+}
 
-  function addPointer(arrayName: string, varName: string): void {
-    if (!pointers.has(arrayName)) pointers.set(arrayName, new Set())
-    pointers.get(arrayName)!.add(varName)
-  }
+/** Scan a body's direct statements for arr[expr] index patterns (not nested block bodies). */
+export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
+  const result: ScopePointer[] = []
+  const seen = new Set<string>()
 
-  function scanExpr(expr: Expr): void {
+  function addFromExpr(expr: Expr): void {
+    if (expr.type === 'index' && expr.array.type === 'identifier') {
+      const arrayName = expr.array.name
+      const label = exprToString(expr.index)
+      const key = `${arrayName}:${label}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push({ arrayName, expr: expr.index, label })
+      }
+    }
+    // Recurse into sub-expressions but not into nested index arrays
     switch (expr.type) {
-      case 'index':
-        if (expr.array.type === 'identifier') {
-          collectIdentsFromExpr(expr.array.name, expr.index)
-        }
-        scanExpr(expr.array)
-        scanExpr(expr.index)
-        break
-      case 'binary':
-        scanExpr(expr.left)
-        scanExpr(expr.right)
-        break
-      case 'unary':
-        scanExpr(expr.operand)
-        break
-      case 'call':
-        expr.args.forEach(scanExpr)
-        break
+      case 'binary': addFromExpr(expr.left); addFromExpr(expr.right); break
+      case 'unary': addFromExpr(expr.operand); break
+      case 'call': expr.args.forEach(addFromExpr); break
+      case 'index': addFromExpr(expr.array); addFromExpr(expr.index); break
     }
   }
 
-  function collectIdentsFromExpr(arrayName: string, expr: Expr): void {
-    if (expr.type === 'identifier') {
-      addPointer(arrayName, expr.name)
-    } else if (expr.type === 'binary') {
-      collectIdentsFromExpr(arrayName, expr.left)
-      collectIdentsFromExpr(arrayName, expr.right)
+  function scanExprs(...exprs: Expr[]): void {
+    exprs.forEach(addFromExpr)
+  }
+
+  for (const stmt of body) {
+    switch (stmt.type) {
+      case 'if': case 'while':
+        scanExprs(stmt.condition)
+        break
+      case 'for':
+        scanExprs(stmt.from, stmt.to)
+        break
+      case 'let': scanExprs(stmt.value); break
+      case 'assign': scanExprs(stmt.target, stmt.value); break
+      case 'swap': scanExprs(stmt.left, stmt.right); break
+      case 'exprStmt': scanExprs(stmt.expr); break
+      case 'def': case 'dim': case 'pointer': case 'comment': case 'alloc': break
+    }
+  }
+
+  return result
+}
+
+/** Full recursive scan for all pointer labels — used for static color pre-assignment. */
+export function collectAllPointerLabels(nodes: ASTNode[]): string[] {
+  const labels = new Set<string>()
+
+  function scanExpr(expr: Expr): void {
+    if (expr.type === 'index' && expr.array.type === 'identifier') {
+      labels.add(exprToString(expr.index))
+    }
+    switch (expr.type) {
+      case 'binary': scanExpr(expr.left); scanExpr(expr.right); break
+      case 'unary': scanExpr(expr.operand); break
+      case 'call': expr.args.forEach(scanExpr); break
+      case 'index': scanExpr(expr.array); scanExpr(expr.index); break
     }
   }
 
@@ -62,7 +92,7 @@ export function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
   }
 
   nodes.forEach(scanNode)
-  return pointers
+  return [...labels]
 }
 
 /** Collect directive pointer labels from AST. */
@@ -81,16 +111,4 @@ export function collectDirectivePointerLabels(nodes: ASTNode[]): string[] {
   }
   nodes.forEach(scan)
   return labels
-}
-
-/** Get all pointer variable names (flat set) from AST nodes. */
-export function getPointerVarNames(nodes: ASTNode[]): string[] {
-  const pointerMap = detectPointers(nodes)
-  const vars = new Set<string>()
-  for (const varSet of pointerMap.values()) {
-    for (const v of varSet) vars.add(v)
-  }
-  const labels = collectDirectivePointerLabels(nodes)
-  for (const label of labels) vars.add(label)
-  return [...vars]
 }

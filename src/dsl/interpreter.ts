@@ -6,21 +6,20 @@ import { lex } from './lexer.ts'
 import { parse as parseSource } from './parser.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
-import { detectPointers, collectDirectivePointerLabels } from './analysis.ts'
+import { collectScopePointers, collectAllPointerLabels, collectDirectivePointerLabels } from './analysis.ts'
+import type { ScopePointer } from './analysis.ts'
 
 /**
  * Create a runner for the given algorithm AST.
  * Returns a function that takes input arrays and produces Step[].
  */
 export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => Step[] {
-  const pointerMap = detectPointers(algo.body)
-  const allPointerVars = new Set<string>()
-  for (const vars of pointerMap.values()) {
-    for (const v of vars) allPointerVars.add(v)
-  }
+  const allLabels = collectAllPointerLabels(algo.body)
   const directiveLabels = collectDirectivePointerLabels(algo.body)
-  for (const label of directiveLabels) allPointerVars.add(label)
-  const colorMap = assignPointerColors([...allPointerVars])
+  for (const label of directiveLabels) {
+    if (!allLabels.includes(label)) allLabels.push(label)
+  }
+  const colorMap = assignPointerColors(allLabels)
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
@@ -32,6 +31,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
     const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
+    const activePointerStack: ScopePointer[][] = []
     let pendingComment: string | null = null
 
     for (const [name, values] of input) {
@@ -62,6 +62,44 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function popScope(): void {
       scopeStack.pop()
+    }
+
+    function pushPointers(body: ASTNode[]): void {
+      activePointerStack.push(collectScopePointers(body))
+    }
+
+    function popPointers(): void {
+      activePointerStack.pop()
+    }
+
+    function collectVarNames(expr: Expr, out: Set<string>): void {
+      switch (expr.type) {
+        case 'identifier': out.add(expr.name); break
+        case 'binary': collectVarNames(expr.left, out); collectVarNames(expr.right, out); break
+        case 'unary': collectVarNames(expr.operand, out); break
+        case 'index': collectVarNames(expr.array, out); collectVarNames(expr.index, out); break
+        case 'call': expr.args.forEach(a => collectVarNames(a, out)); break
+      }
+    }
+
+    function isActivePointerVar(name: string): boolean {
+      for (const level of activePointerStack) {
+        for (const entry of level) {
+          if (exprContainsVar(entry.expr, name)) return true
+        }
+      }
+      return false
+    }
+
+    function exprContainsVar(expr: Expr, name: string): boolean {
+      switch (expr.type) {
+        case 'identifier': return expr.name === name
+        case 'binary': return exprContainsVar(expr.left, name) || exprContainsVar(expr.right, name)
+        case 'unary': return exprContainsVar(expr.operand, name)
+        case 'index': return exprContainsVar(expr.array, name) || exprContainsVar(expr.index, name)
+        case 'call': return expr.args.some(a => exprContainsVar(a, name))
+        case 'number': return false
+      }
     }
 
     function evalExprString(exprStr: string): number {
@@ -109,27 +147,36 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
 
       const pointers: Pointer[] = []
-      for (const [arrayName, varNames] of pointerMap) {
-        for (const varName of varNames) {
-          if (hasVar(varName)) {
+      const seenPointers = new Set<string>()
+      const activePointerVarNames = new Set<string>()
+      for (const level of activePointerStack) {
+        for (const entry of level) {
+          const key = `${entry.arrayName}:${entry.label}`
+          if (seenPointers.has(key)) continue
+          try {
+            const index = evalExpr(entry.expr)
+            seenPointers.add(key)
             pointers.push({
-              name: varName,
-              arrayName,
-              index: getVar(varName)!,
-              color: colorMap.get(varName) || '#888',
+              name: entry.label,
+              arrayName: entry.arrayName,
+              index,
+              color: colorMap.get(entry.label) || '#888',
             })
-          }
+            collectVarNames(entry.expr, activePointerVarNames)
+          } catch { /* variable not yet defined — skip */ }
         }
       }
 
       for (const [label, def] of directivePointers) {
-        const index = evalExpr(def.expr)
-        pointers.push({
-          name: label,
-          arrayName: def.arrayName,
-          index,
-          color: colorMap.get(label) || '#888',
-        })
+        try {
+          const index = evalExpr(def.expr)
+          pointers.push({
+            name: label,
+            arrayName: def.arrayName,
+            index,
+            color: colorMap.get(label) || '#888',
+          })
+        } catch { /* skip */ }
       }
 
       const variables: Record<string, number> = {}
@@ -229,10 +276,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         if (++callDepth > 1000) throw new Error('Max recursion depth exceeded')
         const argValues = args.map(a => evalExpr(a))
         pushScope()
+        pushPointers(proc.body)
         for (let i = 0; i < proc.params.length; i++) {
           setVar(proc.params[i], argValues[i])
         }
         for (const stmt of proc.body) execNode(stmt)
+        popPointers()
         popScope()
         callDepth--
         return 0
@@ -309,7 +358,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'def': execDef(node); break
         case 'exprStmt':
           if (node.expr.type === 'call' && procedures.has(node.expr.callee)) {
-            evalExpr(node.expr)
+            const call = node.expr
+            const argVals = call.args.map(a => evalExpr(a))
+            snapshot(node.line, `Call ${call.callee}(${argVals.join(', ')})`)
+            evalCall(call.callee, call.args)
           } else {
             evalExpr(node.expr)
             snapshot(node.line, '')
@@ -322,15 +374,18 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
       if (toVal - fromVal > 10000) throw new Error('For loop range too large')
+      pushPointers(node.body)
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
+      popPointers()
     }
 
     function execWhile(node: WhileNode): void {
       let guard = 0
+      pushPointers(node.body)
       while (evalExpr(node.condition) !== 0) {
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -338,6 +393,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         if (++guard > 10000) throw new Error('Infinite loop detected')
       }
       snapshot(node.line, 'While condition is false')
+      popPointers()
     }
 
     function execIf(node: IfNode): void {
@@ -353,16 +409,20 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       snapshot(node.line, desc)
 
       if (cond !== 0) {
+        pushPointers(node.body)
         for (const stmt of node.body) execNode(stmt)
+        popPointers()
       } else if (node.elseBody.length > 0) {
+        pushPointers(node.elseBody)
         for (const stmt of node.elseBody) execNode(stmt)
+        popPointers()
       }
     }
 
     function execLet(node: LetNode): void {
       const val = evalExpr(node.value)
       setVar(node.name, val)
-      if (!allPointerVars.has(node.name)) {
+      if (!isActivePointerVar(node.name)) {
         currentVarHighlights.push({ varName: node.name, type: 'active' })
       }
       if (node.value.type === 'index' && node.value.array.type === 'identifier') {
@@ -377,7 +437,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
         setVar(node.target.name, val)
-        if (!allPointerVars.has(node.target.name)) {
+        if (!isActivePointerVar(node.target.name)) {
           currentVarHighlights.push({ varName: node.target.name, type: 'active' })
         }
         snapshot(node.line, `Set ${node.target.name} = ${val}`)
@@ -387,7 +447,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         arr[idx] = val
         const arrayName = getArrayName(node.target.array)
         currentHighlights = [{ arrayName, indices: [idx], type: 'active' }]
-        if (node.value.type === 'identifier' && !allPointerVars.has(node.value.name)) {
+        if (node.value.type === 'identifier' && !isActivePointerVar(node.value.name)) {
           currentVarHighlights.push({ varName: node.value.name, type: 'active' })
         }
         snapshot(node.line, `Set ${arrayName}[${idx}] = ${val}`)
@@ -439,9 +499,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
 
     // Execute
+    pushPointers(algo.body)
     snapshot(algo.line, `Start ${algo.name}`)
     for (const stmt of algo.body) execNode(stmt)
     snapshot(algo.body[algo.body.length - 1].line, 'Done')
+    popPointers()
 
     return steps
   }
