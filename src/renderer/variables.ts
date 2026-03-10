@@ -10,11 +10,12 @@ export function drawVariables(
   varHighlights: VarHighlight[],
   pointerNames: Set<string>,
   yOffset: number,
+  xOffset: number = 40,
 ): void {
   const displayVars = Object.entries(variables).filter(([name]) => !pointerNames.has(name))
   if (displayVars.length === 0) return
 
-  const startX = 40
+  const startX = xOffset
   let x = startX
 
   for (const [name, value] of displayVars) {

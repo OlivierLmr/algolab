@@ -321,6 +321,12 @@ export function parse(tokens: Token[]): AlgoNode {
       return { type: 'number', value: parseInt(tok.value, 10) }
     }
 
+    // Infinity
+    if (tok.type === 'keyword' && tok.value === 'inf') {
+      advance()
+      return { type: 'number', value: Infinity }
+    }
+
     // Parenthesized expression
     if (tok.type === 'paren' && tok.value === '(') {
       advance()

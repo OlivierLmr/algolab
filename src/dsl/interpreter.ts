@@ -4,7 +4,7 @@ import type {
 } from './ast.ts'
 import { lex } from './lexer.ts'
 import { parse as parseSource } from './parser.ts'
-import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
+import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange, CallFrame } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { collectScopePointers, collectAllPointerLabels, collectDirectivePointerLabels } from './analysis.ts'
 import type { ScopePointer } from './analysis.ts'
@@ -27,6 +27,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     const scopeStack: Map<string, number>[] = [new Map()]
     const procedures = new Map<string, { params: string[]; body: ASTNode[] }>()
     let callDepth = 0
+
+    interface ActiveFrame {
+      name: string
+      args: number[]
+      allocatedArrays: Set<string>
+    }
+    const callFrameStack: ActiveFrame[] = []
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
@@ -141,12 +148,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         pendingComment = null
       }
 
-      const trackedArrays: TrackedArray[] = []
-      for (const [name, values] of arrays) {
-        trackedArrays.push({ name, values: [...values] })
-      }
-
-      const pointers: Pointer[] = []
+      // Collect all pointers
+      const allPointers: Pointer[] = []
       const seenPointers = new Set<string>()
       const activePointerVarNames = new Set<string>()
       for (const level of activePointerStack) {
@@ -156,7 +159,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           try {
             const index = evalExpr(entry.expr)
             seenPointers.add(key)
-            pointers.push({
+            allPointers.push({
               name: entry.label,
               arrayName: entry.arrayName,
               index,
@@ -170,7 +173,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       for (const [label, def] of directivePointers) {
         try {
           const index = evalExpr(def.expr)
-          pointers.push({
+          allPointers.push({
             name: label,
             arrayName: def.arrayName,
             index,
@@ -179,25 +182,95 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         } catch { /* skip */ }
       }
 
-      const variables: Record<string, number> = {}
-      for (const scope of scopeStack) {
-        for (const [k, v] of scope) {
-          variables[k] = v
+      // Collect all dim ranges
+      const allDimRanges: DimRange[] = []
+      for (const [arrayName, range] of dimRanges) {
+        allDimRanges.push({ arrayName, from: range.from, to: range.to })
+      }
+
+      // Build call stack frames
+      const frameArrayNames = new Set<string>()
+      const frameVarNames = new Set<string>()
+      const callStackFrames: CallFrame[] = []
+
+      if (callFrameStack.length > 0) {
+        for (let fi = 0; fi < callFrameStack.length; fi++) {
+          const af = callFrameStack[fi]
+          const label = `${af.name}(${af.args.join(', ')})`
+
+          // Frame's variables come from scopeStack[fi + 1]
+          const frameVars: Record<string, number> = {}
+          const scopeIndex = fi + 1
+          if (scopeIndex < scopeStack.length) {
+            for (const [k, v] of scopeStack[scopeIndex]) {
+              frameVars[k] = v
+              frameVarNames.add(k)
+            }
+          }
+
+          // Frame's arrays
+          const frameArrays: TrackedArray[] = []
+          for (const arrName of af.allocatedArrays) {
+            const arr = arrays.get(arrName)
+            if (arr) {
+              frameArrays.push({ name: arrName, values: [...arr] })
+              frameArrayNames.add(arrName)
+            }
+          }
+
+          // Filter pointers for this frame's arrays
+          const framePointers = allPointers.filter(p => af.allocatedArrays.has(p.arrayName))
+          // Filter highlights for this frame's arrays
+          const frameHighlights = currentHighlights.filter(h => af.allocatedArrays.has(h.arrayName))
+          // Filter var highlights for this frame's variables
+          const frameVarHighlights = currentVarHighlights.filter(h => h.varName in frameVars)
+          // Filter dim ranges for this frame's arrays
+          const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
+
+          callStackFrames.push({
+            label,
+            variables: frameVars,
+            arrays: frameArrays,
+            pointers: framePointers,
+            highlights: frameHighlights,
+            varHighlights: frameVarHighlights,
+            dimRanges: frameDimRanges,
+          })
         }
       }
 
-      const dimRangeList: DimRange[] = []
-      for (const [arrayName, range] of dimRanges) {
-        dimRangeList.push({ arrayName, from: range.from, to: range.to })
+      // Global arrays: not owned by any frame
+      const globalArrays: TrackedArray[] = []
+      for (const [name, values] of arrays) {
+        if (!frameArrayNames.has(name)) {
+          globalArrays.push({ name, values: [...values] })
+        }
       }
 
+      // Global variables: from scopeStack[0] (and not in any frame)
+      const globalVars: Record<string, number> = {}
+      for (const scope of scopeStack) {
+        for (const [k, v] of scope) {
+          if (!frameVarNames.has(k)) {
+            globalVars[k] = v
+          }
+        }
+      }
+
+      // Global pointers/highlights/dimRanges: not belonging to any frame's arrays
+      const globalPointers = allPointers.filter(p => !frameArrayNames.has(p.arrayName))
+      const globalHighlights = currentHighlights.filter(h => !frameArrayNames.has(h.arrayName))
+      const globalVarHighlights = currentVarHighlights.filter(h => !frameVarNames.has(h.varName))
+      const globalDimRanges = allDimRanges.filter(d => !frameArrayNames.has(d.arrayName))
+
       steps.push({
-        arrays: trackedArrays,
-        pointers,
-        highlights: [...currentHighlights],
-        varHighlights: [...currentVarHighlights],
-        dimRanges: dimRangeList,
-        variables,
+        arrays: globalArrays,
+        pointers: globalPointers,
+        highlights: globalHighlights,
+        varHighlights: globalVarHighlights,
+        dimRanges: globalDimRanges,
+        variables: globalVars,
+        callStack: callStackFrames,
         currentLine: line,
         description,
       })
@@ -275,6 +348,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (proc) {
         if (++callDepth > 1000) throw new Error('Max recursion depth exceeded')
         const argValues = args.map(a => evalExpr(a))
+        const frame: ActiveFrame = { name, args: argValues, allocatedArrays: new Set() }
+        callFrameStack.push(frame)
         pushScope()
         pushPointers(proc.body)
         for (let i = 0; i < proc.params.length; i++) {
@@ -283,6 +358,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         for (const stmt of proc.body) execNode(stmt)
         popPointers()
         popScope()
+        // Clean up arrays allocated by this frame
+        for (const arrName of frame.allocatedArrays) {
+          arrays.delete(arrName)
+        }
+        callFrameStack.pop()
         callDepth--
         return 0
       }
@@ -478,6 +558,9 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execAlloc(node: AllocNode): void {
       const size = evalExpr(node.size)
       arrays.set(node.arrayName, new Array(size).fill(0))
+      if (callFrameStack.length > 0) {
+        callFrameStack[callFrameStack.length - 1].allocatedArrays.add(node.arrayName)
+      }
     }
 
     function execDef(node: DefNode): void {

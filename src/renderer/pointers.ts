@@ -7,8 +7,9 @@ export function drawPointers(
   ctx: CanvasRenderingContext2D,
   pointers: Pointer[],
   arrayYPositions: Map<string, number>,
+  xOffset: number = 40,
 ): void {
-  const startX = 40
+  const startX = xOffset
 
   // Group pointers by array, sort by index for label stacking
   const grouped = new Map<string, Pointer[]>()

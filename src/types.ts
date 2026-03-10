@@ -27,6 +27,16 @@ export interface DimRange {
   to: number
 }
 
+export interface CallFrame {
+  label: string
+  variables: Record<string, number>
+  arrays: TrackedArray[]
+  pointers: Pointer[]
+  highlights: Highlight[]
+  varHighlights: VarHighlight[]
+  dimRanges: DimRange[]
+}
+
 export interface Step {
   arrays: TrackedArray[]
   pointers: Pointer[]
@@ -34,6 +44,7 @@ export interface Step {
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
   variables: Record<string, number>
+  callStack: CallFrame[]
   currentLine: number
   description: string
 }

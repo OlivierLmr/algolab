@@ -12,9 +12,10 @@ export function drawArray(
   highlights: Highlight[],
   dimRanges: DimRange[],
   yOffset: number,
+  xOffset: number = 40,
 ): void {
   const { name, values } = array
-  const startX = 40
+  const startX = xOffset
 
   // Array label
   ctx.fillStyle = '#333'
@@ -53,7 +54,8 @@ export function drawArray(
     ctx.font = 'bold 18px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(values[i]), x + CELL_SIZE / 2, y + CELL_SIZE / 2)
+    const displayVal = values[i] === Infinity ? '∞' : String(values[i])
+    ctx.fillText(displayVal, x + CELL_SIZE / 2, y + CELL_SIZE / 2)
 
     // Index label below
     ctx.fillStyle = '#999'
