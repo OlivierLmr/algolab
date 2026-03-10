@@ -414,13 +414,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           setVar(binding.name, binding.value)
         }
 
-        // Save focus ranges before call body
+        // Save pointer stack and focus ranges before call body
+        const savedPointerStack = activePointerStack.splice(0)
         const savedFocusRanges = new Map(focusRanges)
 
         // Execute body
         for (const stmt of proc.body) execNode(stmt)
 
-        // Restore focus ranges after return
+        // Restore pointer stack and focus ranges after return
+        activePointerStack.splice(0)
+        activePointerStack.push(...savedPointerStack)
         focusRanges.clear()
         for (const [k, v] of savedFocusRanges) focusRanges.set(k, v)
 
