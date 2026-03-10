@@ -7,17 +7,25 @@ export const algorithmList = algorithms
 
 export const currentAlgoIndex = signal(0)
 export const currentStepIndex = signal(0)
+export const inputText = signal(algorithms[0].defaultInput.join(', '))
 
 export const currentAlgo = computed<AlgorithmDefinition>(
   () => algorithmList[currentAlgoIndex.value]
 )
 
+const parsedInput = computed<number[]>(() => {
+  const nums = inputText.value
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => !Number.isNaN(n))
+  return nums.length > 0 ? nums : currentAlgo.value.defaultInput
+})
+
 export const steps = computed<Step[]>(() => {
   const algo = currentAlgo.value
-  // Extract first param name from source (the array param)
   const match = algo.source.match(/algo \w+\((\w+):/)
   const paramName = match ? match[1] : 'arr'
-  return runAlgorithm(algo.source, paramName, algo.defaultInput)
+  return runAlgorithm(algo.source, paramName, parsedInput.value)
 })
 
 export const currentStep = computed<Step>(
@@ -29,6 +37,7 @@ export const totalSteps = computed(() => steps.value.length)
 export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
+  inputText.value = algorithmList[index].defaultInput.join(', ')
 }
 
 export function nextStep(): void {

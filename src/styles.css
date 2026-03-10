@@ -27,12 +27,23 @@ body {
   font-size: 1.4rem;
 }
 
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header input[type="text"],
 .header select {
   padding: 6px 12px;
   font-size: 14px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
+}
+
+.header input[type="text"] {
+  width: 180px;
 }
 
 .main-layout {
