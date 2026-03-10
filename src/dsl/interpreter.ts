@@ -222,8 +222,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           const framePointers = allPointers.filter(p => af.allocatedArrays.has(p.arrayName))
           // Filter highlights for this frame's arrays
           const frameHighlights = currentHighlights.filter(h => af.allocatedArrays.has(h.arrayName))
-          // Filter var highlights for this frame's variables
-          const frameVarHighlights = currentVarHighlights.filter(h => h.varName in frameVars)
+          // Only highlight variables in the innermost (currently executing) frame
+          const isInnermostFrame = fi === callFrameStack.length - 1
+          const frameVarHighlights = isInnermostFrame
+            ? currentVarHighlights.filter(h => h.varName in frameVars)
+            : []
           // Filter dim ranges for this frame's arrays
           const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
 
