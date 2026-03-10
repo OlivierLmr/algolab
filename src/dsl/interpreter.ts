@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode, DefNode,
   Expr,
 } from './ast.ts'
 import { lex } from './lexer.ts'
@@ -7,11 +7,6 @@ import { parse as parseSource } from './parser.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { detectPointers, collectDirectivePointerLabels } from './analysis.ts'
-
-interface Env {
-  arrays: Map<string, number[]>
-  vars: Map<string, number>
-}
 
 /**
  * Create a runner for the given algorithm AST.
@@ -29,7 +24,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
-    const env: Env = { arrays: new Map(), vars: new Map() }
+    const arrays = new Map<string, number[]>()
+    const scopeStack: Map<string, number>[] = [new Map()]
+    const procedures = new Map<string, { params: string[]; body: ASTNode[] }>()
+    let callDepth = 0
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
@@ -37,7 +35,33 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     let pendingComment: string | null = null
 
     for (const [name, values] of input) {
-      env.arrays.set(name, [...values])
+      arrays.set(name, [...values])
+    }
+
+    function getVar(name: string): number | undefined {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        if (scopeStack[i].has(name)) return scopeStack[i].get(name)
+      }
+      return undefined
+    }
+
+    function setVar(name: string, value: number): void {
+      scopeStack[scopeStack.length - 1].set(name, value)
+    }
+
+    function hasVar(name: string): boolean {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        if (scopeStack[i].has(name)) return true
+      }
+      return false
+    }
+
+    function pushScope(): void {
+      scopeStack.push(new Map())
+    }
+
+    function popScope(): void {
+      scopeStack.pop()
     }
 
     function evalExprString(exprStr: string): number {
@@ -79,19 +103,19 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         pendingComment = null
       }
 
-      const arrays: TrackedArray[] = []
-      for (const [name, values] of env.arrays) {
-        arrays.push({ name, values: [...values] })
+      const trackedArrays: TrackedArray[] = []
+      for (const [name, values] of arrays) {
+        trackedArrays.push({ name, values: [...values] })
       }
 
       const pointers: Pointer[] = []
       for (const [arrayName, varNames] of pointerMap) {
         for (const varName of varNames) {
-          if (env.vars.has(varName)) {
+          if (hasVar(varName)) {
             pointers.push({
               name: varName,
               arrayName,
-              index: env.vars.get(varName)!,
+              index: getVar(varName)!,
               color: colorMap.get(varName) || '#888',
             })
           }
@@ -109,8 +133,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
 
       const variables: Record<string, number> = {}
-      for (const [k, v] of env.vars) {
-        variables[k] = v
+      for (const scope of scopeStack) {
+        for (const [k, v] of scope) {
+          variables[k] = v
+        }
       }
 
       const dimRangeList: DimRange[] = []
@@ -119,7 +145,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
 
       steps.push({
-        arrays,
+        arrays: trackedArrays,
         pointers,
         highlights: [...currentHighlights],
         varHighlights: [...currentVarHighlights],
@@ -136,7 +162,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       switch (expr.type) {
         case 'number': return expr.value
         case 'identifier': {
-          const val = env.vars.get(expr.name)
+          const val = getVar(expr.name)
           if (val === undefined) throw new Error(`Undefined variable: ${expr.name}`)
           return val
         }
@@ -192,17 +218,31 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (name === 'len') {
         const arg = args[0]
         if (arg.type === 'identifier') {
-          const arr = env.arrays.get(arg.name)
+          const arr = arrays.get(arg.name)
           if (arr) return arr.length
         }
         throw new Error(`len() expects an array identifier`)
+      }
+      // User-defined procedure call
+      const proc = procedures.get(name)
+      if (proc) {
+        if (++callDepth > 1000) throw new Error('Max recursion depth exceeded')
+        const argValues = args.map(a => evalExpr(a))
+        pushScope()
+        for (let i = 0; i < proc.params.length; i++) {
+          setVar(proc.params[i], argValues[i])
+        }
+        for (const stmt of proc.body) execNode(stmt)
+        popScope()
+        callDepth--
+        return 0
       }
       throw new Error(`Unknown function: ${name}`)
     }
 
     function getArray(expr: Expr): number[] {
       if (expr.type === 'identifier') {
-        const arr = env.arrays.get(expr.name)
+        const arr = arrays.get(expr.name)
         if (!arr) throw new Error(`Undefined array: ${expr.name}`)
         return arr
       }
@@ -218,7 +258,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (expr.type === 'index' && expr.array.type === 'identifier') {
         const arrName = expr.array.name
         const idx = evalExpr(expr.index)
-        const arr = env.arrays.get(arrName)
+        const arr = arrays.get(arrName)
         const val = arr ? arr[idx] : '?'
         return `${arrName}[${idx}]=${val}`
       }
@@ -248,7 +288,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           } else {
             currentHighlights.push({ arrayName, indices: [idx], type: 'compare' })
           }
-        } else if (expr.type === 'identifier' && env.vars.has(expr.name)) {
+        } else if (expr.type === 'identifier' && hasVar(expr.name)) {
           currentVarHighlights.push({ varName: expr.name, type: 'compare' })
         }
       } catch { /* skip */ }
@@ -266,9 +306,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'pointer': execPointer(node); break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
+        case 'def': execDef(node); break
         case 'exprStmt':
-          evalExpr(node.expr)
-          snapshot(node.line, '')
+          if (node.expr.type === 'call' && procedures.has(node.expr.callee)) {
+            evalExpr(node.expr)
+          } else {
+            evalExpr(node.expr)
+            snapshot(node.line, '')
+          }
           break
       }
     }
@@ -278,7 +323,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const toVal = evalExpr(node.to)
       if (toVal - fromVal > 10000) throw new Error('For loop range too large')
       for (let i = fromVal; i <= toVal; i++) {
-        env.vars.set(node.variable, i)
+        setVar(node.variable, i)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
@@ -316,7 +361,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execLet(node: LetNode): void {
       const val = evalExpr(node.value)
-      env.vars.set(node.name, val)
+      setVar(node.name, val)
       if (!allPointerVars.has(node.name)) {
         currentVarHighlights.push({ varName: node.name, type: 'active' })
       }
@@ -331,7 +376,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execAssign(node: AssignNode): void {
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
-        env.vars.set(node.target.name, val)
+        setVar(node.target.name, val)
         if (!allPointerVars.has(node.target.name)) {
           currentVarHighlights.push({ varName: node.target.name, type: 'active' })
         }
@@ -365,7 +410,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execAlloc(node: AllocNode): void {
       const size = evalExpr(node.size)
-      env.arrays.set(node.arrayName, new Array(size).fill(0))
+      arrays.set(node.arrayName, new Array(size).fill(0))
+    }
+
+    function execDef(node: DefNode): void {
+      procedures.set(node.name, { params: node.params, body: node.body })
     }
 
     function execSwap(node: SwapNode): void {

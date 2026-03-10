@@ -57,6 +57,7 @@ export function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
       case 'pointer': break
       case 'comment': break
       case 'alloc': break
+      case 'def': node.body.forEach(scanNode); break
     }
   }
 
@@ -74,6 +75,7 @@ export function collectDirectivePointerLabels(nodes: ASTNode[]): string[] {
       case 'for': node.body.forEach(scan); break
       case 'while': node.body.forEach(scan); break
       case 'if': node.body.forEach(scan); node.elseBody.forEach(scan); break
+      case 'def': node.body.forEach(scan); break
       default: break
     }
   }

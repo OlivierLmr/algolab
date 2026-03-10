@@ -11,6 +11,7 @@ export type ASTNode =
   | PointerNode
   | CommentNode
   | AllocNode
+  | DefNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -97,6 +98,14 @@ export interface AllocNode {
   type: 'alloc'
   arrayName: string
   size: Expr
+  line: number
+}
+
+export interface DefNode {
+  type: 'def'
+  name: string
+  params: string[]
+  body: ASTNode[]
   line: number
 }
 

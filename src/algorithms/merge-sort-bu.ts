@@ -2,44 +2,45 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const mergeSortBU: AlgorithmDefinition = {
   name: 'Merge Sort (two arrays)',
-  source: `algo MergeSortBU(arr: int[])
+  source: `algo MergeSortAux(arr: int[])
   alloc aux len(arr)
-  let size = 1
-  while size < len(arr)
-    #: comment "Copying arr to aux before merging runs of size {size}"
-    let ci = 0
-    while ci < len(arr)
-      aux[ci] = arr[ci]
-      ci = ci + 1
-    let start = 0
-    while start < len(arr)
-      let mid = start + size
-      if mid < len(arr)
-        let end = mid + size
-        if end > len(arr)
-          end = len(arr)
-        let i = start
-        let j = mid
-        let k = start
-        #: comment "Merging aux[{start}..{mid - 1}] and aux[{mid}..{end - 1}] into arr"
-        while i < mid and j < end
-          #: comment "{aux[i]} <= {aux[j]}? {aux[i] <= aux[j] ? 'Take from left' : 'Take from right'}"
-          if aux[i] <= aux[j]
-            arr[k] = aux[i]
-            i = i + 1
-          else
-            arr[k] = aux[j]
-            j = j + 1
-          k = k + 1
-        while i < mid
-          arr[k] = aux[i]
-          i = i + 1
-          k = k + 1
-        while j < end
-          arr[k] = aux[j]
-          j = j + 1
-          k = k + 1
-      start = start + size + size
-    size = size * 2`,
+
+  def merge(lo, mid, hi)
+    let i = lo
+    #: comment "Copying arr[{lo}..{hi}] to aux"
+    while i <= hi
+      aux[i] = arr[i]
+      i = i + 1
+    let i = lo
+    let j = mid + 1
+    let k = lo
+    #: comment "Merging aux[{lo}..{mid}] and aux[{mid + 1}..{hi}] into arr"
+    while i <= mid and j <= hi
+      if aux[i] <= aux[j]
+        arr[k] = aux[i]
+        i = i + 1
+      else
+        arr[k] = aux[j]
+        j = j + 1
+      k = k + 1
+    while i <= mid
+      arr[k] = aux[i]
+      i = i + 1
+      k = k + 1
+    while j <= hi
+      arr[k] = aux[j]
+      j = j + 1
+      k = k + 1
+
+  def msort(lo, hi)
+    if lo < hi
+      let mid = (lo + hi) / 2
+      #: comment "Sorting left half arr[{lo}..{mid}]"
+      msort(lo, mid)
+      #: comment "Sorting right half arr[{mid + 1}..{hi}]"
+      msort(mid + 1, hi)
+      merge(lo, mid, hi)
+
+  msort(0, len(arr) - 1)`,
   defaultInput: [5, 3, 8, 1, 2],
 }
