@@ -56,6 +56,7 @@ export function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
       case 'dim': break
       case 'pointer': break
       case 'comment': break
+      case 'alloc': break
     }
   }
 

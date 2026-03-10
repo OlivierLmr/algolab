@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode,
   Expr,
 } from './ast.ts'
 import { lex } from './lexer.ts'
@@ -265,6 +265,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'dim': execDim(node); break
         case 'pointer': execPointer(node); break
         case 'comment': execComment(node); break
+        case 'alloc': execAlloc(node); break
         case 'exprStmt':
           evalExpr(node.expr)
           snapshot(node.line, '')
@@ -360,6 +361,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execComment(node: CommentNode): void {
       pendingComment = node.text
+    }
+
+    function execAlloc(node: AllocNode): void {
+      const size = evalExpr(node.size)
+      env.arrays.set(node.arrayName, new Array(size).fill(0))
     }
 
     function execSwap(node: SwapNode): void {

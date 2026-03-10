@@ -10,6 +10,7 @@ export type ASTNode =
   | DimNode
   | PointerNode
   | CommentNode
+  | AllocNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -89,6 +90,13 @@ export interface PointerNode {
 export interface CommentNode {
   type: 'comment'
   text: string
+  line: number
+}
+
+export interface AllocNode {
+  type: 'alloc'
+  arrayName: string
+  size: Expr
   line: number
 }
 
