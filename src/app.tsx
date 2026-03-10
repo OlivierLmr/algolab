@@ -4,7 +4,7 @@ import { Header } from './components/Header.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
-import { currentStep, nextStep, prevStep } from './state.ts'
+import { currentStep, recentDescriptions, nextStep, prevStep } from './state.ts'
 
 export function App() {
   const step = currentStep.value
@@ -29,7 +29,10 @@ export function App() {
       </div>
       <Controls />
       <div class="description">
-        {step?.description || ''}
+        {recentDescriptions.value.map((d) => (
+          <div class="description-previous">{d}</div>
+        ))}
+        <div class="description-current">{step?.description || ''}</div>
       </div>
     </>
   )

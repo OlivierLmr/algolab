@@ -34,6 +34,16 @@ export const currentStep = computed<Step>(
 
 export const totalSteps = computed(() => steps.value.length)
 
+export const recentDescriptions = computed<string[]>(() => {
+  const idx = currentStepIndex.value
+  const all = steps.value
+  const result: string[] = []
+  for (let i = Math.max(0, idx - 3); i < idx; i++) {
+    if (all[i].description) result.push(all[i].description)
+  }
+  return result
+})
+
 export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
