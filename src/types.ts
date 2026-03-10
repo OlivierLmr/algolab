@@ -30,6 +30,7 @@ export interface DimRange {
 export interface CallFrame {
   label: string
   variables: Record<string, number>
+  arrayRefs: { paramName: string; targetName: string }[]
   arrays: TrackedArray[]
   pointers: Pointer[]
   highlights: Highlight[]

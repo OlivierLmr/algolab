@@ -187,10 +187,21 @@ export function parse(tokens: Token[]): AlgoNode {
     const tok = expect('keyword', 'def')
     const name = expect('ident').value
     expect('paren', '(')
-    const params: string[] = []
+    const params: { name: string; paramType?: string }[] = []
     while (!match('paren', ')')) {
       if (params.length > 0) expect('comma')
-      params.push(expect('ident').value)
+      const pName = expect('ident').value
+      let pType: string | undefined
+      if (match('colon')) {
+        advance()
+        pType = expect('ident').value
+        if (match('bracket', '[')) {
+          advance()
+          expect('bracket', ']')
+          pType += '[]'
+        }
+      }
+      params.push({ name: pName, paramType: pType })
     }
     expect('paren', ')')
     skipNewlines()

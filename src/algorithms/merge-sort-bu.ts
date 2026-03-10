@@ -5,28 +5,28 @@ export const mergeSortBU: AlgorithmDefinition = {
   source: `algo MergeSortAux(arr: int[])
   alloc aux len(arr)
 
-  def merge(lo, mid, hi)
-    #: comment "Copying arr[{lo}..{hi}] to aux"
-    for i from lo to hi
-      aux[i] = arr[i]
+  def merge(src: int[], dst: int[], lo, mid, hi)
     let i = lo
     let j = mid + 1
-    #: comment "Merging aux[{lo}..{mid}] and aux[{mid + 1}..{hi}] into arr"
     for k from lo to hi
-      if i <= mid and (j > hi or aux[i] <= aux[j])
-        arr[k] = aux[i]
+      if i <= mid and (j > hi or src[i] <= src[j])
+        dst[k] = src[i]
         i = i + 1
       else
-        arr[k] = aux[j]
+        dst[k] = src[j]
         j = j + 1
 
-  def msort(lo, hi)
+  def msort(src: int[], dst: int[], lo, hi)
     if lo < hi
       let mid = lo + (hi - lo) / 2
-      msort(lo, mid)
-      msort(mid + 1, hi)
-      merge(lo, mid, hi)
+      msort(dst, src, lo, mid)
+      msort(dst, src, mid + 1, hi)
+      merge(src, dst, lo, mid, hi)
+    else
+      dst[lo] = src[lo]
 
-  msort(0, len(arr) - 1)`,
+  for i from 0 to len(arr) - 1
+    aux[i] = arr[i]
+  msort(aux, arr, 0, len(arr) - 1)`,
   defaultInput: [5, 3, 8, 1, 2],
 }

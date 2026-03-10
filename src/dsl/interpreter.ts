@@ -25,15 +25,26 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     const steps: Step[] = []
     const arrays = new Map<string, number[]>()
     const scopeStack: Map<string, number>[] = [new Map()]
-    const procedures = new Map<string, { params: string[]; body: ASTNode[] }>()
+    const procedures = new Map<string, { params: { name: string; paramType?: string }[]; body: ASTNode[] }>()
     let callDepth = 0
 
     interface ActiveFrame {
       name: string
-      args: number[]
+      argStrings: string[]
       allocatedArrays: Set<string>
+      arrayAliases: Map<string, string>
     }
     const callFrameStack: ActiveFrame[] = []
+    const arrayAliasStack: Map<string, string>[] = []
+
+    function resolveArrayName(name: string): string {
+      for (let i = arrayAliasStack.length - 1; i >= 0; i--) {
+        if (arrayAliasStack[i].has(name)) {
+          return resolveArrayName(arrayAliasStack[i].get(name)!)
+        }
+      }
+      return name
+    }
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
@@ -154,14 +165,15 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const activePointerVarNames = new Set<string>()
       for (const level of activePointerStack) {
         for (const entry of level) {
-          const key = `${entry.arrayName}:${entry.label}`
+          const resolvedArrayName = resolveArrayName(entry.arrayName)
+          const key = `${resolvedArrayName}:${entry.label}`
           if (seenPointers.has(key)) continue
           try {
             const index = evalExpr(entry.expr)
             seenPointers.add(key)
             allPointers.push({
               name: entry.label,
-              arrayName: entry.arrayName,
+              arrayName: resolvedArrayName,
               index,
               color: colorMap.get(entry.label) || '#888',
             })
@@ -196,7 +208,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (callFrameStack.length > 0) {
         for (let fi = 0; fi < callFrameStack.length; fi++) {
           const af = callFrameStack[fi]
-          const label = `${af.name}(${af.args.join(', ')})`
+          const label = `${af.name}(${af.argStrings.join(', ')})`
+
+          // Build arrayRefs from aliases
+          const arrayRefs = [...af.arrayAliases.entries()].map(
+            ([paramName, targetName]) => ({ paramName, targetName })
+          )
 
           // Frame's variables come from scopeStack[fi + 1]
           const frameVars: Record<string, number> = {}
@@ -233,6 +250,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           callStackFrames.push({
             label,
             variables: frameVars,
+            arrayRefs,
             arrays: frameArrays,
             pointers: framePointers,
             highlights: frameHighlights,
@@ -341,7 +359,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (name === 'len') {
         const arg = args[0]
         if (arg.type === 'identifier') {
-          const arr = arrays.get(arg.name)
+          const resolved = resolveArrayName(arg.name)
+          const arr = arrays.get(resolved)
           if (arr) return arr.length
         }
         throw new Error(`len() expects an array identifier`)
@@ -350,18 +369,46 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const proc = procedures.get(name)
       if (proc) {
         if (++callDepth > 1000) throw new Error('Max recursion depth exceeded')
-        const argValues = args.map(a => evalExpr(a))
-        const frame: ActiveFrame = { name, args: argValues, allocatedArrays: new Set() }
+
+        // Phase 1: evaluate args — array params get aliases, scalar params get values
+        const aliasMap = new Map<string, string>()
+        const scalarBindings: { name: string; value: number }[] = []
+        const argStrings: string[] = []
+
+        for (let i = 0; i < proc.params.length; i++) {
+          const param = proc.params[i]
+          if (param.paramType === 'int[]') {
+            // Array reference param: extract identifier name and resolve
+            const arg = args[i]
+            if (arg.type !== 'identifier') throw new Error(`Expected array identifier for param ${param.name}`)
+            const resolved = resolveArrayName(arg.name)
+            aliasMap.set(param.name, resolved)
+            argStrings.push(resolved)
+          } else {
+            // Scalar param
+            const val = evalExpr(args[i])
+            scalarBindings.push({ name: param.name, value: val })
+            argStrings.push(String(val))
+          }
+        }
+
+        // Phase 2: push frame, alias stack, scope, bind scalars
+        const frame: ActiveFrame = { name, argStrings, allocatedArrays: new Set(), arrayAliases: aliasMap }
         callFrameStack.push(frame)
+        arrayAliasStack.push(aliasMap)
         pushScope()
         pushPointers(proc.body)
-        for (let i = 0; i < proc.params.length; i++) {
-          setVar(proc.params[i], argValues[i])
+        for (const binding of scalarBindings) {
+          setVar(binding.name, binding.value)
         }
+
+        // Execute body
         for (const stmt of proc.body) execNode(stmt)
+
+        // Cleanup
         popPointers()
         popScope()
-        // Clean up arrays allocated by this frame
+        arrayAliasStack.pop()
         for (const arrName of frame.allocatedArrays) {
           arrays.delete(arrName)
         }
@@ -374,7 +421,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function getArray(expr: Expr): number[] {
       if (expr.type === 'identifier') {
-        const arr = arrays.get(expr.name)
+        const resolved = resolveArrayName(expr.name)
+        const arr = arrays.get(resolved)
         if (!arr) throw new Error(`Undefined array: ${expr.name}`)
         return arr
       }
@@ -382,13 +430,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
 
     function getArrayName(expr: Expr): string {
-      if (expr.type === 'identifier') return expr.name
+      if (expr.type === 'identifier') return resolveArrayName(expr.name)
       throw new Error('Expected array identifier')
     }
 
     function formatValue(expr: Expr): string {
       if (expr.type === 'index' && expr.array.type === 'identifier') {
-        const arrName = expr.array.name
+        const arrName = resolveArrayName(expr.array.name)
         const idx = evalExpr(expr.index)
         const arr = arrays.get(arrName)
         const val = arr ? arr[idx] : '?'
@@ -412,7 +460,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function highlightComparisonSide(expr: Expr): void {
       try {
         if (expr.type === 'index' && expr.array.type === 'identifier') {
-          const arrayName = expr.array.name
+          const arrayName = resolveArrayName(expr.array.name)
           const idx = evalExpr(expr.index)
           const existing = currentHighlights.find(h => h.arrayName === arrayName && h.type === 'compare')
           if (existing) {
@@ -442,8 +490,19 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'exprStmt':
           if (node.expr.type === 'call' && procedures.has(node.expr.callee)) {
             const call = node.expr
-            const argVals = call.args.map(a => evalExpr(a))
-            snapshot(node.line, `Call ${call.callee}(${argVals.join(', ')})`)
+            const proc = procedures.get(call.callee)!
+            const argDisplayParts: string[] = []
+            for (let i = 0; i < call.args.length; i++) {
+              const param = proc.params[i]
+              if (param?.paramType === 'int[]') {
+                // For array params, show the resolved identifier name
+                const arg = call.args[i]
+                argDisplayParts.push(arg.type === 'identifier' ? resolveArrayName(arg.name) : '?')
+              } else {
+                argDisplayParts.push(String(evalExpr(call.args[i])))
+              }
+            }
+            snapshot(node.line, `Call ${call.callee}(${argDisplayParts.join(', ')})`)
             evalCall(call.callee, call.args)
           } else {
             evalExpr(node.expr)
@@ -547,11 +606,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execDim(node: DimNode): void {
       const from = evalExpr(node.from)
       const to = evalExpr(node.to)
-      dimRanges.set(node.arrayName, { from, to })
+      dimRanges.set(resolveArrayName(node.arrayName), { from, to })
     }
 
     function execPointer(node: PointerNode): void {
-      directivePointers.set(node.label, { arrayName: node.arrayName, expr: node.at })
+      directivePointers.set(node.label, { arrayName: resolveArrayName(node.arrayName), expr: node.at })
     }
 
     function execComment(node: CommentNode): void {

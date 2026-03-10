@@ -5,6 +5,7 @@ import { drawVariables, getVariablesHeight } from './variables.ts'
 
 const INDENT = 16
 const HEADER_HEIGHT = 28
+const REFS_ROW_HEIGHT = 20
 const PADDING_TOP = 8
 const PADDING_BOTTOM = 12
 const POINTER_SPACE = 60
@@ -29,6 +30,11 @@ function computeFrameHeight(
 ): number {
   const frame = callStack[index]
   let h = HEADER_HEIGHT + PADDING_TOP
+
+  // Array refs row
+  if (frame.arrayRefs.length > 0) {
+    h += REFS_ROW_HEIGHT
+  }
 
   // Arrays with pointer space above them
   if (frame.arrays.length > 0) {
@@ -103,6 +109,17 @@ function drawFrame(
 
   let curY = boxY + HEADER_HEIGHT + PADDING_TOP
   const contentX = boxX + INDENT
+
+  // Draw array ref labels (e.g. src → aux   dst → arr)
+  if (frame.arrayRefs.length > 0) {
+    ctx.save()
+    ctx.font = '11px monospace'
+    ctx.fillStyle = '#888'
+    const refText = frame.arrayRefs.map(r => `${r.paramName} → ${r.targetName}`).join('   ')
+    ctx.fillText(refText, boxX + 10, curY + 13)
+    ctx.restore()
+    curY += REFS_ROW_HEIGHT
+  }
 
   // Draw arrays (with pointer space)
   if (frame.arrays.length > 0) {

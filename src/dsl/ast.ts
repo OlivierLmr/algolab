@@ -104,7 +104,7 @@ export interface AllocNode {
 export interface DefNode {
   type: 'def'
   name: string
-  params: string[]
+  params: { name: string; paramType?: string }[]
   body: ASTNode[]
   line: number
 }
