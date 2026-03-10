@@ -5,7 +5,6 @@ import { drawVariables, getVariablesHeight } from './variables.ts'
 import { computeCallStackHeight, drawCallStack } from './callstack.ts'
 
 const POINTER_SPACE = 60
-const DESCRIPTION_SPACE = 40
 const CALLSTACK_GAP = 16
 
 /** Compute the required canvas height for a given step. */
@@ -26,7 +25,6 @@ export function computeRequiredHeight(step: Step): number {
 
   const nonPointerVarCount = Object.keys(step.variables).filter(n => !pointerNames.has(n)).length
   if (nonPointerVarCount > 0) y += getVariablesHeight(nonPointerVarCount)
-  if (step.description) y += DESCRIPTION_SPACE
   return y
 }
 
@@ -72,12 +70,4 @@ export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: num
     yOffset += getVariablesHeight(nonPointerVarCount)
   }
 
-  // Draw description at bottom
-  if (step.description) {
-    ctx.fillStyle = '#555'
-    ctx.font = '14px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText(step.description, width / 2, height - 20)
-    ctx.textAlign = 'start'
-  }
 }

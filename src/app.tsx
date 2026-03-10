@@ -26,14 +26,14 @@ export function App() {
       <div class="main-layout">
         <CodePanel />
         <CanvasVisualizer />
+        <div class="description">
+          {recentDescriptions.value.map((d) => (
+            <div class="description-previous">{d}</div>
+          ))}
+          <div class="description-current">{step?.description || ''}</div>
+        </div>
       </div>
       <Controls />
-      <div class="description">
-        {recentDescriptions.value.map((d) => (
-          <div class="description-previous">{d}</div>
-        ))}
-        <div class="description-current">{step?.description || ''}</div>
-      </div>
     </>
   )
 }

@@ -47,12 +47,14 @@ body {
 }
 
 .main-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr auto;
   gap: 20px;
 }
 
 .code-panel {
-  flex: 0 0 auto;
+  grid-row: 1 / -1;
   background: #1e1e1e;
   border-radius: 8px;
   padding: 16px;
@@ -110,7 +112,6 @@ body {
 }
 
 .canvas-container {
-  flex: 1;
   background: #fff;
   border-radius: 8px;
   border: 1px solid #ddd;
@@ -161,7 +162,6 @@ body {
 }
 
 .description {
-  margin-top: 12px;
   padding: 8px 16px;
   font-size: 14px;
   background: #fff;
