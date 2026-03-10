@@ -370,6 +370,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
     }
 
+    function deleteVar(name: string): void {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        if (scopeStack[i].has(name)) { scopeStack[i].delete(name); return }
+      }
+    }
+
     function execFor(node: ForNode): void {
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
@@ -381,6 +387,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         for (const stmt of node.body) execNode(stmt)
       }
       popPointers()
+      deleteVar(node.variable)
     }
 
     function execWhile(node: WhileNode): void {
