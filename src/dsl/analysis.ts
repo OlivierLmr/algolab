@@ -7,7 +7,7 @@ export interface ScopePointer {
   label: string
 }
 
-/** Scan a body's direct statements for arr[expr] index patterns (not nested block bodies). */
+/** Scan a body's statements (recursively into nested blocks) for arr[expr] index patterns. */
 export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
   const result: ScopePointer[] = []
   const seen = new Set<string>()
@@ -35,22 +35,32 @@ export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
     exprs.forEach(addFromExpr)
   }
 
-  for (const stmt of body) {
-    switch (stmt.type) {
-      case 'if': case 'while':
-        scanExprs(stmt.condition)
-        break
-      case 'for':
-        scanExprs(stmt.from, stmt.to)
-        break
-      case 'let': scanExprs(stmt.value); break
-      case 'assign': scanExprs(stmt.target, stmt.value); break
-      case 'swap': scanExprs(stmt.left, stmt.right); break
-      case 'exprStmt': scanExprs(stmt.expr); break
-      case 'def': case 'dim': case 'pointer': case 'comment': case 'alloc': break
+  function scanBody(stmts: ASTNode[]): void {
+    for (const stmt of stmts) {
+      switch (stmt.type) {
+        case 'if':
+          scanExprs(stmt.condition)
+          scanBody(stmt.body)
+          scanBody(stmt.elseBody)
+          break
+        case 'while':
+          scanExprs(stmt.condition)
+          scanBody(stmt.body)
+          break
+        case 'for':
+          scanExprs(stmt.from, stmt.to)
+          scanBody(stmt.body)
+          break
+        case 'let': scanExprs(stmt.value); break
+        case 'assign': scanExprs(stmt.target, stmt.value); break
+        case 'swap': scanExprs(stmt.left, stmt.right); break
+        case 'exprStmt': scanExprs(stmt.expr); break
+        case 'def': case 'dim': case 'pointer': case 'comment': case 'alloc': break
+      }
     }
   }
 
+  scanBody(body)
   return result
 }
 
