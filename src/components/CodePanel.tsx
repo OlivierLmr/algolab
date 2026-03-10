@@ -2,74 +2,18 @@ import { currentAlgo, currentStep } from '../state.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { lex } from '../dsl/lexer.ts'
 import { parse } from '../dsl/parser.ts'
-import type { ASTNode, Expr } from '../dsl/ast.ts'
+import { stripDirectivePrefix, getDisplayInfo } from '../dsl/preprocess.ts'
+import { getPointerVarNames } from '../dsl/analysis.ts'
 import { useMemo } from 'preact/hooks'
 
 /** Extract pointer variable names from the algorithm source. */
-function getPointerVarNames(source: string): string[] {
+function extractPointerVarNames(source: string): string[] {
   try {
-    const tokens = lex(source)
+    const tokens = lex(stripDirectivePrefix(source))
     const ast = parse(tokens)
-    const vars = new Set<string>()
-    collectPointerVars(ast.body, vars)
-    return [...vars]
+    return getPointerVarNames(ast.body)
   } catch {
     return []
-  }
-}
-
-function collectPointerVars(nodes: ASTNode[], vars: Set<string>): void {
-  for (const node of nodes) {
-    switch (node.type) {
-      case 'for':
-        scanExprForPointers(node.from, vars)
-        scanExprForPointers(node.to, vars)
-        collectPointerVars(node.body, vars)
-        break
-      case 'while':
-        scanExprForPointers(node.condition, vars)
-        collectPointerVars(node.body, vars)
-        break
-      case 'if':
-        scanExprForPointers(node.condition, vars)
-        collectPointerVars(node.body, vars)
-        collectPointerVars(node.elseBody, vars)
-        break
-      case 'let': scanExprForPointers(node.value, vars); break
-      case 'assign':
-        scanExprForPointers(node.target, vars)
-        scanExprForPointers(node.value, vars)
-        break
-      case 'swap':
-        scanExprForPointers(node.left, vars)
-        scanExprForPointers(node.right, vars)
-        break
-      case 'exprStmt': scanExprForPointers(node.expr, vars); break
-    }
-  }
-}
-
-function scanExprForPointers(expr: Expr, vars: Set<string>): void {
-  if (expr.type === 'index' && expr.array.type === 'identifier') {
-    collectIdents(expr.index, vars)
-  }
-  if (expr.type === 'binary') {
-    scanExprForPointers(expr.left, vars)
-    scanExprForPointers(expr.right, vars)
-  }
-  if (expr.type === 'unary') scanExprForPointers(expr.operand, vars)
-  if (expr.type === 'call') expr.args.forEach(a => scanExprForPointers(a, vars))
-  if (expr.type === 'index') {
-    scanExprForPointers(expr.array, vars)
-    scanExprForPointers(expr.index, vars)
-  }
-}
-
-function collectIdents(expr: Expr, vars: Set<string>): void {
-  if (expr.type === 'identifier') vars.add(expr.name)
-  if (expr.type === 'binary') {
-    collectIdents(expr.left, vars)
-    collectIdents(expr.right, vars)
   }
 }
 
@@ -109,23 +53,28 @@ function escapeRegex(s: string): string {
 export function CodePanel() {
   const algo = currentAlgo.value
   const step = currentStep.value
-  const lines = algo.source.split('\n')
 
-  const colorMap = useMemo(() => {
-    const varNames = getPointerVarNames(algo.source)
-    return assignPointerColors(varNames)
+  const { displayLines, lineMap, colorMap } = useMemo(() => {
+    const info = getDisplayInfo(algo.source)
+    const varNames = extractPointerVarNames(algo.source)
+    return {
+      displayLines: info.lines,
+      lineMap: info.lineMap,
+      colorMap: assignPointerColors(varNames),
+    }
   }, [algo.source])
 
+  const displayLine = step ? lineMap.get(step.currentLine) : undefined
   const variables = step?.variables ?? {}
   const varEntries = Object.entries(variables)
 
   return (
     <div class="code-panel">
       <pre>
-        {lines.map((line, i) => (
+        {displayLines.map((line, i) => (
           <div
             key={i}
-            class={`code-line ${i === step?.currentLine ? 'code-line-active' : ''}`}
+            class={`code-line ${i === displayLine ? 'code-line-active' : ''}`}
           >
             <span class="line-number">{i + 1}</span>
             {colorizeTokens(line, colorMap)}

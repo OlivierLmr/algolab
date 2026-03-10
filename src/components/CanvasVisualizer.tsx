@@ -23,7 +23,7 @@ export function CanvasVisualizer() {
     const ctx = canvas.getContext('2d')!
     ctx.scale(dpr, dpr)
     renderStep(ctx, step, CANVAS_WIDTH, CANVAS_HEIGHT)
-  })
+  }, [step])
 
   return (
     <div class="canvas-container">

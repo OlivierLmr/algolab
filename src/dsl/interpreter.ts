@@ -1,92 +1,14 @@
 import type {
   ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
-  Expr, IndexExpr,
+  Expr,
 } from './ast.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
+import { detectPointers, collectDirectivePointerLabels } from './analysis.ts'
 
 interface Env {
   arrays: Map<string, number[]>
   vars: Map<string, number>
-}
-
-/** Scan AST for arr[x] patterns to identify pointer variables per array. */
-function detectPointers(nodes: ASTNode[]): Map<string, Set<string>> {
-  const pointers = new Map<string, Set<string>>()
-
-  function addPointer(arrayName: string, varName: string): void {
-    if (!pointers.has(arrayName)) pointers.set(arrayName, new Set())
-    pointers.get(arrayName)!.add(varName)
-  }
-
-  function scanExpr(expr: Expr): void {
-    switch (expr.type) {
-      case 'index':
-        if (expr.array.type === 'identifier') {
-          collectIdentsFromExpr(expr.array.name, expr.index)
-        }
-        scanExpr(expr.array)
-        scanExpr(expr.index)
-        break
-      case 'binary':
-        scanExpr(expr.left)
-        scanExpr(expr.right)
-        break
-      case 'unary':
-        scanExpr(expr.operand)
-        break
-      case 'call':
-        expr.args.forEach(scanExpr)
-        break
-    }
-  }
-
-  function collectIdentsFromExpr(arrayName: string, expr: Expr): void {
-    if (expr.type === 'identifier') {
-      addPointer(arrayName, expr.name)
-    } else if (expr.type === 'binary') {
-      collectIdentsFromExpr(arrayName, expr.left)
-      collectIdentsFromExpr(arrayName, expr.right)
-    }
-  }
-
-  function scanNode(node: ASTNode): void {
-    switch (node.type) {
-      case 'algo': node.body.forEach(scanNode); break
-      case 'for':
-        scanExpr(node.from); scanExpr(node.to); node.body.forEach(scanNode); break
-      case 'while':
-        scanExpr(node.condition); node.body.forEach(scanNode); break
-      case 'if':
-        scanExpr(node.condition); node.body.forEach(scanNode); node.elseBody.forEach(scanNode); break
-      case 'let': scanExpr(node.value); break
-      case 'assign': scanExpr(node.target); scanExpr(node.value); break
-      case 'swap': scanExpr(node.left); scanExpr(node.right); break
-      case 'exprStmt': scanExpr(node.expr); break
-      case 'dim': break
-      case 'pointer': break
-    }
-  }
-
-  nodes.forEach(scanNode)
-  return pointers
-}
-
-/** Collect directive pointer labels from AST. */
-function collectDirectivePointerLabels(nodes: ASTNode[]): string[] {
-  const labels: string[] = []
-  function scan(node: ASTNode): void {
-    switch (node.type) {
-      case 'pointer': labels.push(node.label); break
-      case 'algo': node.body.forEach(scan); break
-      case 'for': node.body.forEach(scan); break
-      case 'while': node.body.forEach(scan); break
-      case 'if': node.body.forEach(scan); node.elseBody.forEach(scan); break
-      default: break
-    }
-  }
-  nodes.forEach(scan)
-  return labels
 }
 
 /**
@@ -196,6 +118,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'index': {
           const arr = getArray(expr.array)
           const idx = evalExpr(expr.index)
+          if (idx < 0 || idx >= arr.length) {
+            const name = expr.array.type === 'identifier' ? expr.array.name : 'array'
+            throw new Error(`Index ${idx} out of bounds for ${name}[0..${arr.length - 1}]`)
+          }
           return arr[idx]
         }
         case 'call': return evalCall(expr.callee, expr.args)
@@ -307,6 +233,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execFor(node: ForNode): void {
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
+      if (toVal - fromVal > 10000) throw new Error('For loop range too large')
       for (let i = fromVal; i <= toVal; i++) {
         env.vars.set(node.variable, i)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
@@ -390,8 +317,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
 
     function execSwap(node: SwapNode): void {
-      const leftIdx = node.left as IndexExpr
-      const rightIdx = node.right as IndexExpr
+      if (node.left.type !== 'index' || node.right.type !== 'index') {
+        throw new Error('swap requires array index expressions')
+      }
+      const leftIdx = node.left
+      const rightIdx = node.right
       const arr = getArray(leftIdx.array)
       const i = evalExpr(leftIdx.index)
       const j = evalExpr(rightIdx.index)

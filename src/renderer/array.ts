@@ -30,7 +30,10 @@ export function drawArray(
       d => d.arrayName === name && i >= d.from && i <= d.to
     )
 
-    if (isDimmed) ctx.globalAlpha = 0.3
+    if (isDimmed) {
+      ctx.save()
+      ctx.globalAlpha = 0.3
+    }
 
     const hl = !isDimmed
       ? highlights.find(h => h.arrayName === name && h.indices.includes(i))
@@ -57,7 +60,7 @@ export function drawArray(
     ctx.font = '11px monospace'
     ctx.fillText(String(i), x + CELL_SIZE / 2, y + CELL_SIZE + 14)
 
-    if (isDimmed) ctx.globalAlpha = 1.0
+    if (isDimmed) ctx.restore()
   }
 
   ctx.textAlign = 'start'

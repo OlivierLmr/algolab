@@ -3,6 +3,8 @@ import { drawArray, ARRAY_Y_START, getArrayHeight } from './array.ts'
 import { drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
 
+const POINTER_SPACE = 60
+
 export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: number, height: number): void {
   // Clear
   ctx.clearRect(0, 0, width, height)
@@ -10,9 +12,7 @@ export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: num
   // Track Y positions for pointer drawing
   const arrayYPositions = new Map<string, number>()
 
-  // Leave room at top for pointers
-  const pointerSpace = 60
-  let yOffset = ARRAY_Y_START + pointerSpace
+  let yOffset = ARRAY_Y_START + POINTER_SPACE
 
   for (const array of step.arrays) {
     arrayYPositions.set(array.name, yOffset)

@@ -1,7 +1,7 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
-  Expr, BinaryExpr, IndexExpr, CallExpr,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, PointerNode,
+  Expr,
 } from './ast.ts'
 
 export function parse(tokens: Token[]): AlgoNode {
@@ -180,7 +180,7 @@ export function parse(tokens: Token[]): AlgoNode {
       advance()
       const value = parseExpr()
       expectNewline()
-      return { type: 'assign', target: expr, value, line } as AssignNode
+      return { type: 'assign', target: expr, value, line }
     }
     expectNewline()
     return { type: 'exprStmt', expr, line }
@@ -231,7 +231,7 @@ export function parse(tokens: Token[]): AlgoNode {
     while (peek().type === 'op' && compOps.includes(peek().value)) {
       const op = advance().value
       const right = parseAddSub()
-      left = { type: 'binary', op, left, right } as BinaryExpr
+      left = { type: 'binary', op, left, right }
     }
     return left
   }
@@ -241,7 +241,7 @@ export function parse(tokens: Token[]): AlgoNode {
     while (match('op', '+') || match('op', '-')) {
       const op = advance().value
       const right = parseMulDiv()
-      left = { type: 'binary', op, left, right } as BinaryExpr
+      left = { type: 'binary', op, left, right }
     }
     return left
   }
@@ -251,7 +251,7 @@ export function parse(tokens: Token[]): AlgoNode {
     while (match('op', '*') || match('op', '/') || match('op', '%')) {
       const op = advance().value
       const right = parseUnary()
-      left = { type: 'binary', op, left, right } as BinaryExpr
+      left = { type: 'binary', op, left, right }
     }
     return left
   }
@@ -273,7 +273,7 @@ export function parse(tokens: Token[]): AlgoNode {
       advance()
       const index = parseExpr()
       expect('bracket', ']')
-      expr = { type: 'index', array: expr, index } as IndexExpr
+      expr = { type: 'index', array: expr, index }
     }
 
     return expr
@@ -307,7 +307,7 @@ export function parse(tokens: Token[]): AlgoNode {
           args.push(parseExpr())
         }
         expect('paren', ')')
-        return { type: 'call', callee: tok.value, args } as CallExpr
+        return { type: 'call', callee: tok.value, args }
       }
       return { type: 'identifier', name: tok.value }
     }
