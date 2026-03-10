@@ -1,7 +1,9 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode,
   Expr,
 } from './ast.ts'
+import { lex } from './lexer.ts'
+import { parse as parseSource } from './parser.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { detectPointers, collectDirectivePointerLabels } from './analysis.ts'
@@ -32,12 +34,32 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
     const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
+    let pendingComment: string | null = null
 
     for (const [name, values] of input) {
       env.arrays.set(name, [...values])
     }
 
+    function interpolateComment(template: string): string {
+      return template.replace(/\{([^}]+)\}/g, (_, exprStr: string) => {
+        try {
+          const tokens = lex(`algo _(_: int[])\n  let _r = ${exprStr}`)
+          const ast = parseSource(tokens)
+          const node = ast.body[0]
+          if (node.type === 'let') return String(evalExpr(node.value))
+          return `{${exprStr}}`
+        } catch {
+          return `{${exprStr}}`
+        }
+      })
+    }
+
     function snapshot(line: number, description: string): void {
+      if (pendingComment !== null) {
+        description = interpolateComment(pendingComment)
+        pendingComment = null
+      }
+
       const arrays: TrackedArray[] = []
       for (const [name, values] of env.arrays) {
         arrays.push({ name, values: [...values] })
@@ -223,6 +245,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'swap': execSwap(node); break
         case 'dim': execDim(node); break
         case 'pointer': execPointer(node); break
+        case 'comment': execComment(node); break
         case 'exprStmt':
           evalExpr(node.expr)
           snapshot(node.line, '')
@@ -314,6 +337,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execPointer(node: PointerNode): void {
       directivePointers.set(node.label, { arrayName: node.arrayName, expr: node.at })
+    }
+
+    function execComment(node: CommentNode): void {
+      pendingComment = node.text
     }
 
     function execSwap(node: SwapNode): void {
