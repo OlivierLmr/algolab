@@ -2,7 +2,7 @@ import type {
   ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode,
   Expr, IndexExpr,
 } from './ast.ts'
-import type { Step, TrackedArray, Pointer, Highlight, DimRange } from '../types.ts'
+import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange } from '../types.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 
 interface Env {
@@ -107,6 +107,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     const steps: Step[] = []
     const env: Env = { arrays: new Map(), vars: new Map() }
     let currentHighlights: Highlight[] = []
+    let currentVarHighlights: VarHighlight[] = []
     const dimRanges = new Map<string, { from: number; to: number }>()
     const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
 
@@ -158,12 +159,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         arrays,
         pointers,
         highlights: [...currentHighlights],
+        varHighlights: [...currentVarHighlights],
         dimRanges: dimRangeList,
         variables,
         currentLine: line,
         description,
       })
       currentHighlights = []
+      currentVarHighlights = []
     }
 
     function evalExpr(expr: Expr): number {
@@ -255,6 +258,35 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       return String(evalExpr(expr))
     }
 
+    function addComparisonHighlights(condition: Expr): void {
+      if (condition.type !== 'binary') return
+      if (condition.op === 'and' || condition.op === 'or') {
+        addComparisonHighlights(condition.left)
+        try { addComparisonHighlights(condition.right) } catch { /* skip if eval fails */ }
+        return
+      }
+      if (!['<', '>', '<=', '>=', '==', '!='].includes(condition.op)) return
+      highlightComparisonSide(condition.left)
+      highlightComparisonSide(condition.right)
+    }
+
+    function highlightComparisonSide(expr: Expr): void {
+      try {
+        if (expr.type === 'index' && expr.array.type === 'identifier') {
+          const arrayName = expr.array.name
+          const idx = evalExpr(expr.index)
+          const existing = currentHighlights.find(h => h.arrayName === arrayName && h.type === 'compare')
+          if (existing) {
+            if (!existing.indices.includes(idx)) existing.indices.push(idx)
+          } else {
+            currentHighlights.push({ arrayName, indices: [idx], type: 'compare' })
+          }
+        } else if (expr.type === 'identifier' && env.vars.has(expr.name)) {
+          currentVarHighlights.push({ varName: expr.name, type: 'compare' })
+        }
+      } catch { /* skip */ }
+    }
+
     function execNode(node: ASTNode): void {
       switch (node.type) {
         case 'for': execFor(node); break
@@ -285,6 +317,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execWhile(node: WhileNode): void {
       let guard = 0
       while (evalExpr(node.condition) !== 0) {
+        addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
         if (++guard > 10000) throw new Error('Infinite loop detected')
@@ -294,24 +327,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execIf(node: IfNode): void {
       let desc = 'Check condition'
+      addComparisonHighlights(node.condition)
       if (node.condition.type === 'binary' && ['<', '>', '<=', '>=', '==', '!='].includes(node.condition.op)) {
         const leftStr = formatValue(node.condition.left)
         const rightStr = formatValue(node.condition.right)
         desc = `Compare ${leftStr} ${node.condition.op} ${rightStr}`
-
-        const indices: number[] = []
-        let arrayName = ''
-        if (node.condition.left.type === 'index' && node.condition.left.array.type === 'identifier') {
-          arrayName = node.condition.left.array.name
-          indices.push(evalExpr(node.condition.left.index))
-        }
-        if (node.condition.right.type === 'index' && node.condition.right.array.type === 'identifier') {
-          if (!arrayName) arrayName = node.condition.right.array.name
-          indices.push(evalExpr(node.condition.right.index))
-        }
-        if (arrayName && indices.length > 0) {
-          currentHighlights = [{ arrayName, indices, type: 'compare' }]
-        }
       }
 
       const cond = evalExpr(node.condition)
@@ -327,6 +347,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execLet(node: LetNode): void {
       const val = evalExpr(node.value)
       env.vars.set(node.name, val)
+      if (!allPointerVars.has(node.name)) {
+        currentVarHighlights.push({ varName: node.name, type: 'active' })
+      }
+      if (node.value.type === 'index' && node.value.array.type === 'identifier') {
+        const arrayName = node.value.array.name
+        const idx = evalExpr(node.value.index)
+        currentHighlights.push({ arrayName, indices: [idx], type: 'active' })
+      }
       snapshot(node.line, `Set ${node.name} = ${val}`)
     }
 
@@ -334,6 +362,9 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
         env.vars.set(node.target.name, val)
+        if (!allPointerVars.has(node.target.name)) {
+          currentVarHighlights.push({ varName: node.target.name, type: 'active' })
+        }
         snapshot(node.line, `Set ${node.target.name} = ${val}`)
       } else if (node.target.type === 'index') {
         const arr = getArray(node.target.array)
@@ -341,6 +372,9 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         arr[idx] = val
         const arrayName = getArrayName(node.target.array)
         currentHighlights = [{ arrayName, indices: [idx], type: 'active' }]
+        if (node.value.type === 'identifier' && !allPointerVars.has(node.value.name)) {
+          currentVarHighlights.push({ varName: node.value.name, type: 'active' })
+        }
         snapshot(node.line, `Set ${arrayName}[${idx}] = ${val}`)
       }
     }

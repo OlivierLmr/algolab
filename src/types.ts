@@ -16,10 +16,23 @@ export interface Highlight {
   type: 'compare' | 'swap' | 'sorted' | 'active'
 }
 
+export interface VarHighlight {
+  varName: string
+  type: 'compare' | 'swap' | 'sorted' | 'active'
+}
+
+export interface DimRange {
+  arrayName: string
+  from: number
+  to: number
+}
+
 export interface Step {
   arrays: TrackedArray[]
   pointers: Pointer[]
   highlights: Highlight[]
+  varHighlights: VarHighlight[]
+  dimRanges: DimRange[]
   variables: Record<string, number>
   currentLine: number
   description: string
