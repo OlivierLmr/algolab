@@ -40,16 +40,35 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       env.arrays.set(name, [...values])
     }
 
+    function evalExprString(exprStr: string): number {
+      const tokens = lex(`algo _(_: int[])\n  let _r = ${exprStr}`)
+      const ast = parseSource(tokens)
+      const node = ast.body[0]
+      if (node.type === 'let') return evalExpr(node.value)
+      throw new Error('Failed to parse expression')
+    }
+
     function interpolateComment(template: string): string {
-      return template.replace(/\{([^}]+)\}/g, (_, exprStr: string) => {
+      return template.replace(/\{([^}]+)\}/g, (full, inner: string) => {
+        // Check for ternary: expr ? 'trueText' : 'falseText'
+        const qIdx = inner.indexOf('?')
+        if (qIdx !== -1) {
+          const condStr = inner.slice(0, qIdx).trim()
+          const rest = inner.slice(qIdx + 1).trim()
+          const branchMatch = rest.match(/^'([^']*)'\s*:\s*'([^']*)'$/)
+          if (branchMatch) {
+            try {
+              const val = evalExprString(condStr)
+              return val !== 0 ? branchMatch[1] : branchMatch[2]
+            } catch { /* fall through to regular eval */ }
+          }
+        }
+
+        // Regular expression interpolation
         try {
-          const tokens = lex(`algo _(_: int[])\n  let _r = ${exprStr}`)
-          const ast = parseSource(tokens)
-          const node = ast.body[0]
-          if (node.type === 'let') return String(evalExpr(node.value))
-          return `{${exprStr}}`
+          return String(evalExprString(inner))
         } catch {
-          return `{${exprStr}}`
+          return full
         }
       })
     }
