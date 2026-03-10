@@ -5,7 +5,7 @@ import { drawVariables, getVariablesHeight } from './variables.ts'
 
 const INDENT = 16
 const HEADER_HEIGHT = 28
-const REFS_ROW_HEIGHT = 20
+const REFS_ROW_HEIGHT = 32
 const PADDING_TOP = 8
 const PADDING_BOTTOM = 12
 const POINTER_SPACE = 60
