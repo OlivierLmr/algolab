@@ -23,6 +23,7 @@ export const mergeSortLR: AlgorithmDefinition = {
     let j = 0
     #: comment "Merging L and R back into arr[{lo}..{hi}]"
     for k from lo to hi
+      #: comment "L[{i}]={L[i]} vs R[{j}]={R[j]}: {L[i] <= R[j] ? 'taking from L' : 'taking from R'}"
       if L[i] <= R[j]
         arr[k] = L[i]
         i = i + 1
@@ -36,8 +37,11 @@ export const mergeSortLR: AlgorithmDefinition = {
     #: comment "The table has {hi-lo} elements, {hi - lo > 1 ? 'it needs to be sorted recursively.' : 'it is already sorted.'}"
     if hi - lo > 1
       let mid = lo + (hi - lo) / 2
+      #: comment "Sorting left half from {lo} to {mid}"
       msort(lo, mid)
+      #: comment "Sorting right half from {mid + 1} to {hi}"
       msort(mid + 1, hi)
+      #: comment "Both halves sorted, merging arr[{lo}..{hi}]"
       merge(lo, mid, hi)
 
   msort(0, len(arr) - 1)`,

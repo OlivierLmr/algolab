@@ -8,6 +8,7 @@ export const mergeSortBU: AlgorithmDefinition = {
   def merge(src: int[], dst: int[], lo, mid, hi)
     let i = lo
     let j = mid + 1
+    #: comment "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
     for k from lo to hi
       if i <= mid and (j > hi or src[i] <= src[j])
         dst[k] = src[i]
@@ -21,16 +22,23 @@ export const mergeSortBU: AlgorithmDefinition = {
     #: dim src from hi + 1 to len(src) - 1
     #: dim dst from 0 to lo - 1
     #: dim dst from hi + 1 to len(dst) - 1
+    #: comment "Subarray [{lo}..{hi}]: {lo < hi ? 'needs splitting' : 'single element, already sorted'}"
     if lo < hi
       let mid = lo + (hi - lo) / 2
+      #: comment "Sorting left half from {lo} to {mid}"
       msort(dst, src, lo, mid)
+      #: comment "Sorting right half from {mid + 1} to {hi}"
       msort(dst, src, mid + 1, hi)
+      #: comment "Both halves sorted, merging into dst[{lo}..{hi}]"
       merge(src, dst, lo, mid, hi)
     else
+      #: comment "Single element: copying src[{lo}]={src[lo]} to dst"
       dst[lo] = src[lo]
 
+  #: comment "Copying arr into aux before sorting"
   for i from 0 to len(arr) - 1
     aux[i] = arr[i]
+  #: comment "Starting recursive sort"
   msort(aux, arr, 0, len(arr) - 1)`,
   defaultInput: [5, 3, 8, 1, 2],
 }
