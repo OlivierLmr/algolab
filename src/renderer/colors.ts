@@ -21,11 +21,11 @@ export function assignPointerColors(varNames: string[]): Map<string, string> {
 
 export function getHighlightColor(type: string): string {
   switch (type) {
-    case 'compare': return 'rgba(52, 152, 219, 0.7)'  // blue
-    case 'swap': return 'rgba(231, 76, 60, 0.7)'      // red
-    case 'sorted': return 'rgba(46, 204, 113, 0.7)'   // green
-    case 'active': return 'rgba(243, 156, 18, 0.7)'   // orange
-    default: return 'rgba(200, 200, 200, 0.5)'
+    case 'compare': return '#3498db'  // blue
+    case 'swap': return '#e74c3c'      // red
+    case 'sorted': return '#2ecc71'    // green
+    case 'active': return '#f39c12'    // orange
+    default: return '#999'
   }
 }
 

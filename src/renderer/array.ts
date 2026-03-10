@@ -37,7 +37,7 @@ export function drawArray(
       : undefined
 
     // Cell background
-    ctx.fillStyle = hl ? getHighlightColor(hl.type) : '#fff'
+    ctx.fillStyle = '#fff'
     ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE)
 
     // Cell border
