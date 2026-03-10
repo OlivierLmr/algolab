@@ -31,6 +31,7 @@ export const mergeSortLR: AlgorithmDefinition = {
         j = j + 1
 
   def msort(lo, hi)
+    focus arr from lo to hi
     if lo < hi
       let mid = lo + (hi - lo) / 2
       msort(lo, mid)

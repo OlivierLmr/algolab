@@ -13,6 +13,7 @@ export function drawArray(
   dimRanges: DimRange[],
   yOffset: number,
   xOffset: number = 40,
+  focusRanges: DimRange[] = [],
 ): void {
   const { name, values } = array
   const startX = xOffset
@@ -26,9 +27,11 @@ export function drawArray(
     const x = startX + i * (CELL_SIZE + CELL_GAP)
     const y = yOffset
 
-    // Check if this cell is dimmed
+    // Check if this cell is dimmed (inside a dim range, or outside a focus range)
     const isDimmed = dimRanges.some(
       d => d.arrayName === name && i >= d.from && i <= d.to
+    ) || focusRanges.some(
+      f => f.arrayName === name && (i < f.from || i > f.to)
     )
 
     if (isDimmed) {

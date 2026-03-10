@@ -17,6 +17,8 @@ export const mergeSortBU: AlgorithmDefinition = {
         j = j + 1
 
   def msort(src: int[], dst: int[], lo, hi)
+    focus src from lo to hi
+    focus dst from lo to hi
     if lo < hi
       let mid = lo + (hi - lo) / 2
       msort(dst, src, lo, mid)
