@@ -55,18 +55,33 @@ body {
 
 .resize-handle {
   grid-row: 1 / -1;
-  width: 8px;
-  margin: 0 -4px;
+  width: 12px;
+  margin: 0 -6px;
   cursor: col-resize;
-  background: transparent;
   position: relative;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.resize-handle:hover,
-.resize-handle:active {
-  background: rgba(100, 150, 255, 0.3);
-  border-radius: 4px;
+.resize-handle::after {
+  content: '';
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  background: #ccc;
+  transition: background 0.15s, height 0.15s;
+}
+
+.resize-handle:hover::after {
+  background: #999;
+  height: 48px;
+}
+
+.resize-handle:active::after {
+  background: #6a9fef;
+  height: 48px;
 }
 
 .code-panel {
@@ -147,6 +162,8 @@ body {
   justify-content: center;
   padding: 16px;
   min-height: 300px;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .controls {
