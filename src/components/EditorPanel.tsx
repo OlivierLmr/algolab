@@ -1,18 +1,22 @@
-import { useRef, useCallback, useEffect } from 'preact/hooks'
-import { customSource, customInput, parseError, currentStepIndex } from '../state.ts'
+import { useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
+import { customSource, customInput, isRunMode, currentStepIndex, tryParseCustom } from '../state.ts'
+import { buildColorMap, colorizeToHtml } from './colorize.ts'
+import { signal } from '@preact/signals'
+
+const editorError = signal<string | null>(null)
 
 export function EditorPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(0)
+  const preRef = useRef<HTMLPreElement>(null)
+
+  const colorMap = useMemo(() => buildColorMap(customSource.value), [customSource.value])
+  const overlayHtml = useMemo(() => colorizeToHtml(customSource.value, colorMap), [customSource.value, colorMap])
 
   const handleSourceChange = useCallback(() => {
-    clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      if (textareaRef.current) {
-        customSource.value = textareaRef.current.value
-        currentStepIndex.value = 0
-      }
-    }, 500)
+    if (textareaRef.current) {
+      customSource.value = textareaRef.current.value
+      editorError.value = null
+    }
   }, [])
 
   // Sync textarea when customSource changes externally (e.g. editBuiltIn, import)
@@ -22,6 +26,14 @@ export function EditorPanel() {
       ta.value = customSource.value
     }
   }, [customSource.value])
+
+  // Sync scroll between textarea and overlay
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && preRef.current) {
+      preRef.current.scrollTop = textareaRef.current.scrollTop
+      preRef.current.scrollLeft = textareaRef.current.scrollLeft
+    }
+  }, [])
 
   const handleTab = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Tab') {
@@ -34,6 +46,17 @@ export function EditorPanel() {
       handleSourceChange()
     }
   }, [handleSourceChange])
+
+  const handleRun = useCallback(() => {
+    const err = tryParseCustom()
+    if (err) {
+      editorError.value = err
+      return
+    }
+    editorError.value = null
+    isRunMode.value = true
+    currentStepIndex.value = 0
+  }, [])
 
   const handleExport = useCallback(() => {
     const data = JSON.stringify({
@@ -64,7 +87,6 @@ export function EditorPanel() {
           if (typeof data.source === 'string') {
             customSource.value = data.source
             if (textareaRef.current) textareaRef.current.value = data.source
-            currentStepIndex.value = 0
           }
           if (typeof data.defaultInput === 'string') {
             customInput.value = data.defaultInput
@@ -78,23 +100,32 @@ export function EditorPanel() {
     input.click()
   }, [])
 
-  const error = parseError.value
+  const error = editorError.value
 
   return (
     <div class="editor-panel">
       <div class="editor-toolbar">
         <span class="editor-toolbar-title">Editor</span>
+        <button class="run-btn" onClick={handleRun}>Run</button>
         <button class="editor-btn" onClick={handleImport}>Import</button>
         <button class="editor-btn" onClick={handleExport}>Export</button>
       </div>
-      <textarea
-        ref={textareaRef}
-        class="editor-textarea"
-        defaultValue={customSource.value}
-        onInput={handleSourceChange}
-        onKeyDown={handleTab}
-        spellcheck={false}
-      />
+      <div class="editor-overlay-container">
+        <pre
+          ref={preRef}
+          class="editor-overlay-pre"
+          dangerouslySetInnerHTML={{ __html: overlayHtml }}
+        />
+        <textarea
+          ref={textareaRef}
+          class="editor-textarea"
+          defaultValue={customSource.value}
+          onInput={handleSourceChange}
+          onKeyDown={handleTab}
+          onScroll={handleScroll}
+          spellcheck={false}
+        />
+      </div>
       <div class="editor-input-row">
         <span class="editor-input-label">Input:</span>
         <input
@@ -103,7 +134,6 @@ export function EditorPanel() {
           value={customInput.value}
           onInput={(e) => {
             customInput.value = (e.target as HTMLInputElement).value
-            currentStepIndex.value = 0
           }}
         />
       </div>

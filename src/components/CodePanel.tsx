@@ -1,59 +1,7 @@
-import { currentAlgo, currentStep } from '../state.ts'
-import { assignPointerColors } from '../renderer/colors.ts'
-import { lex } from '../dsl/lexer.ts'
-import { parse } from '../dsl/parser.ts'
-import { stripDirectivePrefix, getDisplayInfo } from '../dsl/preprocess.ts'
-import { collectAllPointerLabels, collectDirectivePointerLabels } from '../dsl/analysis.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode } from '../state.ts'
+import { getDisplayInfo } from '../dsl/preprocess.ts'
+import { buildColorMap, colorizeTokens } from './colorize.ts'
 import { useMemo } from 'preact/hooks'
-
-/** Extract all pointer labels from the algorithm source. */
-function extractPointerLabels(source: string): string[] {
-  try {
-    const tokens = lex(stripDirectivePrefix(source))
-    const ast = parse(tokens)
-    const labels = collectAllPointerLabels(ast.body)
-    const dirLabels = collectDirectivePointerLabels(ast.body)
-    for (const label of dirLabels) {
-      if (!labels.includes(label)) labels.push(label)
-    }
-    return labels
-  } catch {
-    return []
-  }
-}
-
-/** Render a line of code with colored variable names. */
-function colorizeTokens(line: string, colorMap: Map<string, string>): preact.JSX.Element {
-  if (colorMap.size === 0) return <>{line}</>
-
-  // Build a regex that matches any of the pointer variable names as whole words
-  const varNames = [...colorMap.keys()].sort((a, b) => b.length - a.length)
-  const pattern = new RegExp(`\\b(${varNames.map(escapeRegex).join('|')})\\b`, 'g')
-
-  const parts: preact.JSX.Element[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = pattern.exec(line)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(<span>{line.slice(lastIndex, match.index)}</span>)
-    }
-    const varName = match[1]
-    parts.push(
-      <span style={{ color: colorMap.get(varName), fontWeight: 'bold' }}>{varName}</span>
-    )
-    lastIndex = pattern.lastIndex
-  }
-  if (lastIndex < line.length) {
-    parts.push(<span>{line.slice(lastIndex)}</span>)
-  }
-
-  return <>{parts}</>
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
 
 export function CodePanel() {
   const algo = currentAlgo.value
@@ -61,11 +9,10 @@ export function CodePanel() {
 
   const { displayLines, lineMap, colorMap } = useMemo(() => {
     const info = getDisplayInfo(algo.source)
-    const varNames = extractPointerLabels(algo.source)
     return {
       displayLines: info.lines,
       lineMap: info.lineMap,
-      colorMap: assignPointerColors(varNames),
+      colorMap: buildColorMap(algo.source),
     }
   }, [algo.source])
 
@@ -75,6 +22,12 @@ export function CodePanel() {
 
   return (
     <div class="code-panel">
+      {isCustomMode.value && isRunMode.value && (
+        <div class="code-panel-toolbar">
+          <span class="code-panel-toolbar-title">Running</span>
+          <button class="editor-btn" onClick={toggleRunMode}>Edit</button>
+        </div>
+      )}
       <pre>
         {displayLines.map((line, i) => (
           <div

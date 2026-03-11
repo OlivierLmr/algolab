@@ -50,6 +50,7 @@ export const inputText = signal(
 
 // Custom mode state
 export const isCustomMode = signal(initial?.algo === 'custom')
+export const isRunMode = signal(false)
 export const customSource = signal(CUSTOM_TEMPLATE)
 export const customInput = signal(
   initial?.algo === 'custom' ? (initial?.input ?? '5, 3, 8, 1, 2') : '5, 3, 8, 1, 2'
@@ -76,6 +77,9 @@ const parsedInput = computed<number[]>(() => {
 })
 
 const stepsResult = computed<{ steps: Step[]; error: string | null }>(() => {
+  if (isCustomMode.value && !isRunMode.value) {
+    return { steps: [], error: null }
+  }
   const algo = currentAlgo.value
   try {
     const match = algo.source.match(/algo \w+\((\w+):/)
@@ -131,6 +135,7 @@ effect(() => {
 
 export function selectAlgorithm(index: number): void {
   isCustomMode.value = false
+  isRunMode.value = false
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
   inputText.value = algorithmList[index].defaultInput.join(', ')
@@ -138,6 +143,7 @@ export function selectAlgorithm(index: number): void {
 
 export function selectCustom(): void {
   isCustomMode.value = true
+  isRunMode.value = false
   currentStepIndex.value = 0
 }
 
@@ -146,7 +152,34 @@ export function editBuiltIn(): void {
   customSource.value = algo.source
   customInput.value = inputText.value
   isCustomMode.value = true
+  isRunMode.value = false
   currentStepIndex.value = 0
+}
+
+export function toggleRunMode(): void {
+  isRunMode.value = !isRunMode.value
+  if (isRunMode.value) {
+    currentStepIndex.value = 0
+  }
+}
+
+/** Try to parse the custom source. Returns null on success, error message on failure. */
+export function tryParseCustom(): string | null {
+  try {
+    const source = customSource.value
+    const match = source.match(/algo \w+\((\w+):/)
+    const paramName = match ? match[1] : 'arr'
+    const raw = customInput.value
+    const nums = raw
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => !Number.isNaN(n))
+    const input = nums.length > 0 ? nums : [5, 3, 8, 1, 2]
+    runAlgorithm(source, paramName, input)
+    return null
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e)
+  }
 }
 
 export function nextStep(): void {

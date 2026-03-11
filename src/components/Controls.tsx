@@ -1,19 +1,20 @@
-import { currentStepIndex, totalSteps, nextStep, prevStep, goToStep } from '../state.ts'
+import { currentStepIndex, totalSteps, nextStep, prevStep, goToStep, isCustomMode, isRunMode } from '../state.ts'
 
 export function Controls() {
   const step = currentStepIndex.value
   const total = totalSteps.value
+  const editMode = isCustomMode.value && !isRunMode.value
 
   if (total === 0) {
     return (
-      <div class="controls">
+      <div class={`controls ${editMode ? 'dimmed' : ''}`}>
         <span class="step-counter">No steps</span>
       </div>
     )
   }
 
   return (
-    <div class="controls">
+    <div class={`controls ${editMode ? 'dimmed' : ''}`}>
       <button onClick={prevStep} disabled={step === 0}>
         Previous
       </button>

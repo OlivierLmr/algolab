@@ -5,10 +5,11 @@ import { CodePanel } from './components/CodePanel.tsx'
 import { EditorPanel } from './components/EditorPanel.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
-import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode } from './state.ts'
+import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode, isRunMode } from './state.ts'
 
 export function App() {
   const step = currentStep.value
+  const editMode = isCustomMode.value && !isRunMode.value
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -25,9 +26,11 @@ export function App() {
     <>
       <Header />
       <div class="main-layout">
-        {isCustomMode.value ? <EditorPanel /> : <CodePanel />}
-        <CanvasVisualizer />
-        <div class="description">
+        {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
+        <div class={editMode ? 'dimmed' : ''}>
+          <CanvasVisualizer />
+        </div>
+        <div class={`description ${editMode ? 'dimmed' : ''}`}>
           {recentDescriptions.value.map((d) => (
             <div class="description-previous">{d}</div>
           ))}
