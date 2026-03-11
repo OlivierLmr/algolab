@@ -1,16 +1,15 @@
-import { useRef, useCallback, useEffect, useMemo } from 'preact/hooks'
+import { useRef, useCallback, useEffect } from 'preact/hooks'
 import { customSource, customInput, isRunMode, currentStepIndex, tryParseCustom } from '../state.ts'
 import { buildColorMap, colorizeToHtml } from './colorize.ts'
-import { signal } from '@preact/signals'
+import { signal, computed } from '@preact/signals'
 
 const editorError = signal<string | null>(null)
+const colorMap = computed(() => buildColorMap(customSource.value))
+const overlayHtml = computed(() => colorizeToHtml(customSource.value, colorMap.value))
 
 export function EditorPanel() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
-
-  const colorMap = useMemo(() => buildColorMap(customSource.value), [customSource.value])
-  const overlayHtml = useMemo(() => colorizeToHtml(customSource.value, colorMap), [customSource.value, colorMap])
 
   const handleSourceChange = useCallback(() => {
     if (textareaRef.current) {
@@ -114,7 +113,7 @@ export function EditorPanel() {
         <pre
           ref={preRef}
           class="editor-overlay-pre"
-          dangerouslySetInnerHTML={{ __html: overlayHtml }}
+          dangerouslySetInnerHTML={{ __html: overlayHtml.value }}
         />
         <textarea
           ref={textareaRef}
