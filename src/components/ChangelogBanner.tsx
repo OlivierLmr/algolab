@@ -6,7 +6,7 @@ interface ChangelogEntry {
   message: string
 }
 
-const COOKIE_NAME = 'last_visit'
+const COOKIE_NAME = 'changelog_dismissed'
 const entries = signal<ChangelogEntry[]>([])
 
 function getCookie(name: string): string | null {
@@ -20,31 +20,41 @@ function setCookie(name: string, value: string): void {
 }
 
 async function loadChangelog(): Promise<void> {
-  const lastVisit = getCookie(COOKIE_NAME)
-  // Set cookie to now for next visit
-  setCookie(COOKIE_NAME, new Date().toISOString())
+  const dismissed = getCookie(COOKIE_NAME)
 
-  // First visit (no cookie) → don't show
-  if (!lastVisit) return
+  // First visit: set cookie to now so they're "caught up", show nothing
+  if (!dismissed) {
+    setCookie(COOKIE_NAME, new Date().toISOString())
+    return
+  }
 
   try {
     const res = await fetch('./changelog.json')
     const all: ChangelogEntry[] = await res.json()
-    const lastVisitTime = new Date(lastVisit).getTime()
-    // Show entries newer than last visit
-    const unseen = all.filter(e => new Date(e.date).getTime() > lastVisitTime)
-    entries.value = unseen
+    const dismissedTime = new Date(dismissed).getTime()
+    // Show entries newer than what they last dismissed
+    entries.value = all.filter(e => new Date(e.date).getTime() > dismissedTime)
   } catch {
     // ignore fetch errors
   }
+}
+
+function dismiss(): void {
+  // Advance cookie to the newest entry shown
+  const shown = entries.value
+  if (shown.length > 0) {
+    const newest = shown.reduce((a, b) =>
+      new Date(a.date).getTime() > new Date(b.date).getTime() ? a : b
+    )
+    setCookie(COOKIE_NAME, newest.date)
+  }
+  entries.value = []
 }
 
 loadChangelog()
 
 export function ChangelogBanner() {
   if (entries.value.length === 0) return null
-
-  const dismiss = () => { entries.value = [] }
 
   return (
     <div class="changelog-banner">
