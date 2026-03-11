@@ -4,6 +4,14 @@ export function Controls() {
   const step = currentStepIndex.value
   const total = totalSteps.value
 
+  if (total === 0) {
+    return (
+      <div class="controls">
+        <span class="step-counter">No steps</span>
+      </div>
+    )
+  }
+
   return (
     <div class="controls">
       <button onClick={prevStep} disabled={step === 0}>

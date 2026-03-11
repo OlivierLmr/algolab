@@ -178,3 +178,116 @@ body {
 .description-current {
   color: #555;
 }
+
+/* Editor Panel */
+.editor-panel {
+  grid-row: 1 / -1;
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-toolbar-title {
+  font-size: 13px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: auto;
+}
+
+.editor-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2d2d2d;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.editor-btn:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.editor-textarea {
+  flex: 1;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+  resize: none;
+  tab-size: 2;
+  outline: none;
+  min-height: 200px;
+}
+
+.editor-textarea:focus {
+  border-color: #555;
+}
+
+.editor-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-input-label {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.editor-input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 13px;
+  background: #2d2d2d;
+  color: #d4d4d4;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.editor-input:focus {
+  border-color: #555;
+}
+
+.editor-error {
+  font-size: 12px;
+  color: #f88;
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 4px;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.edit-btn {
+  padding: 6px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.edit-btn:hover {
+  background: #e8e8e8;
+}

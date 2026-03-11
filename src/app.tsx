@@ -2,9 +2,10 @@ import './styles.css'
 import { useEffect } from 'preact/hooks'
 import { Header } from './components/Header.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
+import { EditorPanel } from './components/EditorPanel.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
-import { currentStep, recentDescriptions, nextStep, prevStep } from './state.ts'
+import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode } from './state.ts'
 
 export function App() {
   const step = currentStep.value
@@ -24,7 +25,7 @@ export function App() {
     <>
       <Header />
       <div class="main-layout">
-        <CodePanel />
+        {isCustomMode.value ? <EditorPanel /> : <CodePanel />}
         <CanvasVisualizer />
         <div class="description">
           {recentDescriptions.value.map((d) => (
