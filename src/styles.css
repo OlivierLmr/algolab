@@ -389,3 +389,45 @@ body {
 .run-btn:hover {
   background: #45a049;
 }
+
+/* Changelog banner */
+.changelog-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: #e8f4fd;
+  border: 1px solid #b3d8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1a4a6e;
+}
+
+.changelog-content {
+  flex: 1;
+}
+
+.changelog-header {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.changelog-entry {
+  line-height: 1.5;
+}
+
+.changelog-dismiss {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #1a4a6e;
+  opacity: 0.6;
+  padding: 0 4px;
+}
+
+.changelog-dismiss:hover {
+  opacity: 1;
+}

@@ -1,6 +1,7 @@
 import './styles.css'
 import { useEffect } from 'preact/hooks'
 import { Header } from './components/Header.tsx'
+import { ChangelogBanner } from './components/ChangelogBanner.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
 import { EditorPanel } from './components/EditorPanel.tsx'
 import { ResizeHandle } from './components/ResizeHandle.tsx'
@@ -28,6 +29,7 @@ export function App() {
   return (
     <>
       <Header />
+      <ChangelogBanner />
       <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
         {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
         <ResizeHandle />

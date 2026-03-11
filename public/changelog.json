@@ -1,0 +1,7 @@
+[
+  {
+    "date": "2026-03-11T12:00:00Z",
+    "title": "Custom Algorithm Editor",
+    "message": "You can now write your own algorithms in the editor, save them by exporting to a file, and re-import them later. Select \"Custom\" from the dropdown or click \"Edit\" on any built-in algorithm to get started."
+  }
+]
