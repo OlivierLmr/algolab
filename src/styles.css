@@ -155,7 +155,7 @@ body {
 
 .canvas-wrapper {
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .canvas-container {
