@@ -1,22 +1,20 @@
 import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode } from '../state.ts'
-import { getDisplayInfo } from '../dsl/preprocess.ts'
-import { buildColorMap, colorizeTokens } from './colorize.ts'
+import { buildColorMap, colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo } from 'preact/hooks'
 
 export function CodePanel() {
   const algo = currentAlgo.value
   const step = currentStep.value
 
-  const { displayLines, lineMap, colorMap } = useMemo(() => {
-    const info = getDisplayInfo(algo.source)
+  const { allLines, colorMap } = useMemo(() => {
     return {
-      displayLines: info.lines,
-      lineMap: info.lineMap,
+      allLines: algo.source.split('\n'),
       colorMap: buildColorMap(algo.source),
     }
   }, [algo.source])
 
-  const displayLine = step ? lineMap.get(step.currentLine) : undefined
+  // step.currentLine is the raw source line index (0-based)
+  const activeLine = step?.currentLine
   const variables = step?.variables ?? {}
   const varEntries = Object.entries(variables)
 
@@ -29,15 +27,18 @@ export function CodePanel() {
         </div>
       )}
       <pre>
-        {displayLines.map((line, i) => (
-          <div
-            key={i}
-            class={`code-line ${i === displayLine ? 'code-line-active' : ''}`}
-          >
-            <span class="line-number">{i + 1}</span>
-            {colorizeTokens(line, colorMap)}
-          </div>
-        ))}
+        {allLines.map((line, i) => {
+          const directive = isDirectiveLine(line)
+          return (
+            <div
+              key={i}
+              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${directive ? 'code-line-directive' : ''}`}
+            >
+              <span class="line-number">{i + 1}</span>
+              {colorizeTokens(line, colorMap)}
+            </div>
+          )
+        })}
       </pre>
       {varEntries.length > 0 && (
         <div class="variables-section">

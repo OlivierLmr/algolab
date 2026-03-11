@@ -58,33 +58,52 @@ export function colorizeTokens(line: string, colorMap: Map<string, string>): pre
   return h('span', null, ...parts)
 }
 
-/** Colorize a full source string into an HTML string (for overlay <pre>). */
+/** Colorize a full source string into an HTML string (for overlay <pre>).
+ *  Lines starting with #: are wrapped in a dim style to indicate directives. */
 export function colorizeToHtml(source: string, colorMap: Map<string, string>): string {
-  if (colorMap.size === 0) return escapeHtml(source)
-
-  const varNames = [...colorMap.keys()].sort((a, b) => b.length - a.length)
-  const pattern = new RegExp(`\\b(${varNames.map(escapeRegex).join('|')})\\b`, 'g')
+  const varNames = colorMap.size > 0
+    ? [...colorMap.keys()].sort((a, b) => b.length - a.length)
+    : []
+  const pattern = varNames.length > 0
+    ? new RegExp(`\\b(${varNames.map(escapeRegex).join('|')})\\b`, 'g')
+    : null
 
   return source.split('\n').map(line => {
-    let result = ''
-    let lastIndex = 0
-    let match: RegExpExecArray | null
-    pattern.lastIndex = 0
-
-    while ((match = pattern.exec(line)) !== null) {
-      if (match.index > lastIndex) {
-        result += escapeHtml(line.slice(lastIndex, match.index))
-      }
-      const varName = match[1]
-      const color = colorMap.get(varName)
-      result += `<span style="color:${color};font-weight:bold">${escapeHtml(varName)}</span>`
-      lastIndex = pattern.lastIndex
+    const isDirective = /^\s*#:/.test(line)
+    let colorized = colorizeLine(line, colorMap, pattern)
+    if (isDirective) {
+      colorized = `<span class="directive-line">${colorized}</span>`
     }
-    if (lastIndex < line.length) {
-      result += escapeHtml(line.slice(lastIndex))
-    }
-    return result
+    return colorized
   }).join('\n')
+}
+
+function colorizeLine(line: string, colorMap: Map<string, string>, pattern: RegExp | null): string {
+  if (!pattern) return escapeHtml(line)
+
+  let result = ''
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  pattern.lastIndex = 0
+
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      result += escapeHtml(line.slice(lastIndex, match.index))
+    }
+    const varName = match[1]
+    const color = colorMap.get(varName)
+    result += `<span style="color:${color};font-weight:bold">${escapeHtml(varName)}</span>`
+    lastIndex = pattern.lastIndex
+  }
+  if (lastIndex < line.length) {
+    result += escapeHtml(line.slice(lastIndex))
+  }
+  return result
+}
+
+/** Check if a source line is a directive line. */
+export function isDirectiveLine(line: string): boolean {
+  return /^\s*#:/.test(line)
 }
 
 function escapeHtml(s: string): string {
