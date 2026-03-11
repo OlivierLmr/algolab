@@ -33,7 +33,7 @@ export function App() {
       <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
         {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
         <ResizeHandle />
-        <div class={editMode ? 'dimmed' : ''}>
+        <div class={`canvas-wrapper ${editMode ? 'dimmed' : ''}`}>
           <CanvasVisualizer />
         </div>
         <div class={`description ${editMode ? 'dimmed' : ''}`}>
