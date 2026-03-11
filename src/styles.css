@@ -48,9 +48,25 @@ body {
 
 .main-layout {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 400px 0px 1fr;
   grid-template-rows: 1fr auto;
   gap: 20px;
+}
+
+.resize-handle {
+  grid-row: 1 / -1;
+  width: 8px;
+  margin: 0 -4px;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background: rgba(100, 150, 255, 0.3);
+  border-radius: 4px;
 }
 
 .code-panel {
@@ -59,7 +75,7 @@ body {
   border-radius: 8px;
   padding: 16px;
   overflow-x: auto;
-  min-width: 320px;
+  min-width: 0;
 }
 
 .code-panel pre {
@@ -196,7 +212,7 @@ body {
   background: #1e1e1e;
   border-radius: 8px;
   padding: 16px;
-  min-width: 320px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

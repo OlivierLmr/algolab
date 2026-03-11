@@ -3,9 +3,10 @@ import { useEffect } from 'preact/hooks'
 import { Header } from './components/Header.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
 import { EditorPanel } from './components/EditorPanel.tsx'
+import { ResizeHandle } from './components/ResizeHandle.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
-import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode, isRunMode } from './state.ts'
+import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
 export function App() {
   const step = currentStep.value
@@ -22,11 +23,14 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  const gridColumns = `${codePanelWidth.value}px 0px 1fr`
+
   return (
     <>
       <Header />
-      <div class="main-layout">
+      <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
         {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
+        <ResizeHandle />
         <div class={editMode ? 'dimmed' : ''}>
           <CanvasVisualizer />
         </div>

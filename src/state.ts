@@ -48,6 +48,9 @@ export const inputText = signal(
     : (initial?.input ?? algorithms[0].defaultInput.join(', '))
 )
 
+// Layout
+export const codePanelWidth = signal(400)
+
 // Custom mode state
 export const isCustomMode = signal(initial?.algo === 'custom')
 export const isRunMode = signal(false)
