@@ -25,6 +25,36 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** Turn a label like "j - 1" into a pattern like "j\s*-\s*1" that matches
+ *  regardless of whitespace around operators. */
+function labelToPattern(label: string): string {
+  return label.split(/(\s+)/).map(part =>
+    /^\s+$/.test(part) ? '\\s*' : escapeRegex(part)
+  ).join('')
+}
+
+/** Build a compiled pattern + lookup from a color map.
+ *  Each capturing group maps to a color map key via groupToKey. */
+function buildMatchPattern(colorMap: Map<string, string>): { pattern: RegExp; groupToKey: string[] } | null {
+  if (colorMap.size === 0) return null
+  const keys = [...colorMap.keys()].sort((a, b) => b.length - a.length)
+  const groupToKey: string[] = []
+  const parts = keys.map(key => {
+    groupToKey.push(key)
+    return `(${labelToPattern(key)})`
+  })
+  const pattern = new RegExp(`\\b(?:${parts.join('|')})\\b`, 'g')
+  return { pattern, groupToKey }
+}
+
+/** Find which color map key matched by checking which capture group is non-undefined. */
+function matchedKey(match: RegExpExecArray, groupToKey: string[]): string {
+  for (let i = 0; i < groupToKey.length; i++) {
+    if (match[i + 1] !== undefined) return groupToKey[i]
+  }
+  return groupToKey[0]
+}
+
 /** Build a color map from source code pointer labels. */
 export function buildColorMap(source: string): Map<string, string> {
   return assignPointerColors(extractPointerLabels(source))
@@ -32,10 +62,9 @@ export function buildColorMap(source: string): Map<string, string> {
 
 /** Render a line of code with colored variable names as a JSX element. */
 export function colorizeTokens(line: string, colorMap: Map<string, string>): preact.JSX.Element {
-  if (colorMap.size === 0) return h('span', null, line)
-
-  const varNames = [...colorMap.keys()].sort((a, b) => b.length - a.length)
-  const pattern = new RegExp(`\\b(${varNames.map(escapeRegex).join('|')})\\b`, 'g')
+  const compiled = buildMatchPattern(colorMap)
+  if (!compiled) return h('span', null, line)
+  const { pattern, groupToKey } = compiled
 
   const parts: preact.JSX.Element[] = []
   let lastIndex = 0
@@ -45,9 +74,10 @@ export function colorizeTokens(line: string, colorMap: Map<string, string>): pre
     if (match.index > lastIndex) {
       parts.push(h('span', null, line.slice(lastIndex, match.index)))
     }
-    const varName = match[1]
+    const key = matchedKey(match, groupToKey)
+    const color = colorMap.get(key)
     parts.push(
-      h('span', { style: { color: colorMap.get(varName), fontWeight: 'bold' } }, varName)
+      h('span', { style: { color, fontWeight: 'bold' } }, match[0])
     )
     lastIndex = pattern.lastIndex
   }
@@ -61,16 +91,11 @@ export function colorizeTokens(line: string, colorMap: Map<string, string>): pre
 /** Colorize a full source string into an HTML string (for overlay <pre>).
  *  Lines starting with #: are wrapped in a dim style to indicate directives. */
 export function colorizeToHtml(source: string, colorMap: Map<string, string>): string {
-  const varNames = colorMap.size > 0
-    ? [...colorMap.keys()].sort((a, b) => b.length - a.length)
-    : []
-  const pattern = varNames.length > 0
-    ? new RegExp(`\\b(${varNames.map(escapeRegex).join('|')})\\b`, 'g')
-    : null
+  const compiled = buildMatchPattern(colorMap)
 
   return source.split('\n').map(line => {
     const isDirective = /^\s*#:/.test(line)
-    let colorized = colorizeLine(line, colorMap, pattern)
+    let colorized = colorizeLine(line, colorMap, compiled)
     if (isDirective) {
       colorized = `<span class="directive-line">${colorized}</span>`
     }
@@ -78,8 +103,13 @@ export function colorizeToHtml(source: string, colorMap: Map<string, string>): s
   }).join('\n')
 }
 
-function colorizeLine(line: string, colorMap: Map<string, string>, pattern: RegExp | null): string {
-  if (!pattern) return escapeHtml(line)
+function colorizeLine(
+  line: string,
+  colorMap: Map<string, string>,
+  compiled: { pattern: RegExp; groupToKey: string[] } | null,
+): string {
+  if (!compiled) return escapeHtml(line)
+  const { pattern, groupToKey } = compiled
 
   let result = ''
   let lastIndex = 0
@@ -90,9 +120,9 @@ function colorizeLine(line: string, colorMap: Map<string, string>, pattern: RegE
     if (match.index > lastIndex) {
       result += escapeHtml(line.slice(lastIndex, match.index))
     }
-    const varName = match[1]
-    const color = colorMap.get(varName)
-    result += `<span style="color:${color};font-weight:bold">${escapeHtml(varName)}</span>`
+    const key = matchedKey(match, groupToKey)
+    const color = colorMap.get(key)
+    result += `<span style="color:${color};font-weight:bold">${escapeHtml(match[0])}</span>`
     lastIndex = pattern.lastIndex
   }
   if (lastIndex < line.length) {
