@@ -124,6 +124,7 @@ export function EditorPanel() {
           onKeyDown={handleTab}
           onScroll={handleScroll}
           spellcheck={false}
+          wrap="off"
         />
       </div>
       <div class="editor-input-row">
