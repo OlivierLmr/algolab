@@ -8,6 +8,7 @@ export type ASTNode =
   | SwapNode
   | ExprStmtNode
   | DimNode
+  | UndimNode
   | PointerNode
   | CommentNode
   | AllocNode
@@ -75,6 +76,14 @@ export interface ExprStmtNode {
 
 export interface DimNode {
   type: 'dim'
+  arrayName: string
+  from: Expr
+  to: Expr
+  line: number
+}
+
+export interface UndimNode {
+  type: 'undim'
   arrayName: string
   from: Expr
   to: Expr

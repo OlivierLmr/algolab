@@ -22,6 +22,7 @@ export const quickSort: AlgorithmDefinition = {
       else
         #: comment "arr[{i}]={arr[i]} >= pivot and arr[{j}]={arr[j]} <= pivot: swapping"
         swap arr[i], arr[j]
+    #: undim arr from hi to hi
     #: comment "Placing pivot {arr[hi]} at position {i}"
     swap arr[i], arr[hi]
     return i

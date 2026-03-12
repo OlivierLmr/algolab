@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode,
   Expr,
 } from './ast.ts'
 
@@ -513,6 +513,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'assign': execAssign(node); break
         case 'swap': execSwap(node); break
         case 'dim': execDim(node); break
+        case 'undim': execUndim(node); break
         case 'pointer': execPointer(node); break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
@@ -638,6 +639,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const from = evalExpr(node.from)
       const to = evalExpr(node.to)
       dimRanges.push({ arrayName: resolveArrayName(node.arrayName), from, to })
+    }
+
+    function execUndim(node: UndimNode): void {
+      const from = evalExpr(node.from)
+      const to = evalExpr(node.to)
+      const name = resolveArrayName(node.arrayName)
+      dimRanges = dimRanges.filter(d => !(d.arrayName === name && d.from === from && d.to === to))
     }
 
     function execPointer(node: PointerNode): void {

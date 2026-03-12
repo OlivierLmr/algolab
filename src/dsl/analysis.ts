@@ -56,7 +56,7 @@ export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
         case 'swap': scanExprs(stmt.left, stmt.right); break
         case 'exprStmt': scanExprs(stmt.expr); break
         case 'return': scanExprs(stmt.value); break
-        case 'def': case 'dim': case 'pointer': case 'comment': case 'alloc': break
+        case 'def': case 'dim': case 'undim': case 'pointer': case 'comment': case 'alloc': break
       }
     }
   }
@@ -96,6 +96,7 @@ export function collectAllPointerLabels(nodes: ASTNode[]): string[] {
       case 'exprStmt': scanExpr(node.expr); break
       case 'return': scanExpr(node.value); break
       case 'dim': break
+      case 'undim': break
       case 'pointer': break
       case 'comment': break
       case 'alloc': break
