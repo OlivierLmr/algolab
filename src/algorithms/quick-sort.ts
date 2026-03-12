@@ -5,10 +5,11 @@ export const quickSort: AlgorithmDefinition = {
   source: `algo QuickSort(arr: int[])
 
   def partition(lo, hi)
+    #: dim arr from hi to hi
     let i = lo - 1
     let j = hi
     let done = 0
-    #: comment "Partitioning arr[{lo}..{hi}] with pivot {arr[hi]}"
+    #: comment "Partitioning arr[{lo}..{hi - 1}] with pivot {arr[hi]}"
     while done == 0
       i = i + 1
       while arr[i] < arr[hi]
@@ -39,5 +40,5 @@ export const quickSort: AlgorithmDefinition = {
       qsort(pivotIdx + 1, hi)
 
   qsort(0, len(arr) - 1)`,
-  defaultInput: [5, 3, 8, 1, 2],
+  defaultInput: [5, 3, 4, 1, 2],
 }
