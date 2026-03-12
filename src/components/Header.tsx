@@ -5,7 +5,6 @@ import {
   inputText,
   isCustomMode,
   selectCustom,
-  editBuiltIn,
 } from '../state.ts'
 
 export function Header() {
@@ -40,9 +39,6 @@ export function Header() {
           ))}
           <option value="custom">Custom</option>
         </select>
-        {!custom && (
-          <button class="edit-btn" onClick={editBuiltIn}>Edit</button>
-        )}
       </div>
     </header>
   )

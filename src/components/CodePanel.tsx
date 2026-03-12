@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn } from '../state.ts'
 import { getDisplayInfo } from '../dsl/preprocess.ts'
 import { buildColorMap, colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo } from 'preact/hooks'
@@ -39,12 +39,19 @@ export function CodePanel() {
 
   return (
     <div class="code-panel">
-      {custom && isRunMode.value && (
-        <div class="code-panel-toolbar">
-          <span class="code-panel-toolbar-title">Running</span>
-          <button class="editor-btn" onClick={toggleRunMode}>Edit</button>
-        </div>
-      )}
+      <div class="code-panel-toolbar">
+        {custom && isRunMode.value ? (
+          <>
+            <span class="code-panel-toolbar-title">Running</span>
+            <button class="editor-btn" onClick={toggleRunMode}>Edit</button>
+          </>
+        ) : !custom ? (
+          <>
+            <span class="code-panel-toolbar-title">Code</span>
+            <button class="editor-btn" onClick={editBuiltIn}>Edit</button>
+          </>
+        ) : null}
+      </div>
       <pre>
         {lines.map((line, i) => {
           const directive = custom && isDirectiveLine(line)
