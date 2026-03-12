@@ -31,19 +31,16 @@ export function drawPointers(
       const x = startX + p.index * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const arrowTop = baseY - 4
       const arrowBottom = baseY - 4 - ARROW_Y_GAP * (pi + 1)
-      const color = p.highlight ? getHighlightColor(p.highlight) : p.color
-      const lineWidth = p.highlight ? 3 : 2
-
       // Arrow line
-      ctx.strokeStyle = color
-      ctx.lineWidth = lineWidth
+      ctx.strokeStyle = p.color
+      ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(x, arrowBottom)
       ctx.lineTo(x, arrowTop)
       ctx.stroke()
 
       // Arrow head (pointing down into the array)
-      ctx.fillStyle = color
+      ctx.fillStyle = p.color
       ctx.beginPath()
       ctx.moveTo(x, arrowTop)
       ctx.lineTo(x - 5, arrowTop - 8)
@@ -52,10 +49,24 @@ export function drawPointers(
       ctx.fill()
 
       // Label
-      ctx.fillStyle = color
-      ctx.font = `bold ${p.highlight ? 13 : 12}px monospace`
+      const labelText = `${p.name}=${p.index}`
+      ctx.font = 'bold 12px monospace'
       ctx.textAlign = 'center'
-      ctx.fillText(`${p.name}=${p.index}`, x, arrowBottom - 4)
+
+      if (p.highlight) {
+        const textWidth = ctx.measureText(labelText).width
+        const boxPad = 3
+        const boxX = x - textWidth / 2 - boxPad
+        const boxY = arrowBottom - 14
+        const boxW = textWidth + boxPad * 2
+        const boxH = 16
+        ctx.strokeStyle = getHighlightColor(p.highlight)
+        ctx.lineWidth = 2
+        ctx.strokeRect(boxX, boxY, boxW, boxH)
+      }
+
+      ctx.fillStyle = p.color
+      ctx.fillText(labelText, x, arrowBottom - 4 + (p.highlight ? 1 : 0))
       ctx.textAlign = 'start'
     }
   }
