@@ -7,6 +7,7 @@ import { EditorPanel } from './components/EditorPanel.tsx'
 import { ResizeHandle } from './components/ResizeHandle.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
+import { DslDocs } from './components/DslDocs.tsx'
 import { currentStep, recentDescriptions, nextStep, prevStep, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
 export function App() {
@@ -44,6 +45,7 @@ export function App() {
         </div>
       </div>
       <Controls />
+      {editMode && <DslDocs />}
     </>
   )
 }

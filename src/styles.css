@@ -460,3 +460,96 @@ body {
 .changelog-dismiss:hover {
   opacity: 1;
 }
+
+/* DSL Documentation */
+.dsl-docs {
+  margin-top: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #2d2d2d;
+}
+
+.dsl-docs-summary {
+  font-size: 13px;
+  color: #999;
+  cursor: pointer;
+  padding: 8px 12px;
+  user-select: none;
+}
+
+.dsl-docs-summary:hover {
+  color: #ccc;
+}
+
+.dsl-docs-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 12px 12px;
+}
+
+.dsl-docs-col {
+  min-width: 0;
+}
+
+.dsl-docs-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin: 0 0 6px 8px;
+  font-weight: 600;
+}
+
+.dsl-docs-heading code {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.dsl-docs-prefix {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.dsl-docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.dsl-docs-table td {
+  padding: 2px 8px;
+  vertical-align: top;
+}
+
+.dsl-docs-table td:first-child {
+  white-space: nowrap;
+}
+
+.dsl-docs-table td:last-child {
+  color: #999;
+}
+
+.dsl-docs-table code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: #d4d4d4;
+}
+
+.dsl-docs-operators {
+  color: #999 !important;
+  padding-top: 4px !important;
+}
+
+.dsl-docs-note {
+  font-size: 11px;
+  color: #777;
+  margin: 8px 8px 0;
+  line-height: 1.4;
+}
+
+.dsl-docs-note code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 11px;
+  color: #aaa;
+}
