@@ -4,6 +4,7 @@ import { selectionSort } from './selection-sort.ts'
 import { insertionSort } from './insertion-sort.ts'
 import { mergeSortLR } from './merge-sort-lr.ts'
 import { mergeSortBU } from './merge-sort-bu.ts'
+import { quickSort } from './quick-sort.ts'
 
 export const algorithms: AlgorithmDefinition[] = [
   bubbleSort,
@@ -11,4 +12,5 @@ export const algorithms: AlgorithmDefinition[] = [
   insertionSort,
   mergeSortLR,
   mergeSortBU,
+  quickSort,
 ]
