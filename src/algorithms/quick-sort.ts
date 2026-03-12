@@ -36,6 +36,7 @@ export const quickSort: AlgorithmDefinition = {
       #: comment "Choosing pivot at index {p}, value {arr[p]}"
       swap arr[hi], arr[p]
       let pivotIdx = partition(lo, hi)
+      #: pointer pivotIdx on arr at pivotIdx
       #: comment "Pivot {arr[pivotIdx]} placed at index {pivotIdx}"
       qsort(lo, pivotIdx - 1)
       qsort(pivotIdx + 1, hi)
