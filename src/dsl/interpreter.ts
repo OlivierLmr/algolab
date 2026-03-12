@@ -38,12 +38,21 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     const arrayAliasStack: Map<string, string>[] = []
 
     function resolveArrayName(name: string): string {
-      for (let i = arrayAliasStack.length - 1; i >= 0; i--) {
-        if (arrayAliasStack[i].has(name)) {
-          return resolveArrayName(arrayAliasStack[i].get(name)!)
+      const seen = new Set<string>()
+      let current = name
+      for (;;) {
+        let found = false
+        for (let i = arrayAliasStack.length - 1; i >= 0; i--) {
+          if (arrayAliasStack[i].has(current)) {
+            current = arrayAliasStack[i].get(current)!
+            if (seen.has(current)) return current
+            seen.add(current)
+            found = true
+            break
+          }
         }
+        if (!found) return current
       }
-      return name
     }
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
@@ -365,7 +374,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       // User-defined procedure call
       const proc = procedures.get(name)
       if (proc) {
-        if (++callDepth > 1000) throw new Error('Max recursion depth exceeded')
+        if (++callDepth > 1000) throw new Error('Max recursion depth exceeded (1000 nested calls). Check for infinite recursion in your algorithm.')
 
         // Phase 1: evaluate args — array params get aliases, scalar params get values
         const aliasMap = new Map<string, string>()
@@ -527,7 +536,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function execFor(node: ForNode): void {
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
-      if (toVal - fromVal > 10000) throw new Error('For loop range too large')
+      if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
       pushPointers(node.body)
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
@@ -545,7 +554,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
-        if (++guard > 10000) throw new Error('Infinite loop detected')
+        if (++guard > 10000) throw new Error('Infinite loop detected (10000 iterations). Check your while loop condition.')
       }
       snapshot(node.line, 'While condition is false')
       popPointers()

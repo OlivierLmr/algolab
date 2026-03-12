@@ -3,9 +3,9 @@ import type { AlgorithmDefinition } from '../types.ts'
 export const quickSort: AlgorithmDefinition = {
   name: 'Quick Sort',
   source: `algo QuickSort(arr: int[])
-  alloc piv 1
+  alloc result 1
 
-  def partition(lo, hi, piv: int[])
+  def partition(lo, hi, res: int[])
     let i = lo - 1
     let j = hi
     let done = 0
@@ -24,9 +24,9 @@ export const quickSort: AlgorithmDefinition = {
         swap arr[i], arr[j]
     #: comment "Placing pivot {arr[hi]} at position {i}"
     swap arr[i], arr[hi]
-    piv[0] = i
+    res[0] = i
 
-  def qsort(lo, hi, piv: int[])
+  def qsort(lo, hi, res: int[])
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
     #: comment "Subarray [{lo}..{hi}]: {lo < hi ? 'needs partitioning' : 'base case'}"
@@ -34,12 +34,12 @@ export const quickSort: AlgorithmDefinition = {
       let p = lo + (hi - lo) / 2
       #: comment "Choosing pivot at index {p}, value {arr[p]}"
       swap arr[hi], arr[p]
-      partition(lo, hi, piv)
-      let pivotIdx = piv[0]
+      partition(lo, hi, res)
+      let pivotIdx = res[0]
       #: comment "Pivot {arr[pivotIdx]} placed at index {pivotIdx}"
-      qsort(lo, pivotIdx - 1, piv)
-      qsort(pivotIdx + 1, hi, piv)
+      qsort(lo, pivotIdx - 1, res)
+      qsort(pivotIdx + 1, hi, res)
 
-  qsort(0, len(arr) - 1, piv)`,
+  qsort(0, len(arr) - 1, result)`,
   defaultInput: [5, 3, 8, 1, 2],
 }
