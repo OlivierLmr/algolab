@@ -1,7 +1,13 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode, DefNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode,
   Expr,
 } from './ast.ts'
+
+/** Sentinel thrown by `return` statements to unwind execution. */
+class ReturnSignal {
+  value: number
+  constructor(value: number) { this.value = value }
+}
 import { lex } from './lexer.ts'
 import { parse as parseSource } from './parser.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange, CallFrame } from '../types.ts'
@@ -413,7 +419,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         const savedDimRanges = [...dimRanges]
 
         // Execute body
-        for (const stmt of proc.body) execNode(stmt)
+        let returnValue = 0
+        try {
+          for (const stmt of proc.body) execNode(stmt)
+        } catch (e) {
+          if (e instanceof ReturnSignal) {
+            returnValue = e.value
+          } else {
+            throw e
+          }
+        }
 
         // Restore pointer stack and dim ranges after return
         activePointerStack.splice(0)
@@ -429,7 +444,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
         callFrameStack.pop()
         callDepth--
-        return 0
+        return returnValue
       }
       throw new Error(`Unknown function: ${name}`)
     }
@@ -502,6 +517,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break
+        case 'return': execReturn(node); break
         case 'exprStmt':
           if (node.expr.type === 'call' && procedures.has(node.expr.callee)) {
             const call = node.expr
@@ -642,6 +658,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
     function execDef(node: DefNode): void {
       procedures.set(node.name, { params: node.params, body: node.body })
+    }
+
+    function execReturn(node: ReturnNode): void {
+      const val = evalExpr(node.value)
+      snapshot(node.line, `Return ${val}`)
+      throw new ReturnSignal(val)
     }
 
     function execSwap(node: SwapNode): void {

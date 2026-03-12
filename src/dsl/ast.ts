@@ -12,6 +12,7 @@ export type ASTNode =
   | CommentNode
   | AllocNode
   | DefNode
+  | ReturnNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -106,6 +107,12 @@ export interface DefNode {
   name: string
   params: { name: string; paramType?: string }[]
   body: ASTNode[]
+  line: number
+}
+
+export interface ReturnNode {
+  type: 'return'
+  value: Expr
   line: number
 }
 
