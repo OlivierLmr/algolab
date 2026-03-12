@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-03-12T12:00:00Z",
+    "title": "Quick Sort & Visual Improvements",
+    "message": "New algorithms: Quick Sort and Semi-Recursive Quick Sort. Pointer arrows now appear on arrays (lo, hi, pivotIdx, etc.) with colored highlight boxes. Variables from the current call frame are shown in the sidebar. Also fixed a bug where MergeSort LR produced incorrect results on small subarrays."
+  },
+  {
     "date": "2026-03-11T12:00:00Z",
     "title": "Custom Algorithm Editor",
     "message": "You can now write your own algorithms in the editor, save them by exporting to a file, and re-import them later. Select \"Custom\" from the dropdown or click \"Edit\" on any built-in algorithm to get started."
