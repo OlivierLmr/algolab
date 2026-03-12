@@ -34,8 +34,8 @@ export const mergeSortLR: AlgorithmDefinition = {
   def msort(lo, hi)
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
-    #: comment "The table has {hi-lo} elements, {hi - lo > 1 ? 'it needs to be sorted recursively.' : 'it is already sorted.'}"
-    if hi - lo > 1
+    #: comment "The subarray has {hi - lo + 1} elements, {lo < hi ? 'it needs to be sorted recursively.' : 'it is already sorted.'}"
+    if lo < hi
       let mid = lo + (hi - lo) / 2
       #: comment "Sorting left half from {lo} to {mid}"
       msort(lo, mid)
