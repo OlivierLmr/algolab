@@ -409,14 +409,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         callFrameStack.push(frame)
         arrayAliasStack.push(aliasMap)
         pushScope()
-        pushPointers(proc.body)
         for (const binding of scalarBindings) {
           setVar(binding.name, binding.value)
         }
 
-        // Save pointer stack and dim ranges before call body
+        // Save caller's pointer stack and dim ranges, replace with function body's pointers
         const savedPointerStack = activePointerStack.splice(0)
         const savedDimRanges = [...dimRanges]
+        activePointerStack.push(collectScopePointers(proc.body))
 
         // Execute body
         let returnValue = 0
@@ -430,13 +430,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           }
         }
 
-        // Restore pointer stack and dim ranges after return
+        // Restore caller's pointer stack and dim ranges
         activePointerStack.splice(0)
         activePointerStack.push(...savedPointerStack)
         dimRanges = savedDimRanges
 
         // Cleanup
-        popPointers()
         popScope()
         arrayAliasStack.pop()
         for (const arrName of frame.allocatedArrays) {
@@ -554,19 +553,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
       if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
-      pushPointers(node.body)
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
-      popPointers()
       deleteVar(node.variable)
     }
 
     function execWhile(node: WhileNode): void {
       let guard = 0
-      pushPointers(node.body)
       while (evalExpr(node.condition) !== 0) {
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -574,7 +570,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         if (++guard > 10000) throw new Error('Infinite loop detected (10000 iterations). Check your while loop condition.')
       }
       snapshot(node.line, 'While condition is false')
-      popPointers()
     }
 
     function execIf(node: IfNode): void {
@@ -590,13 +585,9 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       snapshot(node.line, desc)
 
       if (cond !== 0) {
-        pushPointers(node.body)
         for (const stmt of node.body) execNode(stmt)
-        popPointers()
       } else if (node.elseBody.length > 0) {
-        pushPointers(node.elseBody)
         for (const stmt of node.elseBody) execNode(stmt)
-        popPointers()
       }
     }
 
