@@ -439,6 +439,12 @@ body {
   line-height: 1.5;
 }
 
+.changelog-separator {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 6px 0;
+}
+
 .changelog-dismiss {
   background: none;
   border: none;

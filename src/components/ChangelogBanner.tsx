@@ -33,7 +33,9 @@ async function loadChangelog(): Promise<void> {
     const all: ChangelogEntry[] = await res.json()
     const dismissedTime = new Date(dismissed).getTime()
     // Show entries newer than what they last dismissed
-    entries.value = all.filter(e => new Date(e.date).getTime() > dismissedTime)
+    entries.value = all
+      .filter(e => new Date(e.date).getTime() > dismissedTime)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   } catch {
     // ignore fetch errors
   }
@@ -60,11 +62,14 @@ export function ChangelogBanner() {
     <div class="changelog-banner">
       <div class="changelog-content">
         <div class="changelog-header">What's new since your last visit:</div>
-        {entries.value.map((entry) => (
-          <div key={entry.date} class="changelog-entry">
-            <strong>{entry.title}</strong>
-            <span> — {entry.message}</span>
-          </div>
+        {entries.value.map((entry, i) => (
+          <>
+            {i > 0 && <hr class="changelog-separator" />}
+            <div key={entry.date} class="changelog-entry">
+              <strong>{entry.title}</strong>
+              <span> — {entry.message}</span>
+            </div>
+          </>
         ))}
       </div>
       <button class="changelog-dismiss" onClick={dismiss} aria-label="Dismiss">x</button>
