@@ -36,9 +36,7 @@ export function drawArray(
       ctx.globalAlpha = 0.3
     }
 
-    const hl = !isDimmed
-      ? highlights.find(h => h.arrayName === name && h.indices.includes(i))
-      : undefined
+    const hl = highlights.find(h => h.arrayName === name && h.indices.includes(i))
 
     // Cell background
     ctx.fillStyle = '#fff'
