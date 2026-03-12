@@ -84,6 +84,8 @@ function drawFrame(
 ): number {
   const frame = callStack[index]
   const totalHeight = computeFrameHeight(callStack, index, pointerNames)
+  const isInnermost = index === callStack.length - 1
+  const contentAlpha = isInnermost ? 1.0 : 0.35
 
   // Draw rounded rectangle border
   const boxX = x
@@ -99,6 +101,10 @@ function drawFrame(
   ctx.fill()
   ctx.stroke()
   ctx.restore()
+
+  // Gray out non-innermost frame content
+  ctx.save()
+  ctx.globalAlpha = contentAlpha
 
   // Draw label
   ctx.save()
@@ -151,6 +157,9 @@ function drawFrame(
     drawVariables(ctx, frame.variables, frame.varHighlights, pointerNames, curY, contentX)
     curY += getVariablesHeight(nonPointerVarCount)
   }
+
+  // Restore full alpha for child frame
+  ctx.restore()
 
   // Draw child frame if any
   if (index + 1 < callStack.length) {
