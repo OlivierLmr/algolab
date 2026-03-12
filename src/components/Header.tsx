@@ -22,7 +22,7 @@ export function Header() {
 
   return (
     <header class="header">
-      <h1>Algorithm Visualizer</h1>
+      <h1>AlgoLab</h1>
       <div class="header-controls">
         {!custom && (
           <input

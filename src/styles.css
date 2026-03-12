@@ -431,8 +431,9 @@ body {
 }
 
 .changelog-header {
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 1.2em;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
 
 .changelog-entry {
