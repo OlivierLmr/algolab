@@ -429,9 +429,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           setVar(binding.name, binding.value)
         }
 
-        // Save caller's pointer stack and dim ranges, replace with function body's pointers
+        // Save caller's pointer stack, dim ranges, and directive pointers
         const savedPointerStack = activePointerStack.splice(0)
         const savedDimRanges = [...dimRanges]
+        const savedDirectivePointers = new Map(directivePointers)
+        directivePointers.clear()
         activePointerStack.push(collectScopePointers(proc.body))
 
         // Execute body
@@ -446,10 +448,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           }
         }
 
-        // Restore caller's pointer stack and dim ranges
+        // Restore caller's pointer stack, dim ranges, and directive pointers
         activePointerStack.splice(0)
         activePointerStack.push(...savedPointerStack)
         dimRanges = savedDimRanges
+        directivePointers.clear()
+        for (const [k, v] of savedDirectivePointers) directivePointers.set(k, v)
 
         // Cleanup
         popScope()
@@ -526,6 +530,23 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       } catch { /* skip */ }
     }
 
+    function snapshotCallIfProcedure(expr: Expr, line: number): void {
+      if (expr.type === 'call' && procedures.has(expr.callee)) {
+        const proc = procedures.get(expr.callee)!
+        const argDisplayParts: string[] = []
+        for (let i = 0; i < expr.args.length; i++) {
+          const param = proc.params[i]
+          if (param?.paramType === 'int[]') {
+            const arg = expr.args[i]
+            argDisplayParts.push(arg.type === 'identifier' ? resolveArrayName(arg.name) : '?')
+          } else {
+            argDisplayParts.push(String(evalExpr(expr.args[i])))
+          }
+        }
+        snapshot(line, `Call ${expr.callee}(${argDisplayParts.join(', ')})`)
+      }
+    }
+
     function execNode(node: ASTNode): void {
       switch (node.type) {
         case 'for': execFor(node); break
@@ -542,25 +563,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'def': execDef(node); break
         case 'return': execReturn(node); break
         case 'exprStmt':
-          if (node.expr.type === 'call' && procedures.has(node.expr.callee)) {
-            const call = node.expr
-            const proc = procedures.get(call.callee)!
-            const argDisplayParts: string[] = []
-            for (let i = 0; i < call.args.length; i++) {
-              const param = proc.params[i]
-              if (param?.paramType === 'int[]') {
-                // For array params, show the resolved identifier name
-                const arg = call.args[i]
-                argDisplayParts.push(arg.type === 'identifier' ? resolveArrayName(arg.name) : '?')
-              } else {
-                argDisplayParts.push(String(evalExpr(call.args[i])))
-              }
-            }
-            snapshot(node.line, `Call ${call.callee}(${argDisplayParts.join(', ')})`)
-            evalCall(call.callee, call.args)
-          } else {
+          snapshotCallIfProcedure(node.expr, node.line)
+          if (!(node.expr.type === 'call' && procedures.has(node.expr.callee))) {
             evalExpr(node.expr)
             snapshot(node.line, '')
+          } else {
+            evalCall(node.expr.callee, node.expr.args)
           }
           break
       }
@@ -618,6 +626,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
 
     function execLet(node: LetNode): void {
+      snapshotCallIfProcedure(node.value, node.line)
       const val = evalExpr(node.value)
       setVar(node.name, val)
       if (!isActivePointerVar(node.name)) {
@@ -632,6 +641,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
 
     function execAssign(node: AssignNode): void {
+      snapshotCallIfProcedure(node.value, node.line)
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
         setVar(node.target.name, val)
