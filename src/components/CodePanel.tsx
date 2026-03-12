@@ -29,8 +29,13 @@ export function CodePanel() {
   const activeLine = step
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)
     : undefined
-  const variables = step?.variables ?? {}
-  const varEntries = Object.entries(variables)
+  // Show variables from global scope + innermost call frame
+  const allVars: Record<string, number> = { ...(step?.variables ?? {}) }
+  if (step && step.callStack.length > 0) {
+    const innermost = step.callStack[step.callStack.length - 1]
+    Object.assign(allVars, innermost.variables)
+  }
+  const varEntries = Object.entries(allVars)
 
   return (
     <div class="code-panel">
