@@ -115,6 +115,22 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
     }
 
+    /** Check that all variables in an expression exist in the current function's
+     *  own scope (or global scope), not inherited from parent call scopes. */
+    function exprVarsInCurrentScope(expr: Expr): boolean {
+      const vars = new Set<string>()
+      collectVarNames(expr, vars)
+      const currentScopeIndex = callFrameStack.length
+      for (const name of vars) {
+        // Check current function's scope
+        if (currentScopeIndex < scopeStack.length && scopeStack[currentScopeIndex].has(name)) continue
+        // Check global scope (for algo-level variables)
+        if (currentScopeIndex > 0 && scopeStack[0].has(name)) continue
+        return false
+      }
+      return true
+    }
+
     function isActivePointerVar(name: string): boolean {
       for (const level of activePointerStack) {
         for (const entry of level) {
@@ -194,6 +210,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           const key = `${resolvedArrayName}:${entry.label}`
           if (seenPointers.has(key)) continue
           try {
+            if (!exprVarsInCurrentScope(entry.expr)) continue
             const index = evalExpr(entry.expr)
             seenPointers.add(key)
             const ptrHl = currentPointerHighlights.find(h => h.label === entry.label)
