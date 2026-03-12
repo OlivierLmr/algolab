@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode,
   Expr,
 } from './ast.ts'
 
@@ -64,7 +64,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     let currentVarHighlights: VarHighlight[] = []
     let currentPointerHighlights: { label: string; type: 'compare' | 'swap' | 'active' }[] = []
     let dimRanges: DimRange[] = []
-    const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
     const activePointerStack: ScopePointer[][] = []
     let pendingComment: string | null = null
 
@@ -210,19 +209,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
       }
 
-      for (const [label, def] of directivePointers) {
-        try {
-          const index = evalExpr(def.expr)
-          const ptrHl = currentPointerHighlights.find(h => h.label === label)
-          allPointers.push({
-            name: label,
-            arrayName: def.arrayName,
-            index,
-            color: colorMap.get(label) || '#888',
-            highlight: ptrHl?.type,
-          })
-        } catch { /* skip */ }
-      }
 
       // Collect all dim ranges
       const allDimRanges: DimRange[] = [...dimRanges]
@@ -429,11 +415,9 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           setVar(binding.name, binding.value)
         }
 
-        // Save caller's pointer stack, dim ranges, and directive pointers
+        // Save caller's pointer stack and dim ranges
         const savedPointerStack = activePointerStack.splice(0)
         const savedDimRanges = [...dimRanges]
-        const savedDirectivePointers = new Map(directivePointers)
-        directivePointers.clear()
         activePointerStack.push(collectScopePointers(proc.body))
 
         // Execute body
@@ -448,12 +432,10 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           }
         }
 
-        // Restore caller's pointer stack, dim ranges, and directive pointers
+        // Restore caller's pointer stack and dim ranges
         activePointerStack.splice(0)
         activePointerStack.push(...savedPointerStack)
         dimRanges = savedDimRanges
-        directivePointers.clear()
-        for (const [k, v] of savedDirectivePointers) directivePointers.set(k, v)
 
         // Cleanup
         popScope()
@@ -557,7 +539,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         case 'swap': execSwap(node); break
         case 'dim': execDim(node); break
         case 'undim': execUndim(node); break
-        case 'pointer': execPointer(node); break
+        case 'pointer': break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break
@@ -675,9 +657,6 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       dimRanges = dimRanges.filter(d => !(d.arrayName === name && d.from === from && d.to === to))
     }
 
-    function execPointer(node: PointerNode): void {
-      directivePointers.set(node.label, { arrayName: resolveArrayName(node.arrayName), expr: node.at })
-    }
 
     function execComment(node: CommentNode): void {
       pendingComment = node.text

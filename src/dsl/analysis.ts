@@ -56,7 +56,15 @@ export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
         case 'swap': scanExprs(stmt.left, stmt.right); break
         case 'exprStmt': scanExprs(stmt.expr); break
         case 'return': scanExprs(stmt.value); break
-        case 'def': case 'dim': case 'undim': case 'pointer': case 'comment': case 'alloc': break
+        case 'pointer': {
+          const key = `${stmt.arrayName}:${stmt.label}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            result.push({ arrayName: stmt.arrayName, expr: stmt.at, label: stmt.label })
+          }
+          break
+        }
+        case 'def': case 'dim': case 'undim': case 'comment': case 'alloc': break
       }
     }
   }
