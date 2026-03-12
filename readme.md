@@ -10,8 +10,9 @@ How the algorithms are written is unclear for now. Maybe simple typescript code 
 
 ## Todo
 
-- [ ] Online code editor
+- [x] Online code editor
   - Enter that mode, so that it shows also the hidden lines. Have something telling you if there is a syntax error (inline or simply in some card somewhere)
   - Have the ability to export and import pieces of code in a ".algolab" format.
 - [x] Store current state (algo, step, input) in the url for easy sharing.
 - [x] Show previous 3 steps in the lower "description" div.
+- [ ] Animations
