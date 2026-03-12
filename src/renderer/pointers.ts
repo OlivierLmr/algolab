@@ -1,5 +1,6 @@
 import type { Pointer } from '../types.ts'
 import { CELL_SIZE, CELL_GAP } from './array.ts'
+import { getHighlightColor } from './colors.ts'
 
 const ARROW_Y_GAP = 18
 
@@ -30,17 +31,19 @@ export function drawPointers(
       const x = startX + p.index * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const arrowTop = baseY - 4
       const arrowBottom = baseY - 4 - ARROW_Y_GAP * (pi + 1)
+      const color = p.highlight ? getHighlightColor(p.highlight) : p.color
+      const lineWidth = p.highlight ? 3 : 2
 
       // Arrow line
-      ctx.strokeStyle = p.color
-      ctx.lineWidth = 2
+      ctx.strokeStyle = color
+      ctx.lineWidth = lineWidth
       ctx.beginPath()
       ctx.moveTo(x, arrowBottom)
       ctx.lineTo(x, arrowTop)
       ctx.stroke()
 
       // Arrow head (pointing down into the array)
-      ctx.fillStyle = p.color
+      ctx.fillStyle = color
       ctx.beginPath()
       ctx.moveTo(x, arrowTop)
       ctx.lineTo(x - 5, arrowTop - 8)
@@ -49,8 +52,8 @@ export function drawPointers(
       ctx.fill()
 
       // Label
-      ctx.fillStyle = p.color
-      ctx.font = 'bold 12px monospace'
+      ctx.fillStyle = color
+      ctx.font = `bold ${p.highlight ? 13 : 12}px monospace`
       ctx.textAlign = 'center'
       ctx.fillText(`${p.name}=${p.index}`, x, arrowBottom - 4)
       ctx.textAlign = 'start'

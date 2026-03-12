@@ -62,6 +62,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     }
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
+    let currentPointerHighlights: { label: string; type: 'compare' | 'swap' | 'active' }[] = []
     let dimRanges: DimRange[] = []
     const directivePointers = new Map<string, { arrayName: string; expr: Expr }>()
     const activePointerStack: ScopePointer[][] = []
@@ -122,6 +123,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
       }
       return false
+    }
+
+    function getPointerLabelsForVar(name: string): string[] {
+      const labels: string[] = []
+      for (const level of activePointerStack) {
+        for (const entry of level) {
+          if (exprContainsVar(entry.expr, name)) labels.push(entry.label)
+        }
+      }
+      return labels
     }
 
     function exprContainsVar(expr: Expr, name: string): boolean {
@@ -186,11 +197,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
           try {
             const index = evalExpr(entry.expr)
             seenPointers.add(key)
+            const ptrHl = currentPointerHighlights.find(h => h.label === entry.label)
             allPointers.push({
               name: entry.label,
               arrayName: resolvedArrayName,
               index,
               color: colorMap.get(entry.label) || '#888',
+              highlight: ptrHl?.type,
             })
             collectVarNames(entry.expr, activePointerVarNames)
           } catch { /* variable not yet defined — skip */ }
@@ -200,11 +213,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       for (const [label, def] of directivePointers) {
         try {
           const index = evalExpr(def.expr)
+          const ptrHl = currentPointerHighlights.find(h => h.label === label)
           allPointers.push({
             name: label,
             arrayName: def.arrayName,
             index,
             color: colorMap.get(label) || '#888',
+            highlight: ptrHl?.type,
           })
         } catch { /* skip */ }
       }
@@ -309,6 +324,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       })
       currentHighlights = []
       currentVarHighlights = []
+      currentPointerHighlights = []
     }
 
     function evalExpr(expr: Expr): number {
@@ -498,7 +514,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
             currentHighlights.push({ arrayName, indices: [idx], type: 'compare' })
           }
         } else if (expr.type === 'identifier' && hasVar(expr.name)) {
-          currentVarHighlights.push({ varName: expr.name, type: 'compare' })
+          const pointerLabels = getPointerLabelsForVar(expr.name)
+          if (pointerLabels.length > 0) {
+            for (const label of pointerLabels) {
+              currentPointerHighlights.push({ label, type: 'compare' })
+            }
+          } else {
+            currentVarHighlights.push({ varName: expr.name, type: 'compare' })
+          }
         }
       } catch { /* skip */ }
     }

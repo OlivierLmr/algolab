@@ -8,6 +8,7 @@ export interface Pointer {
   arrayName: string
   index: number
   color: string
+  highlight?: 'compare' | 'swap' | 'sorted' | 'active'
 }
 
 export interface Highlight {
