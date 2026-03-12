@@ -29,20 +29,25 @@ export const quickSortSemi: AlgorithmDefinition = {
 
   def qsort(lo, hi)
     let curLo = lo
-    while curLo < hi
+    let curHi = hi
+    while curLo < curHi
       #: dim arr from 0 to curLo - 1
-      #: dim arr from hi + 1 to len(arr) - 1
-      #: comment "Subarray [{curLo}..{hi}]: needs partitioning"
-      let p = curLo + (hi - curLo) / 2
+      #: dim arr from curHi + 1 to len(arr) - 1
+      let p = curLo + (curHi - curLo) / 2
       #: comment "Choosing pivot at index {p}, value {arr[p]}"
-      swap arr[hi], arr[p]
-      let pivotIdx = partition(curLo, hi)
+      swap arr[curHi], arr[p]
+      let pivotIdx = partition(curLo, curHi)
       #: comment "Pivot {arr[pivotIdx]} placed at index {pivotIdx}"
-      qsort(curLo, pivotIdx - 1)
       #: undim arr from 0 to curLo - 1
-      #: undim arr from hi + 1 to len(arr) - 1
-      curLo = pivotIdx + 1
-    #: comment "Subarray [{curLo}..{hi}]: {curLo == hi ? 'single element' : 'empty'}"
+      #: undim arr from curHi + 1 to len(arr) - 1
+      if pivotIdx - curLo < curHi - pivotIdx
+        #: comment "Left side smaller: recurse left [{curLo}..{pivotIdx - 1}], iterate right"
+        qsort(curLo, pivotIdx - 1)
+        curLo = pivotIdx + 1
+      else
+        #: comment "Right side smaller: recurse right [{pivotIdx + 1}..{curHi}], iterate left"
+        qsort(pivotIdx + 1, curHi)
+        curHi = pivotIdx - 1
 
   qsort(0, len(arr) - 1)`,
   defaultInput: [5, 3, 4, 1, 2],
