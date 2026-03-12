@@ -578,6 +578,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
+        highlightComparisonSide({ type: 'identifier', name: node.variable })
+        highlightComparisonSide(node.to)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
@@ -592,6 +594,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         for (const stmt of node.body) execNode(stmt)
         if (++guard > 10000) throw new Error('Infinite loop detected (10000 iterations). Check your while loop condition.')
       }
+      addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')
     }
 
