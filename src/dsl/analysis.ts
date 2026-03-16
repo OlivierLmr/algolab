@@ -45,11 +45,9 @@ export function collectScopePointers(body: ASTNode[]): ScopePointer[] {
           break
         case 'while':
           scanExprs(stmt.condition)
-          scanBody(stmt.body)
           break
         case 'for':
           scanExprs(stmt.from, stmt.to)
-          scanBody(stmt.body)
           break
         case 'let': scanExprs(stmt.value); break
         case 'assign': scanExprs(stmt.target, stmt.value); break
@@ -100,8 +98,8 @@ function collectComparisons(body: ASTNode[]): ComparisonPair[] {
     for (const stmt of stmts) {
       switch (stmt.type) {
         case 'if': fromExpr(stmt.condition); fromBody(stmt.body); fromBody(stmt.elseBody); break
-        case 'while': fromExpr(stmt.condition); fromBody(stmt.body); break
-        case 'for': fromBody(stmt.body); break
+        case 'while': fromExpr(stmt.condition); break
+        case 'for': break
         // Don't recurse into def — function bodies get their own pointer set
         default: break
       }
@@ -186,8 +184,14 @@ export function collectAllPointerLabels(nodes: ASTNode[]): string[] {
         bodies.push(node.body)
         for (const child of node.body) bodies.push(...collectBodies(child))
         break
-      case 'for': for (const child of node.body) bodies.push(...collectBodies(child)); break
-      case 'while': for (const child of node.body) bodies.push(...collectBodies(child)); break
+      case 'for':
+        bodies.push(node.body)
+        for (const child of node.body) bodies.push(...collectBodies(child))
+        break
+      case 'while':
+        bodies.push(node.body)
+        for (const child of node.body) bodies.push(...collectBodies(child))
+        break
       case 'if':
         for (const child of node.body) bodies.push(...collectBodies(child))
         for (const child of node.elseBody) bodies.push(...collectBodies(child))

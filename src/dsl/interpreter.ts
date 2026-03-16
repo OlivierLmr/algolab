@@ -608,6 +608,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       const toVal = evalExpr(node.to)
       if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
       pushScope()
+      pushPointers(node.body)
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
         highlightComparisonSide({ type: 'identifier', name: node.variable })
@@ -615,12 +616,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
+      popPointers()
       popScope()
     }
 
     function execWhile(node: WhileNode): void {
       let guard = 0
       pushScope()
+      pushPointers(node.body)
       while (evalExpr(node.condition) !== 0) {
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -629,6 +632,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
       addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')
+      popPointers()
       popScope()
     }
 
