@@ -3,6 +3,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 export const mergeSortLR: AlgorithmDefinition = {
   name: 'Merge Sort (L+R copies)',
   source: `algo MergeSortLR(arr: int[])
+  #: gauge arr
 
   def copy(lo, mid, hi)
     let leftLen = mid - lo + 1

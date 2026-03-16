@@ -3,6 +3,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 export const quickSort: AlgorithmDefinition = {
   name: 'Quick Sort',
   source: `algo QuickSort(arr: int[])
+  #: gauge arr
 
   def partition(lo, hi)
     #: dim arr from hi to hi

@@ -3,6 +3,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 export const mergeSortBU: AlgorithmDefinition = {
   name: 'Merge Sort (two arrays)',
   source: `algo MergeSortAux(arr: int[])
+  #: gauge arr
   alloc aux len(arr)
 
   def merge(src: int[], dst: int[], lo, mid, hi)

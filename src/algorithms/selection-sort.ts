@@ -3,6 +3,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 export const selectionSort: AlgorithmDefinition = {
   name: 'Selection Sort',
   source: `algo SelectionSort(arr: int[])
+  #: gauge arr
   for i from 0 to len(arr) - 2
     #: comment "Looking for minimum in arr[{i}..{len(arr) - 1}]"
     let min = i
