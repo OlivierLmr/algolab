@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, functionLineRanges } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint } from '../state.ts'
 import { getDisplayInfo } from '../dsl/preprocess.ts'
 import { buildColorMap, colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo } from 'preact/hooks'

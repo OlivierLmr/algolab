@@ -106,36 +106,37 @@ export const totalSteps = computed(() => steps.value.length)
 // Per-line breakpoint state (disabled lines)
 export const disabledLines = signal<Set<number>>(new Set())
 
-/** Parse function line ranges from source using indentation-based blocks. */
-export function getFunctionLineRanges(source: string): { name: string; startLine: number; endLine: number }[] {
+/** Parse indentation-based block ranges (def, for, while) from source. */
+export function getBlockLineRanges(source: string): { startLine: number; endLine: number }[] {
   const lines = source.split('\n')
-  const ranges: { name: string; startLine: number; endLine: number }[] = []
+  const ranges: { startLine: number; endLine: number }[] = []
 
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^(\s*)def\s+(\w+)\s*\(/)
+    const match = lines[i].match(/^(\s*)(?:def\s+\w+\s*\(|for\s+|while\s+|if\s+)/)
     if (!match) continue
-    const defIndent = match[1].length
-    const name = match[2]
+    const blockIndent = match[1].length
     const startLine = i
     let endLine = i
     for (let j = i + 1; j < lines.length; j++) {
       const line = lines[j]
       if (line.trim() === '') { endLine = j; continue }
       const indent = line.match(/^(\s*)/)![1].length
-      if (indent <= defIndent) break
+      if (indent <= blockIndent) break
       endLine = j
     }
-    ranges.push({ name, startLine, endLine })
+    if (endLine > startLine) {
+      ranges.push({ startLine, endLine })
+    }
   }
   return ranges
 }
 
-export const functionLineRanges = computed(() => getFunctionLineRanges(currentAlgo.value.source))
+export const blockLineRanges = computed(() => getBlockLineRanges(currentAlgo.value.source))
 
-/** Toggle breakpoint on a source line. If it's a def line, toggle the entire function body. */
+/** Toggle breakpoint on a source line. If it's a block head (def/for/while/if), toggle the entire block. */
 export function toggleBreakpoint(sourceLine: number): void {
   const next = new Set(disabledLines.value)
-  const ranges = functionLineRanges.value
+  const ranges = blockLineRanges.value
   const range = ranges.find((r) => r.startLine === sourceLine)
   if (range) {
     // Toggle all lines in the function (def line + body)
