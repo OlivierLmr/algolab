@@ -166,6 +166,10 @@ body {
   flex-shrink: 0;
 }
 
+.breakpoint-gutter-empty {
+  cursor: default;
+}
+
 .breakpoint-dot {
   display: inline-block;
   width: 8px;

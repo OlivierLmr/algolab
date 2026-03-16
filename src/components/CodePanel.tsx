@@ -75,13 +75,14 @@ export function CodePanel() {
           const directive = custom && isDirectiveLine(line)
           const sourceLine = reverseLineMap ? (reverseLineMap.get(i) ?? i) : i
           const isDisabled = disabledDisplayLines.has(i)
+          const isEmpty = line.trim() === ''
           return (
             <div
               key={i}
               class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${directive ? 'code-line-directive' : ''} ${isDisabled ? 'code-line-skipped' : ''}`}
             >
-              <span class="breakpoint-gutter" onClick={() => toggleBreakpoint(sourceLine)}>
-                <span class={`breakpoint-dot ${isDisabled ? 'breakpoint-dot-disabled' : ''}`} />
+              <span class={`breakpoint-gutter ${isEmpty ? 'breakpoint-gutter-empty' : ''}`} onClick={isEmpty ? undefined : () => toggleBreakpoint(sourceLine)}>
+                {!isEmpty && <span class={`breakpoint-dot ${isDisabled ? 'breakpoint-dot-disabled' : ''}`} />}
               </span>
               <span class="line-number">{i + 1}</span>
               {colorizeTokens(line, colorMap)}
