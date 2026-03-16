@@ -1,7 +1,7 @@
 import { lex } from './lexer.ts'
 import { parse } from './parser.ts'
 import { createRunner } from './interpreter.ts'
-import { preprocessSource, stripDirectivePrefix } from './preprocess.ts'
+import { preprocessSource } from './preprocess.ts'
 import type { DisplayInfo } from './preprocess.ts'
 import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
