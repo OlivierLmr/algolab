@@ -469,6 +469,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         let returnValue = 0
         try {
           for (const stmt of proc.body) execNode(stmt)
+          flushPendingComment(proc.body.length > 0 ? proc.body[proc.body.length - 1].line : 0)
         } catch (e) {
           if (e instanceof ReturnSignal) {
             returnValue = e.value
@@ -606,6 +607,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         highlightComparisonSide(node.to)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
+        flushPendingComment(node.line)
       }
       popPointers()
       popScope()
@@ -619,6 +621,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
+        flushPendingComment(node.line)
         if (++guard > 10000) throw new Error('Infinite loop detected (10000 iterations). Check your while loop condition.')
       }
       addComparisonHighlights(node.condition)
@@ -642,10 +645,12 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       if (cond !== 0) {
         pushScope()
         for (const stmt of node.body) execNode(stmt)
+        flushPendingComment(node.line)
         popScope()
       } else if (node.elseBody.length > 0) {
         pushScope()
         for (const stmt of node.elseBody) execNode(stmt)
+        flushPendingComment(node.line)
         popScope()
       }
     }
@@ -703,6 +708,12 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]
     }
 
+    function flushPendingComment(line: number): void {
+      if (pendingCommentParts !== null) {
+        snapshot(line, '')
+      }
+    }
+
     function execAlloc(node: AllocNode): void {
       const size = evalExpr(node.size)
       arrays.set(node.arrayName, new Array(size).fill(0))
@@ -746,6 +757,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
     pushPointers(algo.body)
     snapshot(algo.line, `Start ${algo.name}`)
     for (const stmt of algo.body) execNode(stmt)
+    flushPendingComment(algo.body[algo.body.length - 1].line)
     snapshot(algo.body[algo.body.length - 1].line, 'Done')
     popPointers()
 

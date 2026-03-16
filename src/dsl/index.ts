@@ -7,6 +7,7 @@ import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
 import { collectAllPointerLabels, collectDirectivePointerLabels } from './analysis.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
+import { validateAST } from './validate.ts'
 
 export interface PipelineResult {
   steps: Step[]
@@ -22,6 +23,11 @@ export function compilePipeline(source: string, paramName: string, input: number
 
   const tokens = lex(stripped)
   const ast = parse(tokens)
+
+  const validationErrors = validateAST(ast)
+  if (validationErrors.length > 0) {
+    throw new Error(`Line ${validationErrors[0].line + 1}: ${validationErrors[0].message}`)
+  }
 
   // Collect pointer labels (single pass, shared with interpreter)
   const labels = collectAllPointerLabels(ast.body)
