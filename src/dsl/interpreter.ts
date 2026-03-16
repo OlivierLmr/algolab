@@ -39,6 +39,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       argStrings: string[]
       allocatedArrays: Set<string>
       arrayAliases: Map<string, string>
+      scopeBase: number
     }
     const callFrameStack: ActiveFrame[] = []
     const arrayAliasStack: Map<string, string>[] = []
@@ -82,6 +83,16 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       scopeStack[scopeStack.length - 1].set(name, value)
     }
 
+    function updateVar(name: string, value: number): void {
+      for (let i = scopeStack.length - 1; i >= 0; i--) {
+        if (scopeStack[i].has(name)) {
+          scopeStack[i].set(name, value)
+          return
+        }
+      }
+      scopeStack[scopeStack.length - 1].set(name, value)
+    }
+
     function hasVar(name: string): boolean {
       for (let i = scopeStack.length - 1; i >= 0; i--) {
         if (scopeStack[i].has(name)) return true
@@ -120,12 +131,24 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     function exprVarsInCurrentScope(expr: Expr): boolean {
       const vars = new Set<string>()
       collectVarNames(expr, vars)
-      const currentScopeIndex = callFrameStack.length
       for (const name of vars) {
-        // Check current function's scope
-        if (currentScopeIndex < scopeStack.length && scopeStack[currentScopeIndex].has(name)) continue
-        // Check global scope (for algo-level variables)
-        if (currentScopeIndex > 0 && scopeStack[0].has(name)) continue
+        let found = false
+        // Check current function's scopes (from scopeBase to stack top)
+        if (callFrameStack.length > 0) {
+          const base = callFrameStack[callFrameStack.length - 1].scopeBase
+          for (let si = base; si < scopeStack.length; si++) {
+            if (scopeStack[si].has(name)) { found = true; break }
+          }
+        }
+        if (found) continue
+        // Check algo-level scopes
+        const algoTop = callFrameStack.length > 0
+          ? callFrameStack[0].scopeBase
+          : scopeStack.length
+        for (let si = 0; si < algoTop; si++) {
+          if (scopeStack[si].has(name)) { found = true; break }
+        }
+        if (found) continue
         return false
       }
       return true
@@ -245,11 +268,14 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
             ([paramName, targetName]) => ({ paramName, targetName })
           )
 
-          // Frame's variables come from scopeStack[fi + 1]
+          // Frame's variables come from all scopes in this frame
           const frameVars: Record<string, number> = {}
-          const scopeIndex = fi + 1
-          if (scopeIndex < scopeStack.length) {
-            for (const [k, v] of scopeStack[scopeIndex]) {
+          const scopeFrom = af.scopeBase
+          const scopeTo = fi + 1 < callFrameStack.length
+            ? callFrameStack[fi + 1].scopeBase
+            : scopeStack.length
+          for (let si = scopeFrom; si < scopeTo; si++) {
+            for (const [k, v] of scopeStack[si]) {
               frameVars[k] = v
               frameVarNames.add(k)
             }
@@ -298,10 +324,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
       }
 
-      // Global variables: from scopeStack[0] (and not in any frame)
+      // Global variables: from algo-level scopes only
       const globalVars: Record<string, number> = {}
-      for (const scope of scopeStack) {
-        for (const [k, v] of scope) {
+      const globalScopeTo = callFrameStack.length > 0
+        ? callFrameStack[0].scopeBase
+        : scopeStack.length
+      for (let si = 0; si < globalScopeTo; si++) {
+        for (const [k, v] of scopeStack[si]) {
           if (!frameVarNames.has(k)) {
             globalVars[k] = v
           }
@@ -424,10 +453,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         }
 
         // Phase 2: push frame, alias stack, scope, bind scalars
-        const frame: ActiveFrame = { name, argStrings, allocatedArrays: new Set(), arrayAliases: aliasMap }
+        const frame: ActiveFrame = { name, argStrings, allocatedArrays: new Set(), arrayAliases: aliasMap, scopeBase: 0 }
         callFrameStack.push(frame)
         arrayAliasStack.push(aliasMap)
         pushScope()
+        frame.scopeBase = scopeStack.length - 1
         for (const binding of scalarBindings) {
           setVar(binding.name, binding.value)
         }
@@ -454,8 +484,8 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         activePointerStack.push(...savedPointerStack)
         dimRanges = savedDimRanges
 
-        // Cleanup
-        popScope()
+        // Cleanup: pop all scopes back to (and including) the function's base scope
+        while (scopeStack.length > frame.scopeBase) popScope()
         arrayAliasStack.pop()
         for (const arrName of frame.allocatedArrays) {
           arrays.delete(arrName)
@@ -573,16 +603,11 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
     }
 
-    function deleteVar(name: string): void {
-      for (let i = scopeStack.length - 1; i >= 0; i--) {
-        if (scopeStack[i].has(name)) { scopeStack[i].delete(name); return }
-      }
-    }
-
     function execFor(node: ForNode): void {
       const fromVal = evalExpr(node.from)
       const toVal = evalExpr(node.to)
       if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
+      pushScope()
       for (let i = fromVal; i <= toVal; i++) {
         setVar(node.variable, i)
         highlightComparisonSide({ type: 'identifier', name: node.variable })
@@ -590,11 +615,12 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
         snapshot(node.line, `Set ${node.variable} = ${i}`)
         for (const stmt of node.body) execNode(stmt)
       }
-      deleteVar(node.variable)
+      popScope()
     }
 
     function execWhile(node: WhileNode): void {
       let guard = 0
+      pushScope()
       while (evalExpr(node.condition) !== 0) {
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -603,6 +629,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
       addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')
+      popScope()
     }
 
     function execIf(node: IfNode): void {
@@ -618,9 +645,13 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       snapshot(node.line, desc)
 
       if (cond !== 0) {
+        pushScope()
         for (const stmt of node.body) execNode(stmt)
+        popScope()
       } else if (node.elseBody.length > 0) {
+        pushScope()
         for (const stmt of node.elseBody) execNode(stmt)
+        popScope()
       }
     }
 
@@ -643,7 +674,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       snapshotCallIfProcedure(node.value, node.line)
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
-        setVar(node.target.name, val)
+        updateVar(node.target.name, val)
         if (!isActivePointerVar(node.target.name)) {
           currentVarHighlights.push({ varName: node.target.name, type: 'active' })
         }
