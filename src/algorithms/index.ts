@@ -6,6 +6,9 @@ import { mergeSortLR } from './merge-sort-lr.ts'
 import { mergeSortBU } from './merge-sort-bu.ts'
 import { quickSort } from './quick-sort.ts'
 import { quickSortSemi } from './quick-sort-semi.ts'
+import { quickSelect } from './quick-select.ts'
+import { countingSort } from './counting-sort.ts'
+import { radixSort } from './radix-sort.ts'
 
 export const algorithms: AlgorithmDefinition[] = [
   bubbleSort,
@@ -15,4 +18,7 @@ export const algorithms: AlgorithmDefinition[] = [
   mergeSortBU,
   quickSort,
   quickSortSemi,
+  quickSelect,
+  countingSort,
+  radixSort,
 ]
