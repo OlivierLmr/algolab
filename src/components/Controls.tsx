@@ -1,4 +1,4 @@
-import { currentStepIndex, totalSteps, nextStep, prevStep, goToStep, isCustomMode, isRunMode } from '../state.ts'
+import { currentStepIndex, totalSteps, nextStep, prevStep, stepOver, stepOut, goToStep, steps, isCustomMode, isRunMode } from '../state.ts'
 
 export function Controls() {
   const step = currentStepIndex.value
@@ -27,6 +27,12 @@ export function Controls() {
       />
       <button onClick={nextStep} disabled={step >= total - 1}>
         Next
+      </button>
+      <button onClick={stepOver} disabled={step >= total - 1}>
+        Over <span class="shortcut-label">Shift+→</span>
+      </button>
+      <button onClick={stepOut} disabled={step >= total - 1 || (steps.value[step]?.callStack.length ?? 0) === 0}>
+        Out <span class="shortcut-label">Shift+↑</span>
       </button>
       <span class="step-counter">
         Step {step + 1} / {total}

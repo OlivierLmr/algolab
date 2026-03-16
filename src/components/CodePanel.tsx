@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, availableFunctions, skippedFunctions, toggleSkipFunction, functionLineRanges } from '../state.ts'
 import { getDisplayInfo } from '../dsl/preprocess.ts'
 import { buildColorMap, colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo } from 'preact/hooks'
@@ -29,6 +29,38 @@ export function CodePanel() {
   const activeLine = step
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)
     : undefined
+
+  // Build set of display line indices belonging to skipped functions
+  const skipped = skippedFunctions.value
+  const skippedLineSet = useMemo(() => {
+    const set = new Set<number>()
+    if (skipped.size === 0) return set
+    const ranges = functionLineRanges.value
+    // Build reverse map: display line → source line (for built-in algos with lineMap)
+    let reverseMap: Map<number, number> | null = null
+    if (lineMap) {
+      reverseMap = new Map()
+      lineMap.forEach((displayLine, sourceLine) => {
+        reverseMap!.set(displayLine, sourceLine)
+      })
+    }
+    for (const range of ranges) {
+      if (!skipped.has(range.name)) continue
+      // Mark body lines (startLine+1 to endLine) — keep the def line visible
+      for (let srcLine = range.startLine + 1; srcLine <= range.endLine; srcLine++) {
+        if (lineMap) {
+          const displayLine = lineMap.get(srcLine)
+          if (displayLine !== undefined) set.add(displayLine)
+        } else {
+          set.add(srcLine)
+        }
+      }
+    }
+    return set
+  }, [algo.source, custom, skipped])
+
+  const funcs = availableFunctions.value
+
   // Show variables from global scope + innermost call frame
   const allVars: Record<string, number> = { ...(step?.variables ?? {}) }
   if (step && step.callStack.length > 0) {
@@ -58,7 +90,7 @@ export function CodePanel() {
           return (
             <div
               key={i}
-              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${directive ? 'code-line-directive' : ''}`}
+              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${directive ? 'code-line-directive' : ''} ${skippedLineSet.has(i) ? 'code-line-skipped' : ''}`}
             >
               <span class="line-number">{i + 1}</span>
               {colorizeTokens(line, colorMap)}
@@ -66,6 +98,21 @@ export function CodePanel() {
           )
         })}
       </pre>
+      {funcs.length > 0 && (
+        <div class="functions-section">
+          <div class="functions-title">Functions</div>
+          {funcs.map((name) => (
+            <label key={name} class="function-toggle">
+              <input
+                type="checkbox"
+                checked={skipped.has(name)}
+                onChange={() => toggleSkipFunction(name)}
+              />
+              Skip {name}
+            </label>
+          ))}
+        </div>
+      )}
       {varEntries.length > 0 && (
         <div class="variables-section">
           <div class="variables-title">Variables</div>

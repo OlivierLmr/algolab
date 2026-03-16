@@ -103,6 +103,96 @@ export const currentStep = computed<Step>(
 
 export const totalSteps = computed(() => steps.value.length)
 
+// Skip function state
+export const skippedFunctions = signal<Set<string>>(new Set())
+
+export const availableFunctions = computed<string[]>(() => {
+  const source = currentAlgo.value.source
+  const names: string[] = []
+  for (const m of source.matchAll(/^\s*def\s+(\w+)\s*\(/gm)) {
+    names.push(m[1])
+  }
+  return names
+})
+
+/** Parse function line ranges from source using indentation-based blocks. */
+export function getFunctionLineRanges(source: string): { name: string; startLine: number; endLine: number }[] {
+  const lines = source.split('\n')
+  const ranges: { name: string; startLine: number; endLine: number }[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(\s*)def\s+(\w+)\s*\(/)
+    if (!match) continue
+    const defIndent = match[1].length
+    const name = match[2]
+    const startLine = i
+    let endLine = i
+    for (let j = i + 1; j < lines.length; j++) {
+      const line = lines[j]
+      if (line.trim() === '') { endLine = j; continue }
+      const indent = line.match(/^(\s*)/)![1].length
+      if (indent <= defIndent) break
+      endLine = j
+    }
+    ranges.push({ name, startLine, endLine })
+  }
+  return ranges
+}
+
+export const functionLineRanges = computed(() => getFunctionLineRanges(currentAlgo.value.source))
+
+/** Returns true if any call stack frame's function name is in skippedFunctions. */
+function isStepInSkippedFunction(step: Step): boolean {
+  const skipped = skippedFunctions.value
+  if (skipped.size === 0) return false
+  return step.callStack.some((frame) => {
+    const name = frame.label.replace(/\(.*$/, '')
+    return skipped.has(name)
+  })
+}
+
+export function stepOver(): void {
+  const allSteps = steps.value
+  const idx = currentStepIndex.value
+  if (idx >= allSteps.length - 1) return
+  const currentDepth = allSteps[idx].callStack.length
+  let i = idx + 1
+  while (i < allSteps.length && allSteps[i].callStack.length > currentDepth) {
+    i++
+  }
+  if (i >= allSteps.length) i = allSteps.length - 1
+  // Skip past skipped functions
+  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+    i++
+  }
+  currentStepIndex.value = i
+}
+
+export function stepOut(): void {
+  const allSteps = steps.value
+  const idx = currentStepIndex.value
+  if (idx >= allSteps.length - 1) return
+  const currentDepth = allSteps[idx].callStack.length
+  if (currentDepth === 0) return
+  let i = idx + 1
+  while (i < allSteps.length && allSteps[i].callStack.length >= currentDepth) {
+    i++
+  }
+  if (i >= allSteps.length) i = allSteps.length - 1
+  // Skip past skipped functions
+  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+    i++
+  }
+  currentStepIndex.value = i
+}
+
+export function toggleSkipFunction(name: string): void {
+  const next = new Set(skippedFunctions.value)
+  if (next.has(name)) next.delete(name)
+  else next.add(name)
+  skippedFunctions.value = next
+}
+
 export const recentDescriptions = computed<string[]>(() => {
   const idx = currentStepIndex.value
   const all = steps.value
@@ -142,12 +232,14 @@ export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
   inputText.value = algorithmList[index].defaultInput.join(', ')
+  skippedFunctions.value = new Set()
 }
 
 export function selectCustom(): void {
   isCustomMode.value = true
   isRunMode.value = false
   currentStepIndex.value = 0
+  skippedFunctions.value = new Set()
 }
 
 export function editBuiltIn(): void {
@@ -186,15 +278,25 @@ export function tryParseCustom(): string | null {
 }
 
 export function nextStep(): void {
-  if (currentStepIndex.value < steps.value.length - 1) {
-    currentStepIndex.value++
+  const allSteps = steps.value
+  let i = currentStepIndex.value
+  if (i >= allSteps.length - 1) return
+  i++
+  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+    i++
   }
+  currentStepIndex.value = i
 }
 
 export function prevStep(): void {
-  if (currentStepIndex.value > 0) {
-    currentStepIndex.value--
+  const allSteps = steps.value
+  let i = currentStepIndex.value
+  if (i <= 0) return
+  i--
+  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+    i--
   }
+  currentStepIndex.value = i
 }
 
 export function goToStep(index: number): void {
