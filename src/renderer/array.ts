@@ -68,11 +68,13 @@ export function drawArray(
       if (!isFinite(values[i])) {
         ratio = 1
       } else if (gaugeMin === gaugeMax) {
-        ratio = 1
+        ratio = 0.5
       } else {
-        ratio = Math.max(0, Math.min(1, (values[i] - gaugeMin) / (gaugeMax - gaugeMin)))
+        ratio = (values[i] - gaugeMin) / (gaugeMax - gaugeMin)
       }
-      const fillHeight = ratio * CELL_SIZE
+      // Map to 0.15–0.85 range so min isn't empty and max isn't full
+      const clamped = 0.15 + Math.max(0, Math.min(1, ratio)) * 0.7
+      const fillHeight = clamped * CELL_SIZE
       ctx.fillStyle = 'rgba(52, 152, 219, 0.35)'
       ctx.fillRect(x, y + CELL_SIZE - fillHeight, CELL_SIZE, fillHeight)
     }
