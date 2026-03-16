@@ -22,14 +22,21 @@ export function drawArray(
   ctx.font = 'bold 14px monospace'
   ctx.fillText(name, startX, yOffset - 8)
 
+  // Pre-compute dimmed indices for O(1) lookup per cell
+  const dimmedIndices = new Set<number>()
+  for (const d of dimRanges) {
+    if (d.arrayName === name) {
+      for (let idx = Math.max(0, d.from); idx <= Math.min(d.to, values.length - 1); idx++) {
+        dimmedIndices.add(idx)
+      }
+    }
+  }
+
   for (let i = 0; i < values.length; i++) {
     const x = startX + i * (CELL_SIZE + CELL_GAP)
     const y = yOffset
 
-    // Check if this cell is dimmed (inside a dim range)
-    const isDimmed = dimRanges.some(
-      d => d.arrayName === name && i >= d.from && i <= d.to
-    )
+    const isDimmed = dimmedIndices.has(i)
 
     if (isDimmed) {
       ctx.save()

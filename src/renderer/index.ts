@@ -6,68 +6,80 @@ import { computeCallStackHeight, drawCallStack } from './callstack.ts'
 
 const POINTER_SPACE = 60
 const CALLSTACK_GAP = 16
+const CONTENT_X = 40
 
-/** Compute the required canvas height for a given step. */
-export function computeRequiredHeight(step: Step): number {
+/** Layout positions computed once, used by both height calculation and rendering. */
+interface StepLayout {
+  pointerNames: Set<string>
+  arrayYPositions: Map<string, number>
+  callStackY: number
+  variablesY: number
+  totalHeight: number
+  hasCallStack: boolean
+  nonPointerVarCount: number
+}
+
+/** Compute layout positions for all visual elements in a step. */
+function computeLayout(step: Step, width: number): StepLayout {
   const pointerNames = new Set(step.pointers.map(p => p.name))
+  const hasCallStack = step.callStack && step.callStack.length > 0
 
-  let y = ARRAY_Y_START + POINTER_SPACE
-  y += step.arrays.length * getArrayHeight()
-
-  if (step.callStack && step.callStack.length > 0) {
-    // Also collect pointer names from all frames
+  if (hasCallStack) {
     for (const frame of step.callStack) {
       for (const p of frame.pointers) pointerNames.add(p.name)
     }
+  }
+
+  const arrayYPositions = new Map<string, number>()
+  let y = ARRAY_Y_START + POINTER_SPACE
+
+  for (const array of step.arrays) {
+    arrayYPositions.set(array.name, y)
+    y += getArrayHeight()
+  }
+
+  let callStackY = y
+  if (hasCallStack) {
     y += CALLSTACK_GAP
+    callStackY = y
     y += computeCallStackHeight(step.callStack, pointerNames)
   }
 
   const nonPointerVarCount = Object.keys(step.variables).filter(n => !pointerNames.has(n)).length
-  if (nonPointerVarCount > 0) y += getVariablesHeight(nonPointerVarCount)
-  return y
-}
-
-export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: number, height: number): void {
-  // Clear
-  ctx.clearRect(0, 0, width, height)
-
-  const hasCallStack = step.callStack && step.callStack.length > 0
-
-  // Collect all pointer names (global + frame) for variable filtering
-  const pointerNames = new Set(step.pointers.map(p => p.name))
-  if (hasCallStack) {
-    for (const frame of step.callStack) {
-      for (const p of frame.pointers) pointerNames.add(p.name)
-    }
+  const variablesY = y
+  if (nonPointerVarCount > 0) {
+    y += getVariablesHeight(nonPointerVarCount)
   }
 
-  // Track Y positions for pointer drawing
-  const arrayYPositions = new Map<string, number>()
+  return { pointerNames, arrayYPositions, callStackY, variablesY, totalHeight: y, hasCallStack, nonPointerVarCount }
+}
 
-  let yOffset = ARRAY_Y_START + POINTER_SPACE
+/** Compute the required canvas height for a given step. */
+export function computeRequiredHeight(step: Step): number {
+  return computeLayout(step, 0).totalHeight
+}
+
+/** Render a step to canvas using pre-computed layout positions. */
+export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: number, height: number): void {
+  ctx.clearRect(0, 0, width, height)
+  const layout = computeLayout(step, width)
 
   // Draw global arrays
   for (const array of step.arrays) {
-    arrayYPositions.set(array.name, yOffset)
-    drawArray(ctx, array, step.highlights, step.dimRanges, yOffset, 40)
-    yOffset += getArrayHeight()
+    const y = layout.arrayYPositions.get(array.name)!
+    drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X)
   }
 
   // Draw pointers above global arrays
-  drawPointers(ctx, step.pointers, arrayYPositions)
+  drawPointers(ctx, step.pointers, layout.arrayYPositions)
 
-  // Draw call stack if present
-  if (hasCallStack) {
-    yOffset += CALLSTACK_GAP
-    yOffset = drawCallStack(ctx, step.callStack, 20, yOffset, width - 40, pointerNames)
+  // Draw call stack
+  if (layout.hasCallStack) {
+    drawCallStack(ctx, step.callStack, 20, layout.callStackY, width - 40, layout.pointerNames)
   }
 
-  // Draw non-pointer global variables below
-  const nonPointerVarCount = Object.keys(step.variables).filter(n => !pointerNames.has(n)).length
-  if (nonPointerVarCount > 0) {
-    drawVariables(ctx, step.variables, step.varHighlights, pointerNames, yOffset)
-    yOffset += getVariablesHeight(nonPointerVarCount)
+  // Draw non-pointer global variables
+  if (layout.nonPointerVarCount > 0) {
+    drawVariables(ctx, step.variables, step.varHighlights, layout.pointerNames, layout.variablesY)
   }
-
 }
