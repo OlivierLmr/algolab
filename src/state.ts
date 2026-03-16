@@ -103,17 +103,8 @@ export const currentStep = computed<Step>(
 
 export const totalSteps = computed(() => steps.value.length)
 
-// Skip function state
-export const skippedFunctions = signal<Set<string>>(new Set())
-
-export const availableFunctions = computed<string[]>(() => {
-  const source = currentAlgo.value.source
-  const names: string[] = []
-  for (const m of source.matchAll(/^\s*def\s+(\w+)\s*\(/gm)) {
-    names.push(m[1])
-  }
-  return names
-})
+// Per-line breakpoint state (disabled lines)
+export const disabledLines = signal<Set<number>>(new Set())
 
 /** Parse function line ranges from source using indentation-based blocks. */
 export function getFunctionLineRanges(source: string): { name: string; startLine: number; endLine: number }[] {
@@ -141,14 +132,28 @@ export function getFunctionLineRanges(source: string): { name: string; startLine
 
 export const functionLineRanges = computed(() => getFunctionLineRanges(currentAlgo.value.source))
 
-/** Returns true if any call stack frame's function name is in skippedFunctions. */
-function isStepInSkippedFunction(step: Step): boolean {
-  const skipped = skippedFunctions.value
-  if (skipped.size === 0) return false
-  return step.callStack.some((frame) => {
-    const name = frame.label.replace(/\(.*$/, '')
-    return skipped.has(name)
-  })
+/** Toggle breakpoint on a source line. If it's a def line, toggle the entire function body. */
+export function toggleBreakpoint(sourceLine: number): void {
+  const next = new Set(disabledLines.value)
+  const ranges = functionLineRanges.value
+  const range = ranges.find((r) => r.startLine === sourceLine)
+  if (range) {
+    // Toggle all lines in the function (def line + body)
+    const allDisabled = Array.from({ length: range.endLine - range.startLine + 1 }, (_, i) => range.startLine + i)
+      .every((l) => next.has(l))
+    for (let l = range.startLine; l <= range.endLine; l++) {
+      if (allDisabled) next.delete(l)
+      else next.add(l)
+    }
+  } else {
+    if (next.has(sourceLine)) next.delete(sourceLine)
+    else next.add(sourceLine)
+  }
+  disabledLines.value = next
+}
+
+function isStepOnDisabledLine(step: Step): boolean {
+  return disabledLines.value.has(step.currentLine)
 }
 
 export function stepOver(): void {
@@ -162,7 +167,7 @@ export function stepOver(): void {
   }
   if (i >= allSteps.length) i = allSteps.length - 1
   // Skip past skipped functions
-  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+  while (i < allSteps.length - 1 && isStepOnDisabledLine(allSteps[i])) {
     i++
   }
   currentStepIndex.value = i
@@ -180,7 +185,7 @@ export function stepOut(): void {
   }
   if (i >= allSteps.length) i = allSteps.length - 1
   // Skip past skipped functions
-  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+  while (i < allSteps.length - 1 && isStepOnDisabledLine(allSteps[i])) {
     i++
   }
   currentStepIndex.value = i
@@ -196,7 +201,7 @@ export function stepOverBack(): void {
     i--
   }
   // Skip past skipped functions
-  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+  while (i > 0 && isStepOnDisabledLine(allSteps[i])) {
     i--
   }
   currentStepIndex.value = i
@@ -213,17 +218,10 @@ export function stepOutBack(): void {
     i--
   }
   // Skip past skipped functions
-  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+  while (i > 0 && isStepOnDisabledLine(allSteps[i])) {
     i--
   }
   currentStepIndex.value = i
-}
-
-export function toggleSkipFunction(name: string): void {
-  const next = new Set(skippedFunctions.value)
-  if (next.has(name)) next.delete(name)
-  else next.add(name)
-  skippedFunctions.value = next
 }
 
 export const recentDescriptions = computed<string[]>(() => {
@@ -265,14 +263,14 @@ export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
   inputText.value = algorithmList[index].defaultInput.join(', ')
-  skippedFunctions.value = new Set()
+  disabledLines.value = new Set()
 }
 
 export function selectCustom(): void {
   isCustomMode.value = true
   isRunMode.value = false
   currentStepIndex.value = 0
-  skippedFunctions.value = new Set()
+  disabledLines.value = new Set()
 }
 
 export function editBuiltIn(): void {
@@ -315,7 +313,7 @@ export function nextStep(): void {
   let i = currentStepIndex.value
   if (i >= allSteps.length - 1) return
   i++
-  while (i < allSteps.length - 1 && isStepInSkippedFunction(allSteps[i])) {
+  while (i < allSteps.length - 1 && isStepOnDisabledLine(allSteps[i])) {
     i++
   }
   currentStepIndex.value = i
@@ -326,7 +324,7 @@ export function prevStep(): void {
   let i = currentStepIndex.value
   if (i <= 0) return
   i--
-  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+  while (i > 0 && isStepOnDisabledLine(allSteps[i])) {
     i--
   }
   currentStepIndex.value = i

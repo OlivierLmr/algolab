@@ -157,33 +157,37 @@ body {
   padding: 1px 0;
 }
 
-.functions-section {
-  border-top: 1px solid #444;
-  margin-top: 12px;
-  padding-top: 10px;
-  font-family: monospace;
-  font-size: 13px;
-  color: #d4d4d4;
-}
-
-.functions-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888;
-  margin-bottom: 6px;
-}
-
-.function-toggle {
-  display: flex;
+.breakpoint-gutter {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 0;
+  justify-content: center;
+  width: 14px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
-.function-toggle input[type="checkbox"] {
-  cursor: pointer;
+.breakpoint-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e45649;
+  opacity: 0.85;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.breakpoint-dot-disabled {
+  background: #555;
+  opacity: 0.35;
+}
+
+.breakpoint-gutter:hover .breakpoint-dot {
+  opacity: 1;
+}
+
+.breakpoint-gutter:hover .breakpoint-dot-disabled {
+  background: #888;
+  opacity: 0.6;
 }
 
 .shortcut-label {
