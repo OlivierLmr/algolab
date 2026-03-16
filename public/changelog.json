@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-03-16T12:00:00Z",
+    "title": "New Algorithms & Debugging Tools",
+    "message": "New algorithms: QuickSelect, Counting Sort, and Radix Sort (LSD). New stepping controls: step over and step out (forward and backward) let you skip loop bodies and function calls. Click line numbers in the code gutter to toggle breakpoints on any line, including for/while/if blocks. Variables are now block-scoped inside loops, matching expected behavior."
+  },
+  {
     "date": "2026-03-12T12:00:00Z",
     "title": "Quick Sort & Visual Improvements",
     "message": "New algorithms: Quick Sort and Semi-Recursive Quick Sort. Pointer arrows now appear on arrays (lo, hi, pivotIdx, etc.) with colored highlight boxes. Variables from the current call frame are shown in the sidebar. Also fixed a bug where MergeSort LR produced incorrect results on small subarrays."
