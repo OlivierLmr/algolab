@@ -4,8 +4,7 @@ export const mergeSortLR: AlgorithmDefinition = {
   name: 'Merge Sort (L+R copies)',
   source: `algo MergeSortLR(arr: int[])
   #: gauge arr
-  #: skip copy
-
+  #: stepover
   def copy(lo, mid, hi)
     let leftLen = mid - lo + 1
     let rightLen = hi - mid

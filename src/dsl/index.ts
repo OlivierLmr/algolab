@@ -161,31 +161,41 @@ function getBlockRangesFromAST(ast: AlgoNode): { startLine: number; endLine: num
   return ranges
 }
 
-/** Collect default disabled lines from `skip` directives matching `def` block ranges. */
+/** Collect default disabled lines from `stepover` directives applied to the next sibling node. */
 function getDefaultDisabledLines(
   ast: AlgoNode,
   blockRanges: { startLine: number; endLine: number }[],
 ): Set<number> {
   const disabled = new Set<number>()
 
-  // Collect skip targets
-  const skipTargets = new Set<string>()
-  for (const node of ast.body) {
-    if (node.type === 'skip') skipTargets.add(node.functionName)
-  }
-  if (skipTargets.size === 0) return disabled
-
-  // Find matching def nodes and their block ranges
-  for (const node of ast.body) {
-    if (node.type === 'def' && skipTargets.has(node.name)) {
-      const range = blockRanges.find(r => r.startLine === node.line)
-      if (range) {
-        for (let l = range.startLine; l <= range.endLine; l++) {
-          disabled.add(l)
+  function processNodes(nodes: ASTNode[]): void {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (node.type === 'stepover') {
+        // Find next non-directive sibling
+        const next = nodes[i + 1]
+        if (!next) continue
+        // If it's a block node (def/for/while/if), disable the whole block range
+        const range = blockRanges.find(r => r.startLine === next.line)
+        if (range) {
+          for (let l = range.startLine; l <= range.endLine; l++) {
+            disabled.add(l)
+          }
+        } else {
+          // Single line
+          disabled.add(next.line)
         }
+      }
+      // Recurse into child blocks
+      if (node.type === 'for' || node.type === 'while' || node.type === 'def') {
+        processNodes(node.body)
+      } else if (node.type === 'if') {
+        processNodes(node.body)
+        processNodes(node.elseBody)
       }
     }
   }
 
+  processNodes(ast.body)
   return disabled
 }
