@@ -73,7 +73,7 @@ export function drawArray(
         ratio = Math.max(0, Math.min(1, (values[i] - gaugeMin) / (gaugeMax - gaugeMin)))
       }
       const fillHeight = ratio * CELL_SIZE
-      ctx.fillStyle = 'rgba(52, 152, 219, 0.15)'
+      ctx.fillStyle = 'rgba(52, 152, 219, 0.35)'
       ctx.fillRect(x, y + CELL_SIZE - fillHeight, CELL_SIZE, fillHeight)
     }
 
