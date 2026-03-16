@@ -1,4 +1,4 @@
-import { currentStepIndex, totalSteps, nextStep, prevStep, stepOver, stepOut, goToStep, steps, isCustomMode, isRunMode } from '../state.ts'
+import { currentStepIndex, totalSteps, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, goToStep, steps, isCustomMode, isRunMode } from '../state.ts'
 
 export function Controls() {
   const step = currentStepIndex.value
@@ -15,6 +15,12 @@ export function Controls() {
 
   return (
     <div class={`controls ${editMode ? 'dimmed' : ''}`}>
+      <button onClick={stepOutBack} disabled={step === 0 || (steps.value[step]?.callStack.length ?? 0) === 0}>
+        <span class="shortcut-label">Shift+↓</span> In
+      </button>
+      <button onClick={stepOverBack} disabled={step === 0}>
+        <span class="shortcut-label">Shift+←</span> Over
+      </button>
       <button onClick={prevStep} disabled={step === 0}>
         Previous
       </button>

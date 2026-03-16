@@ -8,7 +8,7 @@ import { ResizeHandle } from './components/ResizeHandle.tsx'
 import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
-import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
+import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
 export function App() {
   const step = currentStep.value
@@ -19,7 +19,9 @@ export function App() {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.shiftKey && e.key === 'ArrowRight') { e.preventDefault(); stepOver() }
+      else if (e.shiftKey && e.key === 'ArrowLeft') { e.preventDefault(); stepOverBack() }
       else if (e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); stepOut() }
+      else if (e.shiftKey && e.key === 'ArrowDown') { e.preventDefault(); stepOutBack() }
       else if (e.key === 'ArrowRight') { e.preventDefault(); nextStep() }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep() }
     }

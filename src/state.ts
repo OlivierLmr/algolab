@@ -186,6 +186,39 @@ export function stepOut(): void {
   currentStepIndex.value = i
 }
 
+export function stepOverBack(): void {
+  const allSteps = steps.value
+  const idx = currentStepIndex.value
+  if (idx <= 0) return
+  const currentDepth = allSteps[idx].callStack.length
+  let i = idx - 1
+  while (i > 0 && allSteps[i].callStack.length > currentDepth) {
+    i--
+  }
+  // Skip past skipped functions
+  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+    i--
+  }
+  currentStepIndex.value = i
+}
+
+export function stepOutBack(): void {
+  const allSteps = steps.value
+  const idx = currentStepIndex.value
+  if (idx <= 0) return
+  const currentDepth = allSteps[idx].callStack.length
+  if (currentDepth === 0) return
+  let i = idx - 1
+  while (i > 0 && allSteps[i].callStack.length >= currentDepth) {
+    i--
+  }
+  // Skip past skipped functions
+  while (i > 0 && isStepInSkippedFunction(allSteps[i])) {
+    i--
+  }
+  currentStepIndex.value = i
+}
+
 export function toggleSkipFunction(name: string): void {
   const next = new Set(skippedFunctions.value)
   if (next.has(name)) next.delete(name)
