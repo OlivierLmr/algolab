@@ -5,6 +5,7 @@ export const mergeSortBU: AlgorithmDefinition = {
   source: `algo MergeSortAux(arr: int[])
   #: gauge arr
   alloc aux len(arr)
+  #: gauge aux
 
   def merge(src: int[], dst: int[], lo, mid, hi)
     let i = lo

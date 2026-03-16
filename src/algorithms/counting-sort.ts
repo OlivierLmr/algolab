@@ -12,6 +12,7 @@ export const countingSort: AlgorithmDefinition = {
 
   alloc count max + 1
   alloc output len(arr)
+  #: gauge output
 
   #: comment "Phase 1: Count occurrences"
   for i from 0 to len(arr) - 1

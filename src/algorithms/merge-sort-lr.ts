@@ -18,6 +18,8 @@ export const mergeSortLR: AlgorithmDefinition = {
   def merge(lo, mid, hi)
     alloc L mid - lo + 2
     alloc R hi - mid + 1
+    #: gauge L
+    #: gauge R
     #: comment "Copying arr[{lo}..{mid}] to L and arr[{mid + 1}..{hi}] to R"
     copy(lo, mid, hi)
     let i = 0
