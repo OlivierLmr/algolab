@@ -14,6 +14,8 @@ export type ASTNode =
   | AllocNode
   | DefNode
   | ReturnNode
+  | GaugeNode
+  | UngaugeNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -128,6 +130,18 @@ export interface DefNode {
 export interface ReturnNode {
   type: 'return'
   value: Expr
+  line: number
+}
+
+export interface GaugeNode {
+  type: 'gauge'
+  arrayName: string
+  line: number
+}
+
+export interface UngaugeNode {
+  type: 'ungauge'
+  arrayName: string
   line: number
 }
 

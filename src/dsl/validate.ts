@@ -280,6 +280,16 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         validateExpr(node.to, node.line)
         break
       }
+      case 'gauge':
+      case 'ungauge': {
+        const sym = lookupSymbol(node.arrayName)
+        if (sym === undefined) {
+          errors.push({ line: node.line, message: `Undefined array '${node.arrayName}'` })
+        } else if (sym === 'scalar') {
+          errors.push({ line: node.line, message: `'${node.arrayName}' is not an array` })
+        }
+        break
+      }
       case 'pointer': {
         const sym = lookupSymbol(node.arrayName)
         if (sym === undefined) {

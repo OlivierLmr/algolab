@@ -67,7 +67,7 @@ export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: num
   // Draw global arrays
   for (const array of step.arrays) {
     const y = layout.arrayYPositions.get(array.name)!
-    drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X)
+    drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X, step.gaugeArrays)
   }
 
   // Draw pointers above global arrays

@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode,
   Expr,
 } from './ast.ts'
 
@@ -90,6 +90,8 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'alloc': return parseAlloc()
         case 'def': return parseDef()
         case 'return': return parseReturn()
+        case 'gauge': return parseGauge()
+        case 'ungauge': return parseUngauge()
       }
     }
 
@@ -235,6 +237,20 @@ export function parse(tokens: Token[]): AlgoNode {
     const value = parseExpr()
     expectNewline()
     return { type: 'return', value, line: tok.line }
+  }
+
+  function parseGauge(): GaugeNode {
+    const tok = expect('keyword', 'gauge')
+    const arrayName = expect('ident').value
+    expectNewline()
+    return { type: 'gauge', arrayName, line: tok.line }
+  }
+
+  function parseUngauge(): UngaugeNode {
+    const tok = expect('keyword', 'ungauge')
+    const arrayName = expect('ident').value
+    expectNewline()
+    return { type: 'ungauge', arrayName, line: tok.line }
   }
 
   function parseAssignOrExpr(): ASTNode {

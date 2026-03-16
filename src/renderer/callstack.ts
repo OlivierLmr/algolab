@@ -141,7 +141,7 @@ function drawFrame(
     let ay = curY + POINTER_SPACE
     for (const array of frame.arrays) {
       arrayYPositions.set(array.name, ay)
-      drawArray(ctx, array, frame.highlights, frame.dimRanges, ay, contentX)
+      drawArray(ctx, array, frame.highlights, frame.dimRanges, ay, contentX, frame.gaugeArrays)
       ay += getArrayHeight()
     }
 

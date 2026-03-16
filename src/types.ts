@@ -37,6 +37,7 @@ export interface CallFrame {
   highlights: Highlight[]
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
+  gaugeArrays: string[]
 }
 
 export interface Step {
@@ -45,6 +46,7 @@ export interface Step {
   highlights: Highlight[]
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
+  gaugeArrays: string[]
   variables: Record<string, number>
   callStack: CallFrame[]
   currentLine: number

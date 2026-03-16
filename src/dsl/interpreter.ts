@@ -57,6 +57,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
     let currentVarHighlights: VarHighlight[] = []
     let currentPointerHighlights: { label: string; type: 'compare' | 'swap' | 'active' }[] = []
     let dimRanges: DimRange[] = []
+    let gaugeArrays = new Set<string>()
 
     type HighlightType = 'compare' | 'swap' | 'sorted' | 'active'
 
@@ -302,6 +303,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
             : []
           // Filter dim ranges for this frame's arrays
           const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
+          const frameGaugeArrays = [...gaugeArrays].filter(n => af.allocatedArrays.has(n))
 
           callStackFrames.push({
             label,
@@ -312,6 +314,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
             highlights: frameHighlights,
             varHighlights: frameVarHighlights,
             dimRanges: frameDimRanges,
+            gaugeArrays: frameGaugeArrays,
           })
         }
       }
@@ -342,6 +345,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       const globalHighlights = currentHighlights.filter(h => !frameArrayNames.has(h.arrayName))
       const globalVarHighlights = currentVarHighlights.filter(h => !frameVarNames.has(h.varName))
       const globalDimRanges = allDimRanges.filter(d => !frameArrayNames.has(d.arrayName))
+      const globalGaugeArrays = [...gaugeArrays].filter(n => !frameArrayNames.has(n))
 
       steps.push({
         arrays: globalArrays,
@@ -349,6 +353,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         highlights: globalHighlights,
         varHighlights: globalVarHighlights,
         dimRanges: globalDimRanges,
+        gaugeArrays: globalGaugeArrays,
         variables: globalVars,
         callStack: callStackFrames,
         currentLine: line,
@@ -463,6 +468,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         // Save caller's pointer stack and dim ranges
         const savedPointerStack = activePointerStack.splice(0)
         const savedDimRanges = [...dimRanges]
+        const savedGaugeArrays = new Set(gaugeArrays)
         activePointerStack.push(collectScopePointers(proc.body))
 
         // Execute body
@@ -482,6 +488,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         activePointerStack.splice(0)
         activePointerStack.push(...savedPointerStack)
         dimRanges = savedDimRanges
+        gaugeArrays = savedGaugeArrays
 
         // Cleanup: pop all scopes back to (and including) the function's base scope
         while (scopeStack.length > frame.scopeBase) popScope()
@@ -578,6 +585,8 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         case 'swap': execSwap(node); break
         case 'dim': execDim(node); break
         case 'undim': execUndim(node); break
+        case 'gauge': execGauge(node); break
+        case 'ungauge': execUngauge(node); break
         case 'pointer': break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
@@ -703,6 +712,14 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       dimRanges = dimRanges.filter(d => !(d.arrayName === name && d.from === from && d.to === to))
     }
 
+
+    function execGauge(node: { arrayName: string }): void {
+      gaugeArrays.add(resolveArrayName(node.arrayName))
+    }
+
+    function execUngauge(node: { arrayName: string }): void {
+      gaugeArrays.delete(resolveArrayName(node.arrayName))
+    }
 
     function execComment(node: CommentNode): void {
       pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]

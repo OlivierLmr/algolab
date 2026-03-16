@@ -13,6 +13,7 @@ export function drawArray(
   dimRanges: DimRange[],
   yOffset: number,
   xOffset: number = 40,
+  gaugeArrays: string[] = [],
 ): void {
   const { name, values } = array
   const startX = xOffset
@@ -32,6 +33,18 @@ export function drawArray(
     }
   }
 
+  // Pre-compute gauge min/max if this array is gauged
+  const isGauged = gaugeArrays.includes(name)
+  let gaugeMin = 0
+  let gaugeMax = 0
+  if (isGauged) {
+    const finiteValues = values.filter(v => isFinite(v))
+    if (finiteValues.length > 0) {
+      gaugeMin = Math.min(...finiteValues)
+      gaugeMax = Math.max(...finiteValues)
+    }
+  }
+
   for (let i = 0; i < values.length; i++) {
     const x = startX + i * (CELL_SIZE + CELL_GAP)
     const y = yOffset
@@ -48,6 +61,21 @@ export function drawArray(
     // Cell background
     ctx.fillStyle = '#fff'
     ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE)
+
+    // Gauge fill (after background, before border/text)
+    if (isGauged) {
+      let ratio: number
+      if (!isFinite(values[i])) {
+        ratio = 1
+      } else if (gaugeMin === gaugeMax) {
+        ratio = 1
+      } else {
+        ratio = Math.max(0, Math.min(1, (values[i] - gaugeMin) / (gaugeMax - gaugeMin)))
+      }
+      const fillHeight = ratio * CELL_SIZE
+      ctx.fillStyle = 'rgba(52, 152, 219, 0.15)'
+      ctx.fillRect(x, y + CELL_SIZE - fillHeight, CELL_SIZE, fillHeight)
+    }
 
     // Cell border
     ctx.strokeStyle = hl ? getHighlightColor(hl.type) : '#999'
