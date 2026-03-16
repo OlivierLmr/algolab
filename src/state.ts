@@ -1,7 +1,8 @@
 import { signal, computed, effect } from '@preact/signals'
 import type { Step, AlgorithmDefinition } from './types.ts'
 import { algorithms } from './algorithms/index.ts'
-import { runAlgorithm } from './dsl/index.ts'
+import { compilePipeline, runAlgorithm } from './dsl/index.ts'
+import type { PipelineResult } from './dsl/index.ts'
 
 export const algorithmList = algorithms
 
@@ -79,23 +80,26 @@ const parsedInput = computed<number[]>(() => {
   return nums.length > 0 ? nums : currentAlgo.value.defaultInput
 })
 
-const stepsResult = computed<{ steps: Step[]; error: string | null }>(() => {
+const pipelineResult = computed<{ result: PipelineResult | null; error: string | null }>(() => {
   if (isCustomMode.value && !isRunMode.value) {
-    return { steps: [], error: null }
+    return { result: null, error: null }
   }
   const algo = currentAlgo.value
   try {
     const match = algo.source.match(/algo \w+\((\w+):/)
     const paramName = match ? match[1] : 'arr'
-    const result = runAlgorithm(algo.source, paramName, parsedInput.value)
-    return { steps: result, error: null }
+    const result = compilePipeline(algo.source, paramName, parsedInput.value)
+    return { result, error: null }
   } catch (e) {
-    return { steps: [], error: e instanceof Error ? e.message : String(e) }
+    return { result: null, error: e instanceof Error ? e.message : String(e) }
   }
 })
 
-export const steps = computed<Step[]>(() => stepsResult.value.steps)
-export const parseError = computed<string | null>(() => stepsResult.value.error)
+export const steps = computed<Step[]>(() => pipelineResult.value.result?.steps ?? [])
+export const parseError = computed<string | null>(() => pipelineResult.value.error)
+export const pipelineColorMap = computed(() => pipelineResult.value.result?.colorMap ?? new Map<string, string>())
+export const pipelineBlockRanges = computed(() => pipelineResult.value.result?.blockRanges ?? [])
+export const pipelineDisplayInfo = computed(() => pipelineResult.value.result?.displayInfo ?? null)
 
 export const currentStep = computed<Step>(
   () => steps.value[currentStepIndex.value]
@@ -106,37 +110,10 @@ export const totalSteps = computed(() => steps.value.length)
 // Per-line breakpoint state (disabled lines)
 export const disabledLines = signal<Set<number>>(new Set())
 
-/** Parse indentation-based block ranges (def, for, while) from source. */
-export function getBlockLineRanges(source: string): { startLine: number; endLine: number }[] {
-  const lines = source.split('\n')
-  const ranges: { startLine: number; endLine: number }[] = []
-
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^(\s*)(?:def\s+\w+\s*\(|for\s+|while\s+|if\s+)/)
-    if (!match) continue
-    const blockIndent = match[1].length
-    const startLine = i
-    let endLine = i
-    for (let j = i + 1; j < lines.length; j++) {
-      const line = lines[j]
-      if (line.trim() === '') { endLine = j; continue }
-      const indent = line.match(/^(\s*)/)![1].length
-      if (indent <= blockIndent) break
-      endLine = j
-    }
-    if (endLine > startLine) {
-      ranges.push({ startLine, endLine })
-    }
-  }
-  return ranges
-}
-
-export const blockLineRanges = computed(() => getBlockLineRanges(currentAlgo.value.source))
-
 /** Toggle breakpoint on a source line. If it's a block head (def/for/while/if), toggle the entire block. */
 export function toggleBreakpoint(sourceLine: number): void {
   const next = new Set(disabledLines.value)
-  const ranges = blockLineRanges.value
+  const ranges = pipelineBlockRanges.value
   const range = ranges.find((r) => r.startLine === sourceLine)
   if (range) {
     // Toggle all lines in the function (def line + body)

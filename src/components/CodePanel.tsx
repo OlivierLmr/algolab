@@ -1,30 +1,20 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint } from '../state.ts'
-import { getDisplayInfo } from '../dsl/preprocess.ts'
-import { buildColorMap, colorizeTokens, isDirectiveLine } from './colorize.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo } from '../state.ts'
+import { colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo } from 'preact/hooks'
 
 export function CodePanel() {
   const algo = currentAlgo.value
   const step = currentStep.value
   const custom = isCustomMode.value
+  const colorMap = pipelineColorMap.value
+  const displayInfo = pipelineDisplayInfo.value
 
-  const { lines, lineMap, colorMap } = useMemo(() => {
-    if (custom) {
-      // Custom run mode: show all lines, direct line index mapping
-      return {
-        lines: algo.source.split('\n'),
-        lineMap: null,
-        colorMap: buildColorMap(algo.source),
-      }
+  const { lines, lineMap } = useMemo(() => {
+    if (custom || !displayInfo) {
+      return { lines: algo.source.split('\n'), lineMap: null }
     }
-    // Built-in: hide directive lines, use lineMap for active line
-    const info = getDisplayInfo(algo.source)
-    return {
-      lines: info.lines,
-      lineMap: info.lineMap,
-      colorMap: buildColorMap(algo.source),
-    }
-  }, [algo.source, custom])
+    return { lines: displayInfo.lines, lineMap: displayInfo.lineMap }
+  }, [algo.source, custom, displayInfo])
 
   const activeLine = step
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)

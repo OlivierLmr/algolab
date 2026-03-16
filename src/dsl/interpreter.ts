@@ -1,6 +1,6 @@
 import type {
   ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode,
-  Expr,
+  Expr, CommentPart,
 } from './ast.ts'
 
 /** Sentinel thrown by `return` statements to unwind execution. */
@@ -8,24 +8,15 @@ class ReturnSignal {
   value: number
   constructor(value: number) { this.value = value }
 }
-import { lex } from './lexer.ts'
-import { parse as parseSource } from './parser.ts'
 import type { Step, TrackedArray, Pointer, Highlight, VarHighlight, DimRange, CallFrame } from '../types.ts'
-import { assignPointerColors } from '../renderer/colors.ts'
-import { collectScopePointers, collectAllPointerLabels, collectDirectivePointerLabels } from './analysis.ts'
+import { collectScopePointers } from './analysis.ts'
 import type { ScopePointer } from './analysis.ts'
 
 /**
  * Create a runner for the given algorithm AST.
- * Returns a function that takes input arrays and produces Step[].
+ * colorMap is computed once in the pipeline and shared.
  */
-export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => Step[] {
-  const allLabels = collectAllPointerLabels(algo.body)
-  const directiveLabels = collectDirectivePointerLabels(algo.body)
-  for (const label of directiveLabels) {
-    if (!allLabels.includes(label)) allLabels.push(label)
-  }
-  const colorMap = assignPointerColors(allLabels)
+export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (input: Map<string, number[]>) => Step[] {
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
@@ -66,7 +57,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
     let currentPointerHighlights: { label: string; type: 'compare' | 'swap' | 'active' }[] = []
     let dimRanges: DimRange[] = []
     const activePointerStack: ScopePointer[][] = []
-    let pendingComment: string | null = null
+    let pendingCommentParts: CommentPart[] | null = null
 
     for (const [name, values] of input) {
       arrays.set(name, [...values])
@@ -184,43 +175,27 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
       }
     }
 
-    function evalExprString(exprStr: string): number {
-      const tokens = lex(`algo _(_: int[])\n  let _r = ${exprStr}`)
-      const ast = parseSource(tokens)
-      const node = ast.body[0]
-      if (node.type === 'let') return evalExpr(node.value)
-      throw new Error('Failed to parse expression')
-    }
-
-    function interpolateComment(template: string): string {
-      return template.replace(/\{([^}]+)\}/g, (full, inner: string) => {
-        // Check for ternary: expr ? 'trueText' : 'falseText'
-        const qIdx = inner.indexOf('?')
-        if (qIdx !== -1) {
-          const condStr = inner.slice(0, qIdx).trim()
-          const rest = inner.slice(qIdx + 1).trim()
-          const branchMatch = rest.match(/^'([^']*)'\s*:\s*'([^']*)'$/)
-          if (branchMatch) {
+    function evaluateCommentParts(parts: CommentPart[]): string {
+      return parts.map(part => {
+        switch (part.type) {
+          case 'text': return part.text
+          case 'expr':
+            try { return String(evalExpr(part.expr)) }
+            catch { return '{?}' }
+          case 'ternary':
             try {
-              const val = evalExprString(condStr)
-              return val !== 0 ? branchMatch[1] : branchMatch[2]
-            } catch { /* fall through to regular eval */ }
-          }
+              const val = evalExpr(part.condition)
+              return val !== 0 ? part.trueText : part.falseText
+            }
+            catch { return '{?}' }
         }
-
-        // Regular expression interpolation
-        try {
-          return String(evalExprString(inner))
-        } catch {
-          return full
-        }
-      })
+      }).join('')
     }
 
     function snapshot(line: number, description: string): void {
-      if (pendingComment !== null) {
-        description = interpolateComment(pendingComment)
-        pendingComment = null
+      if (pendingCommentParts !== null) {
+        description = evaluateCommentParts(pendingCommentParts)
+        pendingCommentParts = null
       }
 
       // Collect all pointers
@@ -711,7 +686,7 @@ export function createRunner(algo: AlgoNode): (input: Map<string, number[]>) => 
 
 
     function execComment(node: CommentNode): void {
-      pendingComment = node.text
+      pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]
     }
 
     function execAlloc(node: AllocNode): void {

@@ -5,23 +5,7 @@ import { parse } from '../dsl/parser.ts'
 import { stripDirectivePrefix } from '../dsl/preprocess.ts'
 import { collectAllPointerLabels, collectDirectivePointerLabels } from '../dsl/analysis.ts'
 
-/** Extract all pointer labels from the algorithm source. */
-export function extractPointerLabels(source: string): string[] {
-  try {
-    const tokens = lex(stripDirectivePrefix(source))
-    const ast = parse(tokens)
-    const labels = collectAllPointerLabels(ast.body)
-    const dirLabels = collectDirectivePointerLabels(ast.body)
-    for (const label of dirLabels) {
-      if (!labels.includes(label)) labels.push(label)
-    }
-    return labels
-  } catch {
-    return []
-  }
-}
-
-export function escapeRegex(s: string): string {
+function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
@@ -33,8 +17,7 @@ function labelToPattern(label: string): string {
   ).join('')
 }
 
-/** Build a compiled pattern + lookup from a color map.
- *  Each capturing group maps to a color map key via groupToKey. */
+/** Build a compiled pattern + lookup from a color map. */
 function buildMatchPattern(colorMap: Map<string, string>): { pattern: RegExp; groupToKey: string[] } | null {
   if (colorMap.size === 0) return null
   const keys = [...colorMap.keys()].sort((a, b) => b.length - a.length)
@@ -47,7 +30,6 @@ function buildMatchPattern(colorMap: Map<string, string>): { pattern: RegExp; gr
   return { pattern, groupToKey }
 }
 
-/** Find which color map key matched by checking which capture group is non-undefined. */
 function matchedKey(match: RegExpExecArray, groupToKey: string[]): string {
   for (let i = 0; i < groupToKey.length; i++) {
     if (match[i + 1] !== undefined) return groupToKey[i]
@@ -55,9 +37,21 @@ function matchedKey(match: RegExpExecArray, groupToKey: string[]): string {
   return groupToKey[0]
 }
 
-/** Build a color map from source code pointer labels. */
+/** Build a color map from source code by parsing and collecting pointer labels.
+ *  Used by EditorPanel for live syntax highlighting during editing. */
 export function buildColorMap(source: string): Map<string, string> {
-  return assignPointerColors(extractPointerLabels(source))
+  try {
+    const tokens = lex(stripDirectivePrefix(source))
+    const ast = parse(tokens)
+    const labels = collectAllPointerLabels(ast.body)
+    const dirLabels = collectDirectivePointerLabels(ast.body)
+    for (const label of dirLabels) {
+      if (!labels.includes(label)) labels.push(label)
+    }
+    return assignPointerColors(labels)
+  } catch {
+    return new Map()
+  }
 }
 
 /** Render a line of code with colored variable names as a JSX element. */
@@ -88,8 +82,7 @@ export function colorizeTokens(line: string, colorMap: Map<string, string>): pre
   return h('span', null, ...parts)
 }
 
-/** Colorize a full source string into an HTML string (for overlay <pre>).
- *  Lines starting with #: are wrapped in a dim style to indicate directives. */
+/** Colorize a full source string into an HTML string (for overlay <pre>). */
 export function colorizeToHtml(source: string, colorMap: Map<string, string>): string {
   const compiled = buildMatchPattern(colorMap)
 

@@ -98,9 +98,15 @@ export interface PointerNode {
   line: number
 }
 
+export type CommentPart =
+  | { type: 'text'; text: string }
+  | { type: 'expr'; expr: Expr }
+  | { type: 'ternary'; condition: Expr; trueText: string; falseText: string }
+
 export interface CommentNode {
   type: 'comment'
   text: string
+  parts?: CommentPart[]
   line: number
 }
 

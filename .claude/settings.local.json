@@ -9,7 +9,10 @@
       "Skill(commit-changes)",
       "Bash(git commit:*)",
       "WebFetch(domain:github.com)",
-      "Bash(gh run:*)"
+      "Bash(gh run:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
