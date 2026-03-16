@@ -13,18 +13,19 @@ export const radixSort: AlgorithmDefinition = {
       let digit = (arr[i] / exp) % 10
       count[digit] = count[digit] + 1
 
-    #: comment "Computing prefix sums"
-    for i from 1 to 9
-      count[i] = count[i] + count[i - 1]
+    #: comment "Computing prefix sums (starting positions)"
+    let sum = 0
+    for i from 0 to 9
+      let c = count[i]
+      count[i] = sum
+      sum = sum + c
 
-    #: comment "Building output array (right to left for stability)"
-    let i = len(arr) - 1
-    while i >= 0
+    #: comment "Building output array"
+    for i from 0 to len(arr) - 1
       let digit = (arr[i] / exp) % 10
-      #: comment "Placing arr[{i}]={arr[i]} (digit={digit}) at position {count[digit] - 1}"
-      output[count[digit] - 1] = arr[i]
-      count[digit] = count[digit] - 1
-      i = i - 1
+      #: comment "Placing arr[{i}]={arr[i]} (digit={digit}) at position {count[digit]}"
+      output[count[digit]] = arr[i]
+      count[digit] = count[digit] + 1
 
     #: comment "Copying output back to arr"
     for i from 0 to len(arr) - 1
