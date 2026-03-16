@@ -100,6 +100,7 @@ export const parseError = computed<string | null>(() => pipelineResult.value.err
 export const pipelineColorMap = computed(() => pipelineResult.value.result?.colorMap ?? new Map<string, string>())
 export const pipelineBlockRanges = computed(() => pipelineResult.value.result?.blockRanges ?? [])
 export const pipelineDisplayInfo = computed(() => pipelineResult.value.result?.displayInfo ?? null)
+export const pipelineDefaultDisabledLines = computed(() => pipelineResult.value.result?.defaultDisabledLines ?? new Set<number>())
 
 export const currentStep = computed<Step>(
   () => steps.value[currentStepIndex.value]
@@ -212,11 +213,12 @@ export const recentDescriptions = computed<string[]>(() => {
   return result
 })
 
-// Clamp initial step to valid range
+// Clamp initial step to valid range and apply default disabled lines
 if (initial) {
   const maxStep = steps.value.length - 1
   if (currentStepIndex.value > maxStep) currentStepIndex.value = Math.max(0, maxStep)
 }
+disabledLines.value = new Set(pipelineDefaultDisabledLines.value)
 
 // Sync state to URL hash
 effect(() => {
@@ -241,7 +243,7 @@ export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
   inputText.value = algorithmList[index].defaultInput.join(', ')
-  disabledLines.value = new Set()
+  disabledLines.value = new Set(pipelineDefaultDisabledLines.value)
 }
 
 export function selectCustom(): void {

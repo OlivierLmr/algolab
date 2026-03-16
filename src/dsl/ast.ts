@@ -16,6 +16,7 @@ export type ASTNode =
   | ReturnNode
   | GaugeNode
   | UngaugeNode
+  | SkipNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -142,6 +143,12 @@ export interface GaugeNode {
 export interface UngaugeNode {
   type: 'ungauge'
   arrayName: string
+  line: number
+}
+
+export interface SkipNode {
+  type: 'skip'
+  functionName: string
   line: number
 }
 

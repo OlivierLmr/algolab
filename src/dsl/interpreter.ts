@@ -588,6 +588,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         case 'gauge': execGauge(node); break
         case 'ungauge': execUngauge(node); break
         case 'pointer': break
+        case 'skip': break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break

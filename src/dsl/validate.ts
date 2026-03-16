@@ -280,6 +280,12 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         validateExpr(node.to, node.line)
         break
       }
+      case 'skip': {
+        if (!functions.has(node.functionName)) {
+          errors.push({ line: node.line, message: `Unknown function '${node.functionName}'` })
+        }
+        break
+      }
       case 'gauge':
       case 'ungauge': {
         const sym = lookupSymbol(node.arrayName)

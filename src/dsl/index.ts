@@ -15,6 +15,7 @@ export interface PipelineResult {
   blockRanges: { startLine: number; endLine: number }[]
   displayInfo: DisplayInfo
   directiveLines: Set<number>
+  defaultDisabledLines: Set<number>
 }
 
 /** Full pipeline: source → preprocess → lex → parse → analyze → interpret → PipelineResult */
@@ -48,7 +49,10 @@ export function compilePipeline(source: string, paramName: string, input: number
   const inputMap = new Map([[paramName, input]])
   const steps = runner(inputMap)
 
-  return { steps, colorMap, blockRanges, displayInfo, directiveLines }
+  // Compute default disabled lines from skip directives
+  const defaultDisabledLines = getDefaultDisabledLines(ast, blockRanges)
+
+  return { steps, colorMap, blockRanges, displayInfo, directiveLines, defaultDisabledLines }
 }
 
 /** Convenience wrapper: returns just the steps (for tryParseCustom etc.) */
@@ -155,4 +159,33 @@ function getBlockRangesFromAST(ast: AlgoNode): { startLine: number; endLine: num
 
   walk(ast.body)
   return ranges
+}
+
+/** Collect default disabled lines from `skip` directives matching `def` block ranges. */
+function getDefaultDisabledLines(
+  ast: AlgoNode,
+  blockRanges: { startLine: number; endLine: number }[],
+): Set<number> {
+  const disabled = new Set<number>()
+
+  // Collect skip targets
+  const skipTargets = new Set<string>()
+  for (const node of ast.body) {
+    if (node.type === 'skip') skipTargets.add(node.functionName)
+  }
+  if (skipTargets.size === 0) return disabled
+
+  // Find matching def nodes and their block ranges
+  for (const node of ast.body) {
+    if (node.type === 'def' && skipTargets.has(node.name)) {
+      const range = blockRanges.find(r => r.startLine === node.line)
+      if (range) {
+        for (let l = range.startLine; l <= range.endLine; l++) {
+          disabled.add(l)
+        }
+      }
+    }
+  }
+
+  return disabled
 }
