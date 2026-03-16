@@ -52,10 +52,36 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         if (!found) return current
       }
     }
+    // --- Visualization state (highlights, pointers, dims) ---
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
     let currentPointerHighlights: { label: string; type: 'compare' | 'swap' | 'active' }[] = []
     let dimRanges: DimRange[] = []
+
+    type HighlightType = 'compare' | 'swap' | 'sorted' | 'active'
+
+    function clearHighlights(): void {
+      currentHighlights = []
+      currentVarHighlights = []
+      currentPointerHighlights = []
+    }
+
+    /** Add array cell highlights, merging indices into existing highlight of same type. */
+    function addArrayHighlight(arrayName: string, indices: number[], type: HighlightType): void {
+      const existing = currentHighlights.find(h => h.arrayName === arrayName && h.type === type)
+      if (existing) {
+        for (const idx of indices) {
+          if (!existing.indices.includes(idx)) existing.indices.push(idx)
+        }
+      } else {
+        currentHighlights.push({ arrayName, indices: [...indices], type })
+      }
+    }
+
+    /** Replace all array highlights with a single one (for primary actions like swap/assign). */
+    function setArrayHighlight(arrayName: string, indices: number[], type: HighlightType): void {
+      currentHighlights = [{ arrayName, indices, type }]
+    }
     const activePointerStack: ScopePointer[][] = []
     let pendingCommentParts: CommentPart[] | null = null
 
@@ -225,7 +251,6 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       }
 
 
-      // Collect all dim ranges
       const allDimRanges: DimRange[] = [...dimRanges]
 
       // Build call stack frames
@@ -329,9 +354,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         currentLine: line,
         description,
       })
-      currentHighlights = []
-      currentVarHighlights = []
-      currentPointerHighlights = []
+      clearHighlights()
     }
 
     function evalExpr(expr: Expr): number {
@@ -513,14 +536,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
     function highlightComparisonSide(expr: Expr): void {
       try {
         if (expr.type === 'index' && expr.array.type === 'identifier') {
-          const arrayName = resolveArrayName(expr.array.name)
-          const idx = evalExpr(expr.index)
-          const existing = currentHighlights.find(h => h.arrayName === arrayName && h.type === 'compare')
-          if (existing) {
-            if (!existing.indices.includes(idx)) existing.indices.push(idx)
-          } else {
-            currentHighlights.push({ arrayName, indices: [idx], type: 'compare' })
-          }
+          addArrayHighlight(resolveArrayName(expr.array.name), [evalExpr(expr.index)], 'compare')
         } else if (expr.type === 'identifier' && hasVar(expr.name)) {
           const pointerLabels = getPointerLabelsForVar(expr.name)
           if (pointerLabels.length > 0) {
@@ -642,9 +658,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         currentVarHighlights.push({ varName: node.name, type: 'active' })
       }
       if (node.value.type === 'index' && node.value.array.type === 'identifier') {
-        const arrayName = node.value.array.name
-        const idx = evalExpr(node.value.index)
-        currentHighlights.push({ arrayName, indices: [idx], type: 'active' })
+        addArrayHighlight(node.value.array.name, [evalExpr(node.value.index)], 'active')
       }
       snapshot(node.line, `Set ${node.name} = ${val}`)
     }
@@ -663,7 +677,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
         const idx = evalExpr(node.target.index)
         arr[idx] = val
         const arrayName = getArrayName(node.target.array)
-        currentHighlights = [{ arrayName, indices: [idx], type: 'active' }]
+        setArrayHighlight(arrayName, [idx], 'active')
         if (node.value.type === 'identifier' && !isActivePointerVar(node.value.name)) {
           currentVarHighlights.push({ varName: node.value.name, type: 'active' })
         }
@@ -718,7 +732,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>): (in
       const j = evalExpr(rightIdx.index)
       const arrayName = getArrayName(leftIdx.array)
 
-      currentHighlights = [{ arrayName, indices: [i, j], type: 'swap' }]
+      setArrayHighlight(arrayName, [i, j], 'swap')
       const desc = `Swap ${arrayName}[${i}]=${arr[i]} and ${arrayName}[${j}]=${arr[j]}`
 
       const tmp = arr[i]
