@@ -20,7 +20,7 @@ interface StepLayout {
 }
 
 /** Compute layout positions for all visual elements in a step. */
-function computeLayout(step: Step, width: number): StepLayout {
+function computeLayout(step: Step, _width: number): StepLayout {
   const pointerNames = new Set(step.pointers.map(p => p.name))
   const hasCallStack = step.callStack && step.callStack.length > 0
 

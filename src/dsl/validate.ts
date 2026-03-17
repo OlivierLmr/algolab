@@ -110,20 +110,21 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         errors.push({ line, message: `'${name}' expects ${builtin.paramCount} argument(s), got ${args.length}` })
       }
       for (let i = 0; i < args.length; i++) {
+        const arg = args[i]
         if (builtin.arrayArgs.includes(i)) {
           // This argument must be an array identifier
-          if (args[i].type === 'identifier') {
-            const sym = lookupSymbol(args[i].name)
+          if (arg.type === 'identifier') {
+            const sym = lookupSymbol(arg.name)
             if (sym === undefined) {
-              errors.push({ line, message: `Undefined array '${args[i].name}'` })
+              errors.push({ line, message: `Undefined array '${arg.name}'` })
             } else if (sym === 'scalar') {
-              errors.push({ line, message: `'${args[i].name}' is not an array (expected by '${name}')` })
+              errors.push({ line, message: `'${arg.name}' is not an array (expected by '${name}')` })
             }
           } else {
-            validateExpr(args[i], line)
+            validateExpr(arg, line)
           }
         } else {
-          validateExpr(args[i], line)
+          validateExpr(arg, line)
         }
       }
       return
@@ -141,23 +142,24 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
     }
 
     for (let i = 0; i < args.length; i++) {
+      const arg = args[i]
       const param = func.params[i]
       if (!param) continue
       if (param.paramType === 'int[]') {
         // Must pass an array identifier
-        if (args[i].type === 'identifier') {
-          const sym = lookupSymbol(args[i].name)
+        if (arg.type === 'identifier') {
+          const sym = lookupSymbol(arg.name)
           if (sym === undefined) {
-            errors.push({ line, message: `Undefined array '${args[i].name}'` })
+            errors.push({ line, message: `Undefined array '${arg.name}'` })
           } else if (sym === 'scalar') {
-            errors.push({ line, message: `'${args[i].name}' is not an array (expected for parameter '${param.name}')` })
+            errors.push({ line, message: `'${arg.name}' is not an array (expected for parameter '${param.name}')` })
           }
-        } else if (args[i].type !== 'call') {
+        } else if (arg.type !== 'call') {
           // Allow call expressions (they might return arrays in future), but flag literals/scalars
           errors.push({ line, message: `Expected array identifier for parameter '${param.name}'` })
         }
       } else {
-        validateExpr(args[i], line)
+        validateExpr(arg, line)
       }
     }
   }
