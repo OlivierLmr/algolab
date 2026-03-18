@@ -12,7 +12,7 @@ export function drawVariables(
   yOffset: number,
   xOffset: number = 40,
 ): void {
-  const displayVars = Object.entries(variables).filter(([name]) => !pointerNames.has(name))
+  const displayVars = Object.entries(variables).filter(([name, val]) => val.arrays.length === 0 && !pointerNames.has(name))
   if (displayVars.length === 0) return
 
   const startX = xOffset

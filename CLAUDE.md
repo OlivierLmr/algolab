@@ -1,1 +1,6 @@
-commit regularly, every time something is done and ready.
+- commit regularly, every time something is done and ready.
+- whenever a bug is found, add a test for it and keep it as a regression test
+- whenever implementing a new feature, start by creating the spec and adding unit and integration tests for it, then start implementation
+- use pnpm, not npm
+- while this started as a poc/prototype, this is now intended to be clean and production quality.
+- focus on the conceptual, theoretical cleanness and quality of any non-trivial choice you make. No quick hacks, easy wins. Have something that is architecturally clean, and that is intelligent in terms of theory of software, theory of programming languages.

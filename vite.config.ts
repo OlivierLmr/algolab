@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
@@ -5,4 +6,7 @@ import preact from '@preact/preset-vite'
 export default defineConfig({
   base: '/algolab/',
   plugins: [preact()],
+  test: {
+    include: ['tests/**/*.test.ts'],
+  },
 })

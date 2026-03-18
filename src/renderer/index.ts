@@ -21,15 +21,19 @@ interface StepLayout {
 
 /** Compute layout positions for all visual elements in a step. */
 function computeLayout(step: Step, _width: number): StepLayout {
-  // Derive pointer names from variables with iterator metadata + expression pointers
-  const pointerNames = getPointerVarNames(step.variables, step.expressionPointers)
   const hasCallStack = step.callStack && step.callStack.length > 0
 
+  // Derive pointer names that are actually shown as global pointer arrows.
+  // When inside a call stack, only innermost frame's vars + all expression pointers.
+  let pointerNames: Set<string>
   if (hasCallStack) {
-    for (const frame of step.callStack) {
-      const framePointerNames = getPointerVarNames(frame.variables, frame.expressionPointers)
-      for (const name of framePointerNames) pointerNames.add(name)
-    }
+    const innermost = step.callStack[step.callStack.length - 1]
+    pointerNames = getPointerVarNames(innermost.variables, {
+      ...step.expressionPointers,
+      ...innermost.expressionPointers,
+    })
+  } else {
+    pointerNames = getPointerVarNames(step.variables, step.expressionPointers)
   }
 
   const arrayYPositions = new Map<string, number>()
@@ -47,7 +51,7 @@ function computeLayout(step: Step, _width: number): StepLayout {
     y += computeCallStackHeight(step.callStack, pointerNames)
   }
 
-  const nonPointerVarCount = Object.keys(step.variables).filter(n => !pointerNames.has(n)).length
+  const nonPointerVarCount = Object.entries(step.variables).filter(([n, v]) => v.arrays.length === 0 && !pointerNames.has(n)).length
   const variablesY = y
   if (nonPointerVarCount > 0) {
     y += getVariablesHeight(nonPointerVarCount)
@@ -78,29 +82,32 @@ export function renderStep(
     drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X, step.gaugeArrays)
   }
 
-  // Draw pointers above global arrays: from global vars + frame vars referencing global arrays
+  // Draw pointers above global arrays
   const globalArrayNames = new Set(step.arrays.map(a => a.name))
-  const allVarsForGlobal: Record<string, Value> = { ...step.variables }
-  const allExprPtrsForGlobal: Record<string, Value> = { ...step.expressionPointers }
+  let allVarsForGlobal: Record<string, Value>
+  let allExprPtrsForGlobal: Record<string, Value>
   let innermostVarHighlights = step.varHighlights
   if (step.callStack.length > 0) {
-    // Include frame variables/expressionPointers that reference global arrays
-    for (let fi = 0; fi < step.callStack.length; fi++) {
-      const frame = step.callStack[fi]
-      for (const [name, val] of Object.entries(frame.variables)) {
-        if (val.arrays.some(a => globalArrayNames.has(a)) && !(name in allVarsForGlobal)) {
-          allVarsForGlobal[name] = val
-        }
-      }
-      for (const [label, val] of Object.entries(frame.expressionPointers)) {
-        if (val.arrays.some(a => globalArrayNames.has(a)) && !(label in allExprPtrsForGlobal)) {
-          allExprPtrsForGlobal[label] = val
-        }
-      }
-      if (fi === step.callStack.length - 1) {
-        innermostVarHighlights = [...step.varHighlights, ...frame.varHighlights]
+    // When inside a function call, only show the innermost frame's iterator vars
+    // as global pointers (not the caller's stale iterator vars like pivotIdx).
+    // Expression pointers (explicit #: pointer directives) from all scopes are kept.
+    const innermost = step.callStack[step.callStack.length - 1]
+    allVarsForGlobal = {}
+    for (const [name, val] of Object.entries(innermost.variables)) {
+      if (val.arrays.some(a => globalArrayNames.has(a))) {
+        allVarsForGlobal[name] = val
       }
     }
+    allExprPtrsForGlobal = { ...step.expressionPointers }
+    for (const [label, val] of Object.entries(innermost.expressionPointers)) {
+      if (val.arrays.some(a => globalArrayNames.has(a))) {
+        allExprPtrsForGlobal[label] = val
+      }
+    }
+    innermostVarHighlights = [...step.varHighlights, ...innermost.varHighlights]
+  } else {
+    allVarsForGlobal = { ...step.variables }
+    allExprPtrsForGlobal = { ...step.expressionPointers }
   }
   const globalPointers = derivePointers(allVarsForGlobal, allExprPtrsForGlobal, colorMap, innermostVarHighlights)
     .filter(p => globalArrayNames.has(p.arrayName))
