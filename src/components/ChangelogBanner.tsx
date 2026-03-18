@@ -3,7 +3,7 @@ import { signal } from '@preact/signals'
 interface ChangelogEntry {
   date: string
   title: string
-  message: string
+  items: string[]
 }
 
 const COOKIE_NAME = 'changelog_dismissed'
@@ -67,7 +67,9 @@ export function ChangelogBanner() {
             {i > 0 && <hr class="changelog-separator" />}
             <div key={entry.date} class="changelog-entry">
               <strong>{entry.title}</strong>
-              <span> — {entry.message}</span>
+              <ul class="changelog-items">
+                {entry.items.map(item => <li>{item}</li>)}
+              </ul>
             </div>
           </>
         ))}

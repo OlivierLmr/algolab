@@ -2,26 +2,48 @@
   {
     "date": "2026-03-18T12:00:00Z",
     "title": "Automatic Iterators & Cell Hover Arrows",
-    "message": "Pointer arrows are now fully automatic — variables used as array indices are detected and displayed as colored pointers without any manual annotation. Hovering over an array cell that holds an index value draws an arrow to the target array cell it references. Fixed a bug where input array values (e.g. arr in Counting Sort) were not recognized as iterators. Behind the scenes, a new static type inference engine powers all of this, replacing the previous runtime heuristics with a constraint-based analysis pass."
+    "items": [
+      "Pointer arrows are now fully automatic — variables used as array indices are detected and displayed as colored pointers without any manual annotation.",
+      "Hovering over an array cell that holds an index value draws an arrow to the target array cell it references.",
+      "Fixed a bug where input array values (e.g. arr in Counting Sort) were not recognized as iterators.",
+      "Behind the scenes, a new static type inference engine replaces the previous runtime heuristics with a constraint-based analysis pass."
+    ]
   },
   {
     "date": "2026-03-16T18:00:00Z",
     "title": "Gauge Visualization & Internal Improvements",
-    "message": "Array cells now show a proportional blue fill (gauge) indicating relative value size — enabled on all sorting algorithms. New stepover directive lets algorithm authors disable breakpoints on helper functions by default. Under the hood: restructured the compilation pipeline, added a semantic validation pass, and improved renderer performance."
+    "items": [
+      "Array cells now show a proportional blue fill (gauge) indicating relative value size — enabled on all sorting algorithms.",
+      "New stepover directive lets algorithm authors disable breakpoints on helper functions by default.",
+      "Under the hood: restructured the compilation pipeline, added a semantic validation pass, and improved renderer performance."
+    ]
   },
   {
     "date": "2026-03-16T12:00:00Z",
     "title": "New Algorithms & Debugging Tools",
-    "message": "New algorithms: QuickSelect, Counting Sort, and Radix Sort (LSD). New stepping controls: step over and step out (forward and backward) let you skip loop bodies and function calls. Click line numbers in the code gutter to toggle breakpoints on any line, including for/while/if blocks. Variables are now block-scoped inside loops, matching expected behavior."
+    "items": [
+      "New algorithms: QuickSelect, Counting Sort, and Radix Sort (LSD).",
+      "New stepping controls: step over and step out (forward and backward) let you skip loop bodies and function calls.",
+      "Click line numbers in the code gutter to toggle breakpoints on any line, including for/while/if blocks.",
+      "Variables are now block-scoped inside loops, matching expected behavior."
+    ]
   },
   {
     "date": "2026-03-12T12:00:00Z",
     "title": "Quick Sort & Visual Improvements",
-    "message": "New algorithms: Quick Sort and Semi-Recursive Quick Sort. Pointer arrows now appear on arrays (lo, hi, pivotIdx, etc.) with colored highlight boxes. Variables from the current call frame are shown in the sidebar. Also fixed a bug where MergeSort LR produced incorrect results on small subarrays."
+    "items": [
+      "New algorithms: Quick Sort and Semi-Recursive Quick Sort.",
+      "Pointer arrows now appear on arrays (lo, hi, pivotIdx, etc.) with colored highlight boxes.",
+      "Variables from the current call frame are shown in the sidebar.",
+      "Fixed a bug where MergeSort LR produced incorrect results on small subarrays."
+    ]
   },
   {
     "date": "2026-03-11T12:00:00Z",
     "title": "Custom Algorithm Editor",
-    "message": "You can now write your own algorithms in the editor, save them by exporting to a file, and re-import them later. Select \"Custom\" from the dropdown or click \"Edit\" on any built-in algorithm to get started."
+    "items": [
+      "Write your own algorithms in the editor, save them by exporting to a file, and re-import them later.",
+      "Select \"Custom\" from the dropdown or click \"Edit\" on any built-in algorithm to get started."
+    ]
   }
 ]
