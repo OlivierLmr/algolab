@@ -867,6 +867,17 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       } else if (node.target.type === 'index') {
         const arr = getArray(node.target.array)
         const idx = evalExpr(node.target.index).num
+
+        // Direct variable tagging for assignment target: arr[var]
+        if (node.target.index.type === 'identifier' && node.target.array.type === 'identifier') {
+          tagVar(node.target.index.name, resolveArrayName(node.target.array.name))
+        }
+
+        // Retroactive cell tagging for assignment target: targetArr[sourceArr[x]]
+        if (node.target.array.type === 'identifier') {
+          retroactivelyTagCells(node.target.index, resolveArrayName(node.target.array.name))
+        }
+
         arr[idx] = val
         const arrayName = getArrayName(node.target.array)
         setArrayHighlight(arrayName, [idx], 'active')

@@ -1,4 +1,4 @@
-import type { Step } from '../types.ts'
+import type { Step, Value } from '../types.ts'
 import { drawArray, ARRAY_Y_START, getArrayHeight } from './array.ts'
 import { derivePointers, getPointerVarNames, drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
@@ -78,8 +78,32 @@ export function renderStep(
     drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X, step.gaugeArrays)
   }
 
-  // Draw pointers above global arrays (derived from variables + expression pointers)
-  const globalPointers = derivePointers(step.variables, step.expressionPointers, colorMap, step.varHighlights)
+  // Draw pointers above global arrays: from global vars + frame vars referencing global arrays
+  const globalArrayNames = new Set(step.arrays.map(a => a.name))
+  const allVarsForGlobal: Record<string, Value> = { ...step.variables }
+  const allExprPtrsForGlobal: Record<string, Value> = { ...step.expressionPointers }
+  let innermostVarHighlights = step.varHighlights
+  if (step.callStack.length > 0) {
+    // Include frame variables/expressionPointers that reference global arrays
+    for (let fi = 0; fi < step.callStack.length; fi++) {
+      const frame = step.callStack[fi]
+      for (const [name, val] of Object.entries(frame.variables)) {
+        if (val.arrays.some(a => globalArrayNames.has(a)) && !(name in allVarsForGlobal)) {
+          allVarsForGlobal[name] = val
+        }
+      }
+      for (const [label, val] of Object.entries(frame.expressionPointers)) {
+        if (val.arrays.some(a => globalArrayNames.has(a)) && !(label in allExprPtrsForGlobal)) {
+          allExprPtrsForGlobal[label] = val
+        }
+      }
+      if (fi === step.callStack.length - 1) {
+        innermostVarHighlights = [...step.varHighlights, ...frame.varHighlights]
+      }
+    }
+  }
+  const globalPointers = derivePointers(allVarsForGlobal, allExprPtrsForGlobal, colorMap, innermostVarHighlights)
+    .filter(p => globalArrayNames.has(p.arrayName))
   drawPointers(ctx, globalPointers, layout.arrayYPositions)
 
   // Draw call stack
