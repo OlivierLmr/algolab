@@ -112,10 +112,12 @@ describe('Quick Select: pivotIdx not visible during partition()', () => {
     expect(stepsWithPivotIdx.length).toBeGreaterThan(0)
   })
 
-  it('expression pointer k exists in global scope', () => {
-    const stepsWithK = steps.filter(s => 'k' in s.expressionPointers)
+  it('expression pointer k exists in global scope as a scoped variable', () => {
+    const stepsWithK = steps.filter(s =>
+      'k' in s.variables && s.variables['k'].arrays.length > 0
+    )
     expect(stepsWithK.length).toBeGreaterThan(0)
-    // k should be present even during partition calls (it's a global expression pointer)
+    // k should be present even during partition calls (it's a global scoped variable)
     const stepsInPartitionWithK = stepsWithK.filter(s => isInFrame(s, 'partition'))
     expect(stepsInPartitionWithK.length).toBeGreaterThan(0)
   })
@@ -208,35 +210,119 @@ describe('Direct variable tagging', () => {
     expect(last.variables['i'].arrays).toContain('arr')
   })
 
-  it('arr[i+1] creates expression pointer "i + 1"', () => {
+  it('arr[i+1] creates scoped expression variable "i + 1"', () => {
     const source = `algo Test(arr[])
   let i = 0
   let v = arr[i + 1]`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30])
     const last = steps[steps.length - 1]
-    expect(last.expressionPointers).toHaveProperty('i + 1')
+    expect(last.variables).toHaveProperty('i + 1')
+    expect(last.variables['i + 1'].arrays).toContain('arr')
   })
 })
 
 describe('Expression pointers', () => {
-  it('arr[i-1] creates an expression pointer with correct value', () => {
+  it('arr[i-1] creates a scoped expression variable with correct value', () => {
     const source = `algo Test(arr[])
   for i from 1 to len(arr) - 1
     let v = arr[i - 1]`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30])
-    const stepWithExpr = steps.find(s => 'i - 1' in s.expressionPointers)
+    const stepWithExpr = steps.find(s =>
+      'i - 1' in s.variables && s.variables['i - 1'].arrays.length > 0
+    )
     expect(stepWithExpr).toBeDefined()
-    expect(stepWithExpr!.expressionPointers['i - 1'].arrays).toContain('arr')
+    expect(stepWithExpr!.variables['i - 1'].arrays).toContain('arr')
   })
 
-  it('explicit #: pointer creates an expression pointer', () => {
+  it('explicit #: pointer creates a scoped expression variable', () => {
     const source = `algo Test(arr[])
   let boundary = 3
   #: pointer boundary on arr at boundary`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30, 40, 50])
     const last = steps[steps.length - 1]
-    expect(last.expressionPointers).toHaveProperty('boundary')
-    expect(last.expressionPointers['boundary'].num).toBe(3)
+    expect(last.variables).toHaveProperty('boundary')
+    expect(last.variables['boundary'].num).toBe(3)
+    expect(last.variables['boundary'].arrays).toContain('arr')
+  })
+})
+
+describe('MergeSortLR: expression pointers scoped to copy, not leaking into merge', () => {
+  // Regression test: `lo + i` and `mid + 1 + j` are expression pointers used
+  // in `copy()` (from `arr[lo + i]` and `arr[mid + 1 + j]`). They must NOT
+  // appear in `merge()` which has its own `i`, `j`, `lo` variables.
+  const source = `algo MergeSortLR(arr[])
+  def copy(lo, mid, hi)
+    let leftLen = mid - lo + 1
+    let rightLen = hi - mid
+    for i from 0 to leftLen - 1
+      L[i] = arr[lo + i]
+    for j from 0 to rightLen - 1
+      R[j] = arr[mid + 1 + j]
+    L[leftLen] = inf
+    R[rightLen] = inf
+
+  def merge(lo, mid, hi)
+    alloc L mid - lo + 2
+    alloc R hi - mid + 1
+    copy(lo, mid, hi)
+    let i = 0
+    let j = 0
+    for k from lo to hi
+      if L[i] <= R[j]
+        arr[k] = L[i]
+        i = i + 1
+      else
+        arr[k] = R[j]
+        j = j + 1
+
+  def msort(lo, hi)
+    if lo < hi
+      let mid = lo + (hi - lo) / 2
+      msort(lo, mid)
+      msort(mid + 1, hi)
+      merge(lo, mid, hi)
+
+  msort(0, len(arr) - 1)`
+
+  const steps = runAlgorithm(source, 'arr', [5, 3, 8, 1, 2])
+
+  it('lo + i expression pointer is visible inside copy()', () => {
+    const stepInCopy = steps.find(s =>
+      s.callStack.length > 0 &&
+      innermostFrame(s).label.startsWith('copy(') &&
+      'lo + i' in innermostFrame(s).variables
+    )
+    expect(stepInCopy).toBeDefined()
+    const frame = innermostFrame(stepInCopy!)
+    expect(frame.variables['lo + i'].arrays.length).toBeGreaterThan(0)
+  })
+
+  it('lo + i expression pointer is NOT visible inside merge() after copy returns', () => {
+    // Find steps in merge() where the for-loop is running (i and j are defined)
+    const stepsInMerge = steps.filter(s =>
+      s.callStack.length > 0 &&
+      innermostFrame(s).label.startsWith('merge(') &&
+      'i' in innermostFrame(s).variables &&
+      'j' in innermostFrame(s).variables
+    )
+    expect(stepsInMerge.length).toBeGreaterThan(0)
+    for (const step of stepsInMerge) {
+      const frame = innermostFrame(step)
+      // These expression pointers belong to copy(), not merge()
+      expect(frame.variables).not.toHaveProperty('lo + i')
+      expect(frame.variables).not.toHaveProperty('mid + 1 + j')
+    }
+  })
+
+  it('mid + 1 + j expression pointer is visible inside copy()', () => {
+    const stepInCopy = steps.find(s =>
+      s.callStack.length > 0 &&
+      innermostFrame(s).label.startsWith('copy(') &&
+      'mid + 1 + j' in innermostFrame(s).variables
+    )
+    expect(stepInCopy).toBeDefined()
+    const frame = innermostFrame(stepInCopy!)
+    expect(frame.variables['mid + 1 + j'].arrays.length).toBeGreaterThan(0)
   })
 })
 

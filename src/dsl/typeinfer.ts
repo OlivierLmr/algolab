@@ -22,7 +22,6 @@
  * Finite, monotone → fixed-point iteration terminates.
  */
 import type { ASTNode, AlgoNode, DefNode, Expr } from './ast.ts'
-import { exprToString } from './ast.ts'
 
 // --- Public interfaces ---
 
@@ -202,57 +201,29 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   collectStructure(ast.body)
 
-  // --- Collect expression pointers ---
+  // --- Collect expression pointers (all are now explicit pointer nodes after AST transform) ---
 
   function collectExprPointers(nodes: ASTNode[]): void {
-    function scanExpr(expr: Expr): void {
-      if (expr.type === 'index' && expr.array.type === 'identifier' && expr.index.type !== 'identifier') {
-        registerExprPtr(exprToString(expr.index), expr.array.name, expr.index, false)
-      }
-      switch (expr.type) {
-        case 'binary': scanExpr(expr.left); scanExpr(expr.right); break
-        case 'unary': scanExpr(expr.operand); break
-        case 'call': expr.args.forEach(scanExpr); break
-        case 'index': scanExpr(expr.array); scanExpr(expr.index); break
-      }
-    }
-    function scanBody(stmts: ASTNode[]): void {
-      for (const stmt of stmts) {
-        switch (stmt.type) {
-          case 'let': scanExpr(stmt.value); break
-          case 'assign': scanExpr(stmt.target); scanExpr(stmt.value); break
-          case 'swap': scanExpr(stmt.left); scanExpr(stmt.right); break
-          case 'if': scanExpr(stmt.condition); scanBody(stmt.body); scanBody(stmt.elseBody); break
-          case 'while': scanExpr(stmt.condition); scanBody(stmt.body); break
-          case 'for': scanExpr(stmt.from); scanExpr(stmt.to); scanBody(stmt.body); break
-          case 'exprStmt': scanExpr(stmt.expr); break
-          case 'return': scanExpr(stmt.value); break
-          case 'def': scanBody(stmt.body); break
-          case 'pointer': registerExprPtr(stmt.label, stmt.arrayName, stmt.at, true); break
+    for (const node of nodes) {
+      if (node.type === 'pointer') {
+        const key = `${node.arrayName}:${node.label}`
+        if (!exprPointers.find(e => `${e.arrayName}:${e.label}` === key)) {
+          exprPointers.push({
+            label: node.label,
+            arrayName: node.arrayName,
+            expr: node.at,
+            varNames: collectVarNamesFromExpr(node.at),
+            explicit: true,
+          })
         }
       }
-    }
-    scanBody(nodes)
-  }
-
-  function registerExprPtr(label: string, arrayName: string, expr: Expr, explicit: boolean): void {
-    const key = `${arrayName}:${label}`
-    const existing = exprPointers.find(e => `${e.arrayName}:${e.label}` === key)
-    if (existing) {
-      if (explicit && !existing.explicit) {
-        existing.explicit = true
-        existing.expr = expr
-        existing.varNames = collectVarNamesFromExpr(expr)
+      if ('body' in node && Array.isArray((node as any).body)) {
+        collectExprPointers((node as any).body)
       }
-      return
+      if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
+        collectExprPointers((node as any).elseBody)
+      }
     }
-    exprPointers.push({
-      label,
-      arrayName,
-      expr,
-      varNames: collectVarNamesFromExpr(expr),
-      explicit,
-    })
   }
 
   collectExprPointers(ast.body)

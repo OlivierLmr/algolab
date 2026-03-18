@@ -141,7 +141,7 @@ function drawFrame(
     }
 
     // Draw pointers for this frame
-    const framePointers = derivePointers(frame.variables, frame.expressionPointers, colorMap, frame.varHighlights)
+    const framePointers = derivePointers(frame.variables, colorMap, frame.varHighlights)
     const frameArrayPointers = framePointers.filter(p => frame.arrays.some(a => a.name === p.arrayName))
     drawPointers(ctx, frameArrayPointers, arrayYPositions, contentX)
 

@@ -8,7 +8,6 @@ function getVisibleGlobalPointerNames(step: Step, colorMap: Map<string, string>)
   const globalArrayNames = new Set(step.arrays.map(a => a.name))
 
   let allVarsForGlobal: Record<string, Value>
-  let allExprPtrsForGlobal: Record<string, Value>
   let varHighlights = step.varHighlights
 
   if (step.callStack.length > 0) {
@@ -19,19 +18,12 @@ function getVisibleGlobalPointerNames(step: Step, colorMap: Map<string, string>)
         allVarsForGlobal[name] = val
       }
     }
-    allExprPtrsForGlobal = { ...step.expressionPointers }
-    for (const [label, val] of Object.entries(innermost.expressionPointers)) {
-      if (val.arrays.some(a => globalArrayNames.has(a))) {
-        allExprPtrsForGlobal[label] = val
-      }
-    }
     varHighlights = [...step.varHighlights, ...innermost.varHighlights]
   } else {
     allVarsForGlobal = { ...step.variables }
-    allExprPtrsForGlobal = { ...step.expressionPointers }
   }
 
-  const pointers = derivePointers(allVarsForGlobal, allExprPtrsForGlobal, colorMap, varHighlights)
+  const pointers = derivePointers(allVarsForGlobal, colorMap, varHighlights)
     .filter(p => globalArrayNames.has(p.arrayName))
 
   return pointers.map(p => p.name).sort()
@@ -96,21 +88,16 @@ describe('Quick Select: renderer pointer visibility', () => {
     }
   })
 
-  it('during partition: k (explicit pointer) IS visible', () => {
+  it('during partition: only innermost frame vars shown as global pointers', () => {
     const stepInPartition = steps.find(s => isInFrame(s, 'partition'))
     expect(stepInPartition).toBeDefined()
     const visible = getVisibleGlobalPointerNames(stepInPartition!, colorMap)
-    expect(visible).toContain('k')
-  })
-
-  it('during partition: only innermost frame vars + expr pointers shown', () => {
-    const stepInPartition = steps.find(s => isInFrame(s, 'partition'))
-    expect(stepInPartition).toBeDefined()
-    const visible = getVisibleGlobalPointerNames(stepInPartition!, colorMap)
-    // p (global iterator) should NOT show
+    // Global-scope variables (k, p, pivotIdx) should NOT show — only innermost frame vars
     expect(visible).not.toContain('p')
-    // pivotIdx (global iterator, if it exists) should NOT show
     expect(visible).not.toContain('pivotIdx')
+    // k is a global-scope expression variable, also not visible during partition
+    // (consistent scoping: only innermost frame's pointers show on global arrays)
+    expect(visible).not.toContain('k')
   })
 
   it('after partition returns: pivotIdx IS visible', () => {

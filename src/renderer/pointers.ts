@@ -14,20 +14,18 @@ interface PointerArrow {
 }
 
 /**
- * Derive pointer arrows from variables and expression pointers.
- * Variables with non-empty .arrays are iterator variables → draw as pointers.
- * Expression pointers similarly map to arrows.
+ * Derive pointer arrows from variables.
+ * Variables with non-empty .arrays are iterator variables (including
+ * expression-variables synthesized from pointer nodes) → draw as pointers.
  */
 export function derivePointers(
   variables: Record<string, Value>,
-  expressionPointers: Record<string, Value>,
   colorMap: Map<string, string>,
   varHighlights: VarHighlight[],
 ): PointerArrow[] {
   const arrows: PointerArrow[] = []
   const seen = new Set<string>()
 
-  // From iterator variables
   for (const [name, val] of Object.entries(variables)) {
     if (val.arrays.length === 0) continue
     for (const arrayName of val.arrays) {
@@ -45,36 +43,16 @@ export function derivePointers(
     }
   }
 
-  // From expression pointers
-  for (const [label, val] of Object.entries(expressionPointers)) {
-    if (val.arrays.length === 0) continue
-    for (const arrayName of val.arrays) {
-      const key = `${arrayName}:${label}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      arrows.push({
-        name: label,
-        arrayName,
-        index: val.num,
-        color: colorMap.get(label) || '#888',
-      })
-    }
-  }
-
   return arrows
 }
 
 /** Get the set of variable names that are shown as pointers (not in the variables panel). */
 export function getPointerVarNames(
   variables: Record<string, Value>,
-  expressionPointers: Record<string, Value>,
 ): Set<string> {
   const names = new Set<string>()
   for (const [name, val] of Object.entries(variables)) {
     if (val.arrays.length > 0) names.add(name)
-  }
-  for (const label of Object.keys(expressionPointers)) {
-    names.add(label)
   }
   return names
 }

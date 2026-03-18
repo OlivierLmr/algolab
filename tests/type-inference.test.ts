@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { lex } from '../src/dsl/lexer.ts'
 import { parse } from '../src/dsl/parser.ts'
 import { inferTypes } from '../src/dsl/typeinfer.ts'
+import { synthesizeExpressionPointers } from '../src/dsl/transform.ts'
 import type { TypeContext } from '../src/dsl/typeinfer.ts'
 
-/** Parse DSL source and run type inference, returning TypeContext. */
+/** Parse DSL source, run AST transform, and run type inference. */
 function infer(source: string, inputArrays: string[] = ['arr']): TypeContext {
   const tokens = lex(source)
   const ast = parse(tokens)
+  synthesizeExpressionPointers(ast, inputArrays)
   return inferTypes(ast, inputArrays)
 }
 
@@ -160,7 +162,8 @@ describe('Type Inference: expression pointers', () => {
     const ep = ctx.expressionPointers.find(e => e.label === 'i - 1')
     expect(ep).toBeDefined()
     expect(ep!.arrayName).toBe('arr')
-    expect(ep!.explicit).toBe(false)
+    // After AST transform, all expression pointers are explicit pointer nodes
+    expect(ep!.explicit).toBe(true)
   })
 
   it('explicit #: pointer creates expression pointer', () => {

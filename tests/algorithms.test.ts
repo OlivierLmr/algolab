@@ -12,7 +12,7 @@ describe('All built-in algorithms run without errors', () => {
         expect(step.arrays).toBeDefined()
         expect(step.variables).toBeDefined()
         expect(step.callStack).toBeDefined()
-        expect(step.expressionPointers).toBeDefined()
+        expect(step.variables).toBeDefined()
       }
     })
   }

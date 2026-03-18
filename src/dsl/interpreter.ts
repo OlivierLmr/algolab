@@ -1,10 +1,10 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode, PointerNode,
   Expr, CommentPart,
 } from './ast.ts'
 import type { Value } from './value.ts'
 import { plainVal, mergeArrays, propagateArithmetic } from './value.ts'
-import type { TypeContext, ExprPointerDef } from './typeinfer.ts'
+import type { TypeContext } from './typeinfer.ts'
 
 /** Sentinel thrown by `return` statements to unwind execution. */
 class ReturnSignal {
@@ -37,8 +37,15 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     const callFrameStack: ActiveFrame[] = []
     const arrayAliasStack: Map<string, string>[] = []
 
-    // Expression pointers loaded from TypeContext
-    const exprPointerDefs: ExprPointerDef[] = typeContext.expressionPointers
+    // --- Live expression variables (scoped pointer registrations) ---
+    // Parallel to scopeStack: each scope level has its own list of registered expr vars.
+    // When a scope is popped, its registrations vanish — natural scoping.
+    interface ExprVarReg {
+      label: string
+      arrayName: string  // syntactic name (resolved at eval time)
+      expr: Expr
+    }
+    const liveExprVars: ExprVarReg[][] = [[]]  // parallel to scopeStack
 
     function resolveArrayName(name: string): string {
       const seen = new Set<string>()
@@ -154,48 +161,12 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
     function pushScope(): void {
       scopeStack.push(new Map())
+      liveExprVars.push([])
     }
 
     function popScope(): void {
       scopeStack.pop()
-    }
-
-    function collectVarNames(expr: Expr, out: Set<string>): void {
-      switch (expr.type) {
-        case 'identifier': out.add(expr.name); break
-        case 'binary': collectVarNames(expr.left, out); collectVarNames(expr.right, out); break
-        case 'unary': collectVarNames(expr.operand, out); break
-        case 'index': collectVarNames(expr.array, out); collectVarNames(expr.index, out); break
-        case 'call': expr.args.forEach(a => collectVarNames(a, out)); break
-      }
-    }
-
-    /** Check that all variables in an expression exist in the current function's
-     *  own scope (or global scope), not inherited from parent call scopes. */
-    function exprVarsInCurrentScope(expr: Expr): boolean {
-      const vars = new Set<string>()
-      collectVarNames(expr, vars)
-      for (const name of vars) {
-        let found = false
-        // Check current function's scopes (from scopeBase to stack top)
-        if (callFrameStack.length > 0) {
-          const base = callFrameStack[callFrameStack.length - 1].scopeBase
-          for (let si = base; si < scopeStack.length; si++) {
-            if (scopeStack[si].has(name)) { found = true; break }
-          }
-        }
-        if (found) continue
-        // Check algo-level scopes
-        const algoTop = callFrameStack.length > 0
-          ? callFrameStack[0].scopeBase
-          : scopeStack.length
-        for (let si = 0; si < algoTop; si++) {
-          if (scopeStack[si].has(name)) { found = true; break }
-        }
-        if (found) continue
-        return false
-      }
-      return true
+      liveExprVars.pop()
     }
 
     function evaluateCommentParts(parts: CommentPart[]): string {
@@ -215,30 +186,36 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       }).join('')
     }
 
+    /**
+     * Evaluate all live expression variables in a scope range and inject
+     * them into a variables record. Each registration produces a Value
+     * with arrays: [resolvedArrayName].
+     */
+    function evaluateExprVars(scopeFrom: number, scopeTo: number): Record<string, Value> {
+      const result: Record<string, Value> = {}
+      for (let si = scopeFrom; si < scopeTo; si++) {
+        if (si >= liveExprVars.length) break
+        for (const reg of liveExprVars[si]) {
+          const resolvedArr = resolveArrayName(reg.arrayName)
+          if (!arrays.has(resolvedArr)) continue
+          try {
+            const val = evalExpr(reg.expr)
+            const existing = result[reg.label]
+            if (existing) {
+              result[reg.label] = { num: val.num, arrays: mergeArrays(existing.arrays, [resolvedArr]) }
+            } else {
+              result[reg.label] = { num: val.num, arrays: [resolvedArr] }
+            }
+          } catch { /* skip — variables may not be available yet */ }
+        }
+      }
+      return result
+    }
+
     function snapshot(line: number, description: string): void {
       if (pendingCommentParts !== null) {
         description = evaluateCommentParts(pendingCommentParts)
         pendingCommentParts = null
-      }
-
-      // Evaluate expression pointers
-      const allExprPointers: Record<string, Value> = {}
-      for (const entry of exprPointerDefs) {
-        // Check all varNames are in current scope
-        const allInScope = entry.varNames.every(name => hasVar(name))
-        if (!allInScope) continue
-        if (!exprVarsInCurrentScope(entry.expr)) continue
-        const resolvedArr = resolveArrayName(entry.arrayName)
-        if (!arrays.has(resolvedArr)) continue
-        try {
-          const val = evalExpr(entry.expr)
-          const existing = allExprPointers[entry.label]
-          if (existing) {
-            allExprPointers[entry.label] = { num: val.num, arrays: mergeArrays(existing.arrays, [resolvedArr]) }
-          } else {
-            allExprPointers[entry.label] = { num: val.num, arrays: [resolvedArr] }
-          }
-        } catch { /* skip */ }
       }
 
       const allDimRanges: DimRange[] = [...dimRanges]
@@ -246,7 +223,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       // Build call stack frames
       const frameArrayNames = new Set<string>()
       const frameVarNames = new Set<string>()
-      const frameExprPtrLabels = new Set<string>()
       const callStackFrames: CallFrame[] = []
 
       if (callFrameStack.length > 0) {
@@ -259,17 +235,25 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
             ([paramName, targetName]) => ({ paramName, targetName })
           )
 
-          // Frame's variables come from all scopes in this frame
-          const frameVars: Record<string, Value> = {}
+          // Frame's scope range
           const scopeFrom = af.scopeBase
           const scopeTo = fi + 1 < callFrameStack.length
             ? callFrameStack[fi + 1].scopeBase
             : scopeStack.length
+
+          // Frame's variables: regular vars + evaluated expression vars
+          const frameVars: Record<string, Value> = {}
           for (let si = scopeFrom; si < scopeTo; si++) {
             for (const [k, v] of scopeStack[si]) {
               frameVars[k] = v
               frameVarNames.add(k)
             }
+          }
+          // Inject scoped expression variables
+          const exprVars = evaluateExprVars(scopeFrom, scopeTo)
+          for (const [k, v] of Object.entries(exprVars)) {
+            frameVars[k] = v
+            frameVarNames.add(k)
           }
 
           // Frame's arrays
@@ -293,20 +277,9 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
           const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
           const frameGaugeArrays = [...gaugeArrays].filter(n => af.allocatedArrays.has(n))
 
-          // Frame expression pointers: those whose arrays are in this frame
-          const frameExprPtrs: Record<string, Value> = {}
-          for (const [epLabel, epVal] of Object.entries(allExprPointers)) {
-            const frameArrays2 = epVal.arrays.filter(a => af.allocatedArrays.has(a))
-            if (frameArrays2.length > 0) {
-              frameExprPtrs[epLabel] = { num: epVal.num, arrays: frameArrays2 }
-              frameExprPtrLabels.add(epLabel)
-            }
-          }
-
           callStackFrames.push({
             label,
             variables: frameVars,
-            expressionPointers: frameExprPtrs,
             arrayRefs,
             arrays: frameArrays,
             highlights: frameHighlights,
@@ -325,7 +298,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         }
       }
 
-      // Global variables: from algo-level scopes only
+      // Global variables: from algo-level scopes only + their expression vars
       const globalVars: Record<string, Value> = {}
       const globalScopeTo = callFrameStack.length > 0
         ? callFrameStack[0].scopeBase
@@ -337,14 +310,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
           }
         }
       }
-
-      // Global expression pointers: not belonging to any frame's arrays
-      const globalExprPtrs: Record<string, Value> = {}
-      for (const [epLabel, epVal] of Object.entries(allExprPointers)) {
-        if (frameExprPtrLabels.has(epLabel)) continue
-        const globalArrays2 = epVal.arrays.filter(a => !frameArrayNames.has(a))
-        if (globalArrays2.length > 0) {
-          globalExprPtrs[epLabel] = { num: epVal.num, arrays: globalArrays2 }
+      // Inject global-scope expression variables
+      const globalExprVars = evaluateExprVars(0, globalScopeTo)
+      for (const [k, v] of Object.entries(globalExprVars)) {
+        if (!frameVarNames.has(k)) {
+          globalVars[k] = v
         }
       }
 
@@ -355,7 +325,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
       steps.push({
         arrays: globalArrays,
-        expressionPointers: globalExprPtrs,
         highlights: globalHighlights,
         varHighlights: globalVarHighlights,
         dimRanges: globalDimRanges,
@@ -593,7 +562,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         case 'undim': execUndim(node); break
         case 'gauge': execGauge(node); break
         case 'ungauge': execUngauge(node); break
-        case 'pointer': break  // Handled statically by type inference
+        case 'pointer': execPointer(node); break
         case 'stepover': break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
@@ -609,6 +578,16 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
           }
           break
       }
+    }
+
+    function execPointer(node: PointerNode): void {
+      // Register this expression variable for re-evaluation at each snapshot.
+      // It lives in the current scope level and vanishes when the scope is popped.
+      liveExprVars[liveExprVars.length - 1].push({
+        label: node.label,
+        arrayName: node.arrayName,
+        expr: node.at,
+      })
     }
 
     function execFor(node: ForNode): void {

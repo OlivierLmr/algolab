@@ -26,7 +26,6 @@ export interface DimRange {
 export interface CallFrame {
   label: string
   variables: Record<string, Value>
-  expressionPointers: Record<string, Value>
   arrayRefs: { paramName: string; targetName: string }[]
   arrays: TrackedArray[]
   highlights: Highlight[]
@@ -37,7 +36,6 @@ export interface CallFrame {
 
 export interface Step {
   arrays: TrackedArray[]
-  expressionPointers: Record<string, Value>
   highlights: Highlight[]
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]

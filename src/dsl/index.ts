@@ -6,6 +6,7 @@ import type { DisplayInfo } from './preprocess.ts'
 import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
 import { inferTypes } from './typeinfer.ts'
+import { synthesizeExpressionPointers } from './transform.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { validateAST } from './validate.ts'
 
@@ -29,6 +30,9 @@ export function compilePipeline(source: string, paramName: string, input: number
   if (validationErrors.length > 0) {
     throw new Error(`Line ${validationErrors[0].line + 1}: ${validationErrors[0].message}`)
   }
+
+  // Synthesize expression pointers as explicit pointer nodes in the AST
+  synthesizeExpressionPointers(ast, [paramName])
 
   // Static type inference (replaces runtime tagging and analysis.ts)
   const typeContext = inferTypes(ast, [paramName])
