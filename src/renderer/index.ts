@@ -183,25 +183,24 @@ export function drawHoverArrow(
       CELL_SIZE + 2,
     )
 
-    // Arrow start: bottom of source cell (at index label level)
-    const sourceStartY = sourceY + INDEX_LABEL_Y_OFFSET
+    // Arrow starts from the value (cell center), ends at target index label
+    const sourceCenterY = sourceY + CELL_SIZE / 2
 
-    // Draw arrow from source to target index label
     ctx.strokeStyle = '#3498db'
     ctx.lineWidth = 2
     ctx.setLineDash([6, 3])
     ctx.beginPath()
 
     if (hover.arrayName === targetArrayName) {
-      // Same array: arc below the cells (through the index labels area)
+      // Same array: arc below the cells to reach the target index label
       const midX = (sourceCenterX + targetCenterX) / 2
-      const arcDrop = Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12)
-      const controlY = sourceStartY + arcDrop
-      ctx.moveTo(sourceCenterX, sourceStartY)
+      const arcDrop = Math.min(35, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 15)
+      const controlY = sourceY + CELL_SIZE + arcDrop
+      ctx.moveTo(sourceCenterX, sourceCenterY)
       ctx.quadraticCurveTo(midX, controlY, targetCenterX, targetIndexY)
     } else {
-      // Different arrays: line from source bottom to target index label
-      ctx.moveTo(sourceCenterX, sourceStartY)
+      // Different arrays: line from source cell center to target index label
+      ctx.moveTo(sourceCenterX, sourceCenterY)
       ctx.lineTo(targetCenterX, targetIndexY)
     }
     ctx.stroke()
@@ -212,8 +211,8 @@ export function drawHoverArrow(
       ? (sourceCenterX + targetCenterX) / 2
       : sourceCenterX
     const prevY = hover.arrayName === targetArrayName
-      ? sourceStartY + Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12)
-      : sourceStartY
+      ? sourceY + CELL_SIZE + Math.min(35, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 15)
+      : sourceCenterY
     const angle = Math.atan2(targetIndexY - prevY, targetCenterX - prevX)
     const headLen = 10
     ctx.fillStyle = '#3498db'
@@ -236,11 +235,11 @@ export function drawHoverArrow(
     ctx.textAlign = 'center'
     if (hover.arrayName === targetArrayName) {
       const midX = (sourceCenterX + targetCenterX) / 2
-      const labelY = sourceStartY + Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12) + 14
+      const labelY = sourceY + CELL_SIZE + Math.min(35, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 15) + 14
       ctx.fillText(`→ ${targetArrayName}[${cellValue.num}]`, midX, labelY)
     } else {
       const labelX = (sourceCenterX + targetCenterX) / 2
-      const labelY = (sourceStartY + targetIndexY) / 2 - 6
+      const labelY = (sourceCenterY + targetIndexY) / 2 - 6
       ctx.fillText(`→ ${targetArrayName}[${cellValue.num}]`, labelX, labelY)
     }
     ctx.textAlign = 'start'
