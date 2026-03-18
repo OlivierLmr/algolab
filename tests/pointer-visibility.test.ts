@@ -222,6 +222,14 @@ describe('Direct variable tagging', () => {
 })
 
 describe('Expression pointers', () => {
+  it('arr[0] (constant index) does NOT create an expression variable', () => {
+    const source = `algo Test(arr[])
+  let v = arr[0]`
+    const steps = runAlgorithm(source, 'arr', [10, 20, 30])
+    const last = steps[steps.length - 1]
+    expect(last.variables).not.toHaveProperty('0')
+  })
+
   it('arr[i-1] creates a scoped expression variable with correct value', () => {
     const source = `algo Test(arr[])
   for i from 1 to len(arr) - 1

@@ -73,16 +73,19 @@ function collectImplicitPointers(nodes: ASTNode[]): PendingPointer[] {
   const seen = new Set<string>()  // dedup by "arrayName:label"
 
   function scanExpr(expr: Expr, line: number): void {
-    // arr[complexExpr] where index is not a bare identifier
+    // arr[complexExpr] where index is not a bare identifier and contains variables
     if (expr.type === 'index' && expr.array.type === 'identifier' && expr.index.type !== 'identifier') {
-      const label = exprToString(expr.index)
-      const arrayName = expr.array.name
-      const key = `${arrayName}:${label}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        const deps = collectVarNames(expr.index)
-        deps.add(arrayName)  // array itself must be available
-        pending.push({ label, arrayName, expr: expr.index, line, deps })
+      const varNames = collectVarNames(expr.index)
+      if (varNames.size > 0) {  // skip constant expressions like arr[0]
+        const label = exprToString(expr.index)
+        const arrayName = expr.array.name
+        const key = `${arrayName}:${label}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          const deps = new Set(varNames)
+          deps.add(arrayName)  // array itself must be available
+          pending.push({ label, arrayName, expr: expr.index, line, deps })
+        }
       }
     }
     // Recurse into sub-expressions
