@@ -117,3 +117,36 @@ export function drawArray(
 export function getArrayHeight(): number {
   return CELL_SIZE + ARRAY_LABEL_HEIGHT + 20 // cell + index labels + gap
 }
+
+/** Identifies a specific cell in an array. */
+export interface CellHit {
+  arrayName: string
+  cellIndex: number
+}
+
+/** Hit-test: given canvas coordinates, return the cell under the cursor (if any). */
+export function hitTestCell(
+  x: number,
+  y: number,
+  arrays: { name: string; length: number }[],
+  arrayYPositions: Map<string, number>,
+  xOffset: number = 40,
+): CellHit | null {
+  for (const arr of arrays) {
+    const arrY = arrayYPositions.get(arr.name)
+    if (arrY === undefined) continue
+    if (y < arrY || y > arrY + CELL_SIZE) continue
+
+    const relX = x - xOffset
+    if (relX < 0) continue
+    const cellIndex = Math.floor(relX / (CELL_SIZE + CELL_GAP))
+    if (cellIndex < 0 || cellIndex >= arr.length) continue
+
+    // Check we're inside the cell, not in the gap
+    const cellLocalX = relX - cellIndex * (CELL_SIZE + CELL_GAP)
+    if (cellLocalX > CELL_SIZE) continue
+
+    return { arrayName: arr.name, cellIndex }
+  }
+  return null
+}
