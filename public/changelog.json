@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-03-18T12:00:00Z",
+    "title": "Automatic Iterators & Cell Hover Arrows",
+    "message": "Pointer arrows are now fully automatic — variables used as array indices are detected and displayed as colored pointers without any manual annotation. Hovering over an array cell that holds an index value draws an arrow to the target array cell it references. Fixed a bug where input array values (e.g. arr in Counting Sort) were not recognized as iterators. Behind the scenes, a new static type inference engine powers all of this, replacing the previous runtime heuristics with a constraint-based analysis pass."
+  },
+  {
     "date": "2026-03-16T18:00:00Z",
     "title": "Gauge Visualization & Internal Improvements",
     "message": "Array cells now show a proportional blue fill (gauge) indicating relative value size — enabled on all sorting algorithms. New stepover directive lets algorithm authors disable breakpoints on helper functions by default. Under the hood: restructured the compilation pipeline, added a semantic validation pass, and improved renderer performance."
