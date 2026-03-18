@@ -9,6 +9,15 @@
  *   Iter<S>   — iterator/position in arrays S         (arrays: [...S])
  *   Array<τ>  — array whose elements have type τ
  *
+ * Two-tier constraint resolution (AND/OR):
+ *   Each variable carries two sets of array associations:
+ *     AND — structural evidence: the variable IS used as a position (arr[x], dim, swap)
+ *     OR  — value flow evidence: the variable MIGHT be a position (let x = y, arg→param)
+ *   During fixed-point iteration, both tiers propagate (and ∪ or) for monotonicity.
+ *   After convergence, resolution applies: and ≠ ∅ → and, else or.
+ *   This prevents value-flow contamination (e.g. `let i = lo` where lo: {src, dst}
+ *   won't override structural evidence from `src[i]`).
+ *
  * Lattice:  Num ⊑ Iter<S>,  Iter<S₁> ⊔ Iter<S₂> = Iter<S₁ ∪ S₂>
  * Finite, monotone → fixed-point iteration terminates.
  */
@@ -92,15 +101,24 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
   const exprPointers: ExprPointerDef[] = []
   const functions = new Map<string, FuncInfo>()
 
-  // All known array names (input + alloc)
-  const allArrayNames = new Set<string>(inputArrayNames)
-
   // Initialize element types for input arrays
   for (const name of inputArrayNames) {
     arrayElemTypes.set(name, [])
   }
 
-  // --- Helper: join (add arrays to a var type tier, return true if changed) ---
+  // --- Helpers ---
+
+  /** Merge `additions` into `target` (set-as-sorted-array). Returns true if any new element was added. */
+  function joinSet(target: string[], additions: string[]): boolean {
+    let changed = false
+    for (const a of additions) {
+      if (!target.includes(a)) {
+        target.push(a)
+        changed = true
+      }
+    }
+    return changed
+  }
 
   function initVar(key: VarKey): void {
     if (!varAnd.has(key)) varAnd.set(key, [])
@@ -109,60 +127,29 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   function joinVarAnd(key: VarKey, arrays: string[]): boolean {
     if (arrays.length === 0) return false
-    const existing = varAnd.get(key) ?? []
-    let changed = false
-    const merged = [...existing]
-    for (const a of arrays) {
-      if (!merged.includes(a)) {
-        merged.push(a)
-        changed = true
-      }
-    }
-    if (changed) varAnd.set(key, merged)
-    return changed
+    const existing = varAnd.get(key)
+    if (!existing) { varAnd.set(key, [...arrays]); return true }
+    return joinSet(existing, arrays)
   }
 
   function joinVarOr(key: VarKey, arrays: string[]): boolean {
     if (arrays.length === 0) return false
-    const existing = varOr.get(key) ?? []
-    let changed = false
-    const merged = [...existing]
-    for (const a of arrays) {
-      if (!merged.includes(a)) {
-        merged.push(a)
-        changed = true
-      }
-    }
-    if (changed) varOr.set(key, merged)
-    return changed
+    const existing = varOr.get(key)
+    if (!existing) { varOr.set(key, [...arrays]); return true }
+    return joinSet(existing, arrays)
   }
 
   function joinElemType(arrName: string, arrays: string[]): boolean {
     if (arrays.length === 0) return false
-    const existing = arrayElemTypes.get(arrName) ?? []
-    let changed = false
-    const merged = [...existing]
-    for (const a of arrays) {
-      if (!merged.includes(a)) {
-        merged.push(a)
-        changed = true
-      }
-    }
-    if (changed) arrayElemTypes.set(arrName, merged)
-    return changed
+    const existing = arrayElemTypes.get(arrName)
+    if (!existing) { arrayElemTypes.set(arrName, [...arrays]); return true }
+    return joinSet(existing, arrays)
   }
 
   function joinReturn(funcName: string, arrays: string[]): boolean {
     const info = functions.get(funcName)
     if (!info || arrays.length === 0) return false
-    let changed = false
-    for (const a of arrays) {
-      if (!info.returnType.includes(a)) {
-        info.returnType.push(a)
-        changed = true
-      }
-    }
-    return changed
+    return joinSet(info.returnType, arrays)
   }
 
   /** During iteration, return and ∪ or for maximum propagation (monotone). */
@@ -178,9 +165,8 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     return merged
   }
 
-  // --- Phase 0: Collect structure ---
+  // --- Collect structure (defs, allocs) ---
 
-  // Collect all def nodes and alloc nodes
   function collectStructure(nodes: ASTNode[]): void {
     for (const node of nodes) {
       if (node.type === 'def') {
@@ -197,16 +183,15 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         functions.set(node.name, { node, paramKeys, returnType: [] })
         collectStructure(node.body)
       } else if (node.type === 'alloc') {
-        allArrayNames.add(node.arrayName)
         arrayElemTypes.set(node.arrayName, [])
-        collectStructure_children(node)
+        collectStructureChildren(node)
       } else {
-        collectStructure_children(node)
+        collectStructureChildren(node)
       }
     }
   }
 
-  function collectStructure_children(node: ASTNode): void {
+  function collectStructureChildren(node: ASTNode): void {
     if (node.type === 'for' || node.type === 'while') {
       collectStructure(node.body)
     } else if (node.type === 'if') {
@@ -217,7 +202,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   collectStructure(ast.body)
 
-  // --- Phase 0.5: Collect expression pointers ---
+  // --- Collect expression pointers ---
 
   function collectExprPointers(nodes: ASTNode[]): void {
     function scanExpr(expr: Expr): void {
@@ -272,7 +257,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   collectExprPointers(ast.body)
 
-  // --- Phase 1: Fixed-point iteration ---
+  // --- Fixed-point iteration ---
 
   let changed = true
   let iterations = 0
@@ -294,7 +279,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     algoScope.pop()
   }
 
-  // --- Phase 2: Resolve AND/OR to final varTypes ---
+  // --- Resolve AND/OR to final varTypes ---
   // resolve(and, or) = and if and ≠ ∅, else or
 
   const varTypes = new Map<VarKey, string[]>()
@@ -305,7 +290,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     varTypes.set(key, a.length > 0 ? a : o)
   }
 
-  // --- Phase 3: Collect labels ---
+  // --- Collect labels ---
 
   const labels = new Set<string>()
   for (const [key, arrays] of varTypes) {
@@ -448,12 +433,9 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       }
 
       case 'def': {
-        // Process function body with its own scope
         scope.push()
         for (const p of node.params) {
-          if (p.isArray) {
-            // Array param: not a variable in the type context
-          } else {
+          if (!p.isArray) {
             const key = scope.define(p.name, node.line)
             initVar(key)
           }
@@ -464,12 +446,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       }
 
       case 'exprStmt': {
-        // Could be a function call
         if (processExprConstraints(node.expr, scope)) nodeChanged = true
-        // If it's a call, process call constraints
-        if (node.expr.type === 'call') {
-          if (processCallConstraints(node.expr, scope)) nodeChanged = true
-        }
         break
       }
 
@@ -631,7 +608,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     return changed
   }
 
-  /** Process function call constraints: propagate arg types to param types and vice versa */
+  /** Process function call constraints: propagate arg types to param types (OR / value flow) */
   function processCallConstraints(expr: Expr, scope: ScopeStack): boolean {
     if (expr.type !== 'call') return false
     if (expr.callee === 'len') return false
