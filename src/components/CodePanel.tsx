@@ -47,11 +47,18 @@ export function CodePanel() {
     return set
   }, [algo.source, custom, disabled])
 
-  // Show variables from global scope + innermost call frame
-  const allVars: Record<string, number> = { ...(step?.variables ?? {}) }
-  if (step && step.callStack.length > 0) {
-    const innermost = step.callStack[step.callStack.length - 1]
-    Object.assign(allVars, innermost.variables)
+  // Show variables from global scope + innermost call frame (non-iterator only)
+  const allVars: Record<string, number> = {}
+  if (step) {
+    for (const [name, val] of Object.entries(step.variables)) {
+      if (val.arrays.length === 0) allVars[name] = val.num
+    }
+    if (step.callStack.length > 0) {
+      const innermost = step.callStack[step.callStack.length - 1]
+      for (const [name, val] of Object.entries(innermost.variables)) {
+        if (val.arrays.length === 0) allVars[name] = val.num
+      }
+    }
   }
   const varEntries = Object.entries(allVars)
 

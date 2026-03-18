@@ -1,6 +1,6 @@
 import type { Step } from '../types.ts'
 import { drawArray, ARRAY_Y_START, getArrayHeight } from './array.ts'
-import { drawPointers } from './pointers.ts'
+import { derivePointers, getPointerVarNames, drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
 import { computeCallStackHeight, drawCallStack } from './callstack.ts'
 
@@ -21,12 +21,14 @@ interface StepLayout {
 
 /** Compute layout positions for all visual elements in a step. */
 function computeLayout(step: Step, _width: number): StepLayout {
-  const pointerNames = new Set(step.pointers.map(p => p.name))
+  // Derive pointer names from variables with iterator metadata + expression pointers
+  const pointerNames = getPointerVarNames(step.variables, step.expressionPointers)
   const hasCallStack = step.callStack && step.callStack.length > 0
 
   if (hasCallStack) {
     for (const frame of step.callStack) {
-      for (const p of frame.pointers) pointerNames.add(p.name)
+      const framePointerNames = getPointerVarNames(frame.variables, frame.expressionPointers)
+      for (const name of framePointerNames) pointerNames.add(name)
     }
   }
 
@@ -60,7 +62,13 @@ export function computeRequiredHeight(step: Step): number {
 }
 
 /** Render a step to canvas using pre-computed layout positions. */
-export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: number, height: number): void {
+export function renderStep(
+  ctx: CanvasRenderingContext2D,
+  step: Step,
+  width: number,
+  height: number,
+  colorMap: Map<string, string>,
+): void {
   ctx.clearRect(0, 0, width, height)
   const layout = computeLayout(step, width)
 
@@ -70,12 +78,13 @@ export function renderStep(ctx: CanvasRenderingContext2D, step: Step, width: num
     drawArray(ctx, array, step.highlights, step.dimRanges, y, CONTENT_X, step.gaugeArrays)
   }
 
-  // Draw pointers above global arrays
-  drawPointers(ctx, step.pointers, layout.arrayYPositions)
+  // Draw pointers above global arrays (derived from variables + expression pointers)
+  const globalPointers = derivePointers(step.variables, step.expressionPointers, colorMap, step.varHighlights)
+  drawPointers(ctx, globalPointers, layout.arrayYPositions)
 
   // Draw call stack
   if (layout.hasCallStack) {
-    drawCallStack(ctx, step.callStack, 20, layout.callStackY, width - 40, layout.pointerNames)
+    drawCallStack(ctx, step.callStack, 20, layout.callStackY, width - 40, layout.pointerNames, colorMap)
   }
 
   // Draw non-pointer global variables

@@ -40,7 +40,6 @@ export const quickSelect: AlgorithmDefinition = {
     #: comment "Choosing pivot at index {p}, value {arr[p]}"
     swap arr[hi], arr[p]
     let pivotIdx = partition(lo, hi)
-    #: pointer pivotIdx on arr at pivotIdx
     #: undim arr from 0 to lo - 1
     #: undim arr from hi + 1 to len(arr) - 1
     #: comment "Pivot at index {pivotIdx}, looking for k={k}"

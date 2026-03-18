@@ -5,7 +5,7 @@ import { preprocessSource } from './preprocess.ts'
 import type { DisplayInfo } from './preprocess.ts'
 import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
-import { collectAllPointerLabels, collectDirectivePointerLabels } from './analysis.ts'
+import { collectIteratorVarNames } from './analysis.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { validateAST } from './validate.ts'
 
@@ -30,12 +30,8 @@ export function compilePipeline(source: string, paramName: string, input: number
     throw new Error(`Line ${validationErrors[0].line + 1}: ${validationErrors[0].message}`)
   }
 
-  // Collect pointer labels (single pass, shared with interpreter)
-  const labels = collectAllPointerLabels(ast.body)
-  const dirLabels = collectDirectivePointerLabels(ast.body)
-  for (const label of dirLabels) {
-    if (!labels.includes(label)) labels.push(label)
-  }
+  // Collect iterator variable names for color assignment
+  const labels = collectIteratorVarNames(ast.body)
   const colorMap = assignPointerColors(labels)
 
   // Pre-parse comment templates

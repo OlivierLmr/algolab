@@ -38,7 +38,7 @@ export function drawArray(
   let gaugeMin = 0
   let gaugeMax = 0
   if (isGauged) {
-    const finiteValues = values.filter(v => isFinite(v))
+    const finiteValues = values.map(v => v.num).filter(n => isFinite(n))
     if (finiteValues.length > 0) {
       gaugeMin = Math.min(...finiteValues)
       gaugeMax = Math.max(...finiteValues)
@@ -48,6 +48,7 @@ export function drawArray(
   for (let i = 0; i < values.length; i++) {
     const x = startX + i * (CELL_SIZE + CELL_GAP)
     const y = yOffset
+    const cellValue = values[i]
 
     const isDimmed = dimmedIndices.has(i)
 
@@ -65,12 +66,12 @@ export function drawArray(
     // Gauge fill (after background, before border/text)
     if (isGauged) {
       let ratio: number
-      if (!isFinite(values[i])) {
+      if (!isFinite(cellValue.num)) {
         ratio = 1
       } else if (gaugeMin === gaugeMax) {
         ratio = 0.5
       } else {
-        ratio = (values[i] - gaugeMin) / (gaugeMax - gaugeMin)
+        ratio = (cellValue.num - gaugeMin) / (gaugeMax - gaugeMin)
       }
       // Map to 0.15–0.85 range so min isn't empty and max isn't full
       const clamped = 0.15 + Math.max(0, Math.min(1, ratio)) * 0.7
@@ -79,17 +80,26 @@ export function drawArray(
       ctx.fillRect(x, y + CELL_SIZE - fillHeight, CELL_SIZE, fillHeight)
     }
 
-    // Cell border
-    ctx.strokeStyle = hl ? getHighlightColor(hl.type) : '#999'
-    ctx.lineWidth = hl ? 3 : 1.5
+    // Cell border — subtle indicator for cells with iterator metadata
+    const hasIteratorMeta = cellValue.arrays.length > 0
+    ctx.strokeStyle = hl ? getHighlightColor(hl.type) : (hasIteratorMeta ? '#6ab0de' : '#999')
+    ctx.lineWidth = hl ? 3 : (hasIteratorMeta ? 2 : 1.5)
     ctx.strokeRect(x, y, CELL_SIZE, CELL_SIZE)
+
+    // Small dot indicator for cells with iterator metadata
+    if (hasIteratorMeta && !hl) {
+      ctx.fillStyle = '#6ab0de'
+      ctx.beginPath()
+      ctx.arc(x + CELL_SIZE - 6, y + 6, 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     // Value
     ctx.fillStyle = '#222'
     ctx.font = 'bold 18px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const displayVal = values[i] === Infinity ? '∞' : String(values[i])
+    const displayVal = cellValue.num === Infinity ? '∞' : String(cellValue.num)
     ctx.fillText(displayVal, x + CELL_SIZE / 2, y + CELL_SIZE / 2)
 
     // Index label below

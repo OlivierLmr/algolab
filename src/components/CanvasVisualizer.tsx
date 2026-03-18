@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'preact/hooks'
-import { currentStep } from '../state.ts'
+import { currentStep, pipelineColorMap } from '../state.ts'
 import { renderStep, computeRequiredHeight } from '../renderer/index.ts'
 
 const CANVAS_WIDTH = 600
@@ -8,6 +8,7 @@ export function CanvasVisualizer() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const step = currentStep.value
+  const colorMap = pipelineColorMap.value
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -22,8 +23,8 @@ export function CanvasVisualizer() {
 
     const ctx = canvas.getContext('2d')!
     ctx.scale(dpr, dpr)
-    renderStep(ctx, step, CANVAS_WIDTH, canvasHeight)
-  }, [step])
+    renderStep(ctx, step, CANVAS_WIDTH, canvasHeight, colorMap)
+  }, [step, colorMap])
 
   return (
     <div class="canvas-container">

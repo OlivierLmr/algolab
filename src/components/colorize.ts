@@ -3,7 +3,7 @@ import { assignPointerColors } from '../renderer/colors.ts'
 import { lex } from '../dsl/lexer.ts'
 import { parse } from '../dsl/parser.ts'
 import { stripDirectivePrefix } from '../dsl/preprocess.ts'
-import { collectAllPointerLabels, collectDirectivePointerLabels } from '../dsl/analysis.ts'
+import { collectIteratorVarNames } from '../dsl/analysis.ts'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -37,17 +37,13 @@ function matchedKey(match: RegExpExecArray, groupToKey: string[]): string {
   return groupToKey[0]
 }
 
-/** Build a color map from source code by parsing and collecting pointer labels.
+/** Build a color map from source code by parsing and collecting iterator variable names.
  *  Used by EditorPanel for live syntax highlighting during editing. */
 export function buildColorMap(source: string): Map<string, string> {
   try {
     const tokens = lex(stripDirectivePrefix(source))
     const ast = parse(tokens)
-    const labels = collectAllPointerLabels(ast.body)
-    const dirLabels = collectDirectivePointerLabels(ast.body)
-    for (const label of dirLabels) {
-      if (!labels.includes(label)) labels.push(label)
-    }
+    const labels = collectIteratorVarNames(ast.body)
     return assignPointerColors(labels)
   } catch {
     return new Map()

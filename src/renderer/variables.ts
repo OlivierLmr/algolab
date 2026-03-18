@@ -1,4 +1,4 @@
-import type { VarHighlight } from '../types.ts'
+import type { Value, VarHighlight } from '../types.ts'
 import { CELL_SIZE } from './array.ts'
 import { getHighlightColor } from './colors.ts'
 
@@ -6,7 +6,7 @@ const VAR_GAP = 20
 
 export function drawVariables(
   ctx: CanvasRenderingContext2D,
-  variables: Record<string, number>,
+  variables: Record<string, Value>,
   varHighlights: VarHighlight[],
   pointerNames: Set<string>,
   yOffset: number,
@@ -40,7 +40,7 @@ export function drawVariables(
     ctx.font = 'bold 18px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(value), x + CELL_SIZE / 2, yOffset + CELL_SIZE / 2)
+    ctx.fillText(String(value.num), x + CELL_SIZE / 2, yOffset + CELL_SIZE / 2)
 
     x += CELL_SIZE + VAR_GAP
   }

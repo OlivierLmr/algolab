@@ -1,6 +1,6 @@
 import type { CallFrame } from '../types.ts'
 import { drawArray, getArrayHeight } from './array.ts'
-import { drawPointers } from './pointers.ts'
+import { derivePointers, drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
 
 const INDENT = 16
@@ -68,9 +68,10 @@ export function drawCallStack(
   y: number,
   availableWidth: number,
   pointerNames: Set<string>,
+  colorMap: Map<string, string>,
 ): number {
   if (callStack.length === 0) return y
-  return drawFrame(ctx, callStack, 0, x, y, availableWidth, pointerNames)
+  return drawFrame(ctx, callStack, 0, x, y, availableWidth, pointerNames, colorMap)
 }
 
 function drawFrame(
@@ -81,6 +82,7 @@ function drawFrame(
   y: number,
   availableWidth: number,
   pointerNames: Set<string>,
+  colorMap: Map<string, string>,
 ): number {
   const frame = callStack[index]
   const totalHeight = computeFrameHeight(callStack, index, pointerNames)
@@ -130,14 +132,7 @@ function drawFrame(
   // Draw arrays (with pointer space)
   if (frame.arrays.length > 0) {
     const arrayYPositions = new Map<string, number>()
-    const arrayStartY = curY + POINTER_SPACE
 
-    for (const array of frame.arrays) {
-      arrayYPositions.set(array.name, arrayStartY + (arrayYPositions.size) * getArrayHeight())
-    }
-
-    // Recalculate with proper offsets
-    arrayYPositions.clear()
     let ay = curY + POINTER_SPACE
     for (const array of frame.arrays) {
       arrayYPositions.set(array.name, ay)
@@ -145,8 +140,10 @@ function drawFrame(
       ay += getArrayHeight()
     }
 
-    // Draw pointers for this frame's arrays
-    drawPointers(ctx, frame.pointers, arrayYPositions, contentX)
+    // Draw pointers for this frame
+    const framePointers = derivePointers(frame.variables, frame.expressionPointers, colorMap, frame.varHighlights)
+    const frameArrayPointers = framePointers.filter(p => frame.arrays.some(a => a.name === p.arrayName))
+    drawPointers(ctx, frameArrayPointers, arrayYPositions, contentX)
 
     curY = ay
   }
@@ -189,7 +186,7 @@ function drawFrame(
     curY += ARROW_HEIGHT
 
     // Recurse into child with more indentation
-    drawFrame(ctx, callStack, index + 1, boxX + INDENT, curY, availableWidth - 2 * INDENT, pointerNames)
+    drawFrame(ctx, callStack, index + 1, boxX + INDENT, curY, availableWidth - 2 * INDENT, pointerNames, colorMap)
   }
 
   return boxY + totalHeight

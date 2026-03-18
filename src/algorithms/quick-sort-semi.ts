@@ -38,7 +38,6 @@ export const quickSortSemi: AlgorithmDefinition = {
       #: comment "Choosing pivot at index {p}, value {arr[p]}"
       swap arr[curHi], arr[p]
       let pivotIdx = partition(curLo, curHi)
-      #: pointer pivotIdx on arr at pivotIdx
       #: comment "Pivot {arr[pivotIdx]} placed at index {pivotIdx}"
       #: undim arr from 0 to curLo - 1
       #: undim arr from curHi + 1 to len(arr) - 1

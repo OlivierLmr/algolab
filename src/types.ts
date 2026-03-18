@@ -1,14 +1,9 @@
+import type { Value } from './dsl/value.ts'
+export type { Value } from './dsl/value.ts'
+
 export interface TrackedArray {
   name: string
-  values: number[]
-}
-
-export interface Pointer {
-  name: string
-  arrayName: string
-  index: number
-  color: string
-  highlight?: 'compare' | 'swap' | 'sorted' | 'active'
+  values: Value[]
 }
 
 export interface Highlight {
@@ -30,10 +25,10 @@ export interface DimRange {
 
 export interface CallFrame {
   label: string
-  variables: Record<string, number>
+  variables: Record<string, Value>
+  expressionPointers: Record<string, Value>
   arrayRefs: { paramName: string; targetName: string }[]
   arrays: TrackedArray[]
-  pointers: Pointer[]
   highlights: Highlight[]
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
@@ -42,12 +37,12 @@ export interface CallFrame {
 
 export interface Step {
   arrays: TrackedArray[]
-  pointers: Pointer[]
+  expressionPointers: Record<string, Value>
   highlights: Highlight[]
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
   gaugeArrays: string[]
-  variables: Record<string, number>
+  variables: Record<string, Value>
   callStack: CallFrame[]
   currentLine: number
   description: string
