@@ -151,7 +151,8 @@ export function drawHoverArrow(
   if (sourceY === undefined) return
 
   const sourceCenterX = CONTENT_X + hover.cellIndex * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-  const sourceCenterY = sourceY + CELL_SIZE / 2
+  // Index label is drawn at y + CELL_SIZE + 14 in array.ts
+  const INDEX_LABEL_Y_OFFSET = CELL_SIZE + 14
 
   for (const targetArrayName of cellValue.arrays) {
     const targetArr = step.arrays.find(a => a.name === targetArrayName)
@@ -161,7 +162,8 @@ export function drawHoverArrow(
 
     const targetIdx = Math.max(0, Math.min(cellValue.num, targetArr.values.length - 1))
     const targetCenterX = CONTENT_X + targetIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-    const targetCenterY = targetY + CELL_SIZE / 2
+    // Arrow points at the index number below the target cell
+    const targetIndexY = targetY + INDEX_LABEL_Y_OFFSET
 
     // Highlight the source cell
     ctx.strokeStyle = '#3498db'
@@ -181,58 +183,66 @@ export function drawHoverArrow(
       CELL_SIZE + 2,
     )
 
-    // Draw curved arrow from source to target
+    // Arrow start: bottom of source cell (at index label level)
+    const sourceStartY = sourceY + INDEX_LABEL_Y_OFFSET
+
+    // Draw arrow from source to target index label
     ctx.strokeStyle = '#3498db'
     ctx.lineWidth = 2
     ctx.setLineDash([6, 3])
     ctx.beginPath()
 
     if (hover.arrayName === targetArrayName) {
-      // Same array: arc above the cells
+      // Same array: arc below the cells (through the index labels area)
       const midX = (sourceCenterX + targetCenterX) / 2
-      const arcHeight = Math.min(40, Math.abs(targetCenterX - sourceCenterX) * 0.4 + 15)
-      const controlY = sourceY - arcHeight
-      ctx.moveTo(sourceCenterX, sourceY)
-      ctx.quadraticCurveTo(midX, controlY, targetCenterX, targetY)
+      const arcDrop = Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12)
+      const controlY = sourceStartY + arcDrop
+      ctx.moveTo(sourceCenterX, sourceStartY)
+      ctx.quadraticCurveTo(midX, controlY, targetCenterX, targetIndexY)
     } else {
-      // Different arrays: straight line between cell centers
-      ctx.moveTo(sourceCenterX, sourceCenterY)
-      ctx.lineTo(targetCenterX, targetCenterY)
+      // Different arrays: line from source bottom to target index label
+      ctx.moveTo(sourceCenterX, sourceStartY)
+      ctx.lineTo(targetCenterX, targetIndexY)
     }
     ctx.stroke()
     ctx.setLineDash([])
 
-    // Arrowhead at target
-    const angle = Math.atan2(
-      targetCenterY - (hover.arrayName === targetArrayName ? sourceY - 20 : sourceCenterY),
-      targetCenterX - sourceCenterX,
-    )
+    // Arrowhead at target index label
+    const prevX = hover.arrayName === targetArrayName
+      ? (sourceCenterX + targetCenterX) / 2
+      : sourceCenterX
+    const prevY = hover.arrayName === targetArrayName
+      ? sourceStartY + Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12)
+      : sourceStartY
+    const angle = Math.atan2(targetIndexY - prevY, targetCenterX - prevX)
     const headLen = 10
-    const arrowTipX = hover.arrayName === targetArrayName ? targetCenterX : targetCenterX
-    const arrowTipY = hover.arrayName === targetArrayName ? targetY : targetCenterY
     ctx.fillStyle = '#3498db'
     ctx.beginPath()
-    ctx.moveTo(arrowTipX, arrowTipY)
+    ctx.moveTo(targetCenterX, targetIndexY)
     ctx.lineTo(
-      arrowTipX - headLen * Math.cos(angle - 0.4),
-      arrowTipY - headLen * Math.sin(angle - 0.4),
+      targetCenterX - headLen * Math.cos(angle - 0.4),
+      targetIndexY - headLen * Math.sin(angle - 0.4),
     )
     ctx.lineTo(
-      arrowTipX - headLen * Math.cos(angle + 0.4),
-      arrowTipY - headLen * Math.sin(angle + 0.4),
+      targetCenterX - headLen * Math.cos(angle + 0.4),
+      targetIndexY - headLen * Math.sin(angle + 0.4),
     )
     ctx.closePath()
     ctx.fill()
 
-    // Label showing "→ targetArray[idx]"
+    // Label
     ctx.font = 'bold 11px monospace'
     ctx.fillStyle = '#3498db'
     ctx.textAlign = 'center'
-    const labelX = (sourceCenterX + targetCenterX) / 2
-    const labelY = hover.arrayName === targetArrayName
-      ? sourceY - Math.min(40, Math.abs(targetCenterX - sourceCenterX) * 0.4 + 15) - 4
-      : (sourceCenterY + targetCenterY) / 2 - 8
-    ctx.fillText(`→ ${targetArrayName}[${cellValue.num}]`, labelX, labelY)
+    if (hover.arrayName === targetArrayName) {
+      const midX = (sourceCenterX + targetCenterX) / 2
+      const labelY = sourceStartY + Math.min(30, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 12) + 14
+      ctx.fillText(`→ ${targetArrayName}[${cellValue.num}]`, midX, labelY)
+    } else {
+      const labelX = (sourceCenterX + targetCenterX) / 2
+      const labelY = (sourceStartY + targetIndexY) / 2 - 6
+      ctx.fillText(`→ ${targetArrayName}[${cellValue.num}]`, labelX, labelY)
+    }
     ctx.textAlign = 'start'
   }
 }
