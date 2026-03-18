@@ -25,23 +25,12 @@ import type { ASTNode, AlgoNode, DefNode, Expr } from './ast.ts'
 
 // --- Public interfaces ---
 
-export interface ExprPointerDef {
-  label: string
-  arrayName: string   // syntactic array name (resolved at runtime)
-  expr: Expr
-  varNames: string[]  // constituent variable names (for scope checking)
-  explicit: boolean   // from #: pointer directive?
-}
-
 export interface TypeContext {
   /** Variable types: key = "varName@line" → arrays the variable iterates on */
   varTypes: Map<string, string[]>
 
   /** Array element types: key = array name → arrays the elements iterate on */
   arrayElementTypes: Map<string, string[]>
-
-  /** Statically identified expression pointers */
-  expressionPointers: ExprPointerDef[]
 
   /** All iterator label names (for color assignment) */
   iteratorLabels: string[]
@@ -97,7 +86,6 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
   const varAnd = new Map<VarKey, string[]>()    // direct structural: arr[x], dim, undim, pointer, swap
   const varOr  = new Map<VarKey, string[]>()    // value flow: let x = expr, x = expr, arg→param, backward
   const arrayElemTypes = new Map<string, string[]>()
-  const exprPointers: ExprPointerDef[] = []
   const functions = new Map<string, FuncInfo>()
 
   // Initialize element types for input arrays
@@ -201,33 +189,6 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   collectStructure(ast.body)
 
-  // --- Collect expression pointers (all are now explicit pointer nodes after AST transform) ---
-
-  function collectExprPointers(nodes: ASTNode[]): void {
-    for (const node of nodes) {
-      if (node.type === 'pointer') {
-        const key = `${node.arrayName}:${node.label}`
-        if (!exprPointers.find(e => `${e.arrayName}:${e.label}` === key)) {
-          exprPointers.push({
-            label: node.label,
-            arrayName: node.arrayName,
-            expr: node.at,
-            varNames: collectVarNamesFromExpr(node.at),
-            explicit: true,
-          })
-        }
-      }
-      if ('body' in node && Array.isArray((node as any).body)) {
-        collectExprPointers((node as any).body)
-      }
-      if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
-        collectExprPointers((node as any).elseBody)
-      }
-    }
-  }
-
-  collectExprPointers(ast.body)
-
   // --- Fixed-point iteration ---
 
   let changed = true
@@ -261,7 +222,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     varTypes.set(key, a.length > 0 ? a : o)
   }
 
-  // --- Collect labels ---
+  // --- Collect labels (variable names + pointer labels for color assignment) ---
 
   const labels = new Set<string>()
   for (const [key, arrays] of varTypes) {
@@ -270,14 +231,11 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       labels.add(name)
     }
   }
-  for (const ep of exprPointers) {
-    labels.add(ep.label)
-  }
+  collectPointerLabels(ast.body, labels)
 
   return {
     varTypes,
     arrayElementTypes: arrayElemTypes,
-    expressionPointers: exprPointers,
     iteratorLabels: [...labels],
   }
 
@@ -632,17 +590,17 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
 // --- Utility ---
 
-function collectVarNamesFromExpr(expr: Expr): string[] {
-  const names = new Set<string>()
-  function walk(e: Expr): void {
-    switch (e.type) {
-      case 'identifier': names.add(e.name); break
-      case 'binary': walk(e.left); walk(e.right); break
-      case 'unary': walk(e.operand); break
-      case 'index': walk(e.array); walk(e.index); break
-      case 'call': e.args.forEach(walk); break
+/** Walk AST nodes and collect all pointer labels into the given set. */
+function collectPointerLabels(nodes: ASTNode[], labels: Set<string>): void {
+  for (const node of nodes) {
+    if (node.type === 'pointer') {
+      labels.add(node.label)
+    }
+    if ('body' in node && Array.isArray((node as any).body)) {
+      collectPointerLabels((node as any).body, labels)
+    }
+    if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
+      collectPointerLabels((node as any).elseBody, labels)
     }
   }
-  walk(expr)
-  return [...names]
 }

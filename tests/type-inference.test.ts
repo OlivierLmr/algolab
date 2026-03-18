@@ -155,25 +155,20 @@ describe('Type Inference: dim/undim expressions', () => {
 })
 
 describe('Type Inference: expression pointers', () => {
-  it('arr[i-1] registers expression pointer "i - 1"', () => {
+  it('arr[i-1] registers "i - 1" as iterator label', () => {
     const ctx = infer(`algo T(arr[])
   for i from 1 to len(arr) - 1
     let v = arr[i - 1]`)
-    const ep = ctx.expressionPointers.find(e => e.label === 'i - 1')
-    expect(ep).toBeDefined()
-    expect(ep!.arrayName).toBe('arr')
-    // After AST transform, all expression pointers are explicit pointer nodes
-    expect(ep!.explicit).toBe(true)
+    // After AST transform, expression pointers become pointer nodes
+    // and their labels are collected in iteratorLabels
+    expect(ctx.iteratorLabels).toContain('i - 1')
   })
 
-  it('explicit #: pointer creates expression pointer', () => {
+  it('explicit #: pointer creates iterator label', () => {
     const ctx = infer(`algo T(arr[])
   let boundary = 3
   pointer boundary on arr at boundary`)
-    const ep = ctx.expressionPointers.find(e => e.label === 'boundary')
-    expect(ep).toBeDefined()
-    expect(ep!.explicit).toBe(true)
-    expect(ep!.arrayName).toBe('arr')
+    expect(ctx.iteratorLabels).toContain('boundary')
   })
 
   it('#: pointer k on arr at k: k gets iterator type from pointer directive', () => {
