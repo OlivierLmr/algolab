@@ -5,6 +5,7 @@ import { preprocessSource } from './preprocess.ts'
 import type { DisplayInfo } from './preprocess.ts'
 import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
+import { forEachChildBody } from './ast.ts'
 import { inferTypes } from './typeinfer.ts'
 import { synthesizeExpressionPointers } from './transform.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
@@ -67,12 +68,7 @@ function preParseCommentTemplates(nodes: ASTNode[]): void {
     if (node.type === 'comment') {
       node.parts = parseCommentTemplate(node.text)
     }
-    if ('body' in node && Array.isArray((node as any).body)) {
-      preParseCommentTemplates((node as any).body)
-    }
-    if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
-      preParseCommentTemplates((node as any).elseBody)
-    }
+    forEachChildBody(node, preParseCommentTemplates)
   }
 }
 

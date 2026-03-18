@@ -1,6 +1,6 @@
 import type { CallFrame } from '../types.ts'
 import { drawArray, getArrayHeight } from './array.ts'
-import { derivePointers, drawPointers } from './pointers.ts'
+import { derivePointers, countNonPointerVars, drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
 
 const INDENT = 16
@@ -43,7 +43,7 @@ function computeFrameHeight(
   }
 
   // Variables
-  const nonPointerVarCount = Object.keys(frame.variables).filter(n => !pointerNames.has(n)).length
+  const nonPointerVarCount = countNonPointerVars(frame.variables, pointerNames)
   if (nonPointerVarCount > 0) {
     h += getVariablesHeight(nonPointerVarCount)
   }
@@ -149,7 +149,7 @@ function drawFrame(
   }
 
   // Draw variables
-  const nonPointerVarCount = Object.keys(frame.variables).filter(n => !pointerNames.has(n)).length
+  const nonPointerVarCount = countNonPointerVars(frame.variables, pointerNames)
   if (nonPointerVarCount > 0) {
     drawVariables(ctx, frame.variables, frame.varHighlights, pointerNames, curY, contentX)
     curY += getVariablesHeight(nonPointerVarCount)

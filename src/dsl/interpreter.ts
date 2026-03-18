@@ -6,6 +6,10 @@ import type { Value } from './value.ts'
 import { plainVal, mergeArrays, propagateArithmetic } from './value.ts'
 import type { TypeContext } from './typeinfer.ts'
 
+const MAX_CALL_DEPTH = 1000
+const MAX_LOOP_ITERATIONS = 10000
+const MAX_LOOP_RANGE = 10000
+
 /** Sentinel thrown by `return` statements to unwind execution. */
 class ReturnSignal {
   value: Value
@@ -413,7 +417,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       // User-defined procedure call
       const proc = procedures.get(name)
       if (proc) {
-        if (++callDepth > 1000) throw new Error('Max recursion depth exceeded (1000 nested calls). Check for infinite recursion in your algorithm.')
+        if (++callDepth > MAX_CALL_DEPTH) throw new Error(`Max recursion depth exceeded (${MAX_CALL_DEPTH} nested calls). Check for infinite recursion in your algorithm.`)
 
         // Phase 1: evaluate args — array params get aliases, scalar params get values
         const aliasMap = new Map<string, string>()
@@ -593,7 +597,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     function execFor(node: ForNode): void {
       const fromVal = evalExpr(node.from).num
       const toVal = evalExpr(node.to).num
-      if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
+      if (toVal - fromVal > MAX_LOOP_RANGE) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
       pushScope()
 
       // Static type for the loop variable
@@ -619,7 +623,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
-        if (++guard > 10000) throw new Error('Infinite loop detected (10000 iterations). Check your while loop condition.')
+        if (++guard > MAX_LOOP_ITERATIONS) throw new Error(`Infinite loop detected (${MAX_LOOP_ITERATIONS} iterations). Check your while loop condition.`)
       }
       addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')

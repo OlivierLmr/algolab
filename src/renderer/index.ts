@@ -1,7 +1,7 @@
 import type { Step } from '../types.ts'
 import { drawArray, ARRAY_Y_START, getArrayHeight, CELL_SIZE, CELL_GAP, hitTestCell } from './array.ts'
 import type { CellHit } from './array.ts'
-import { derivePointers, getPointerVarNames, drawPointers } from './pointers.ts'
+import { derivePointers, getPointerVarNames, countNonPointerVars, drawPointers } from './pointers.ts'
 import { drawVariables, getVariablesHeight } from './variables.ts'
 import { computeCallStackHeight, drawCallStack } from './callstack.ts'
 
@@ -49,7 +49,7 @@ function computeLayout(step: Step, _width: number): StepLayout {
     y += computeCallStackHeight(step.callStack, pointerNames)
   }
 
-  const nonPointerVarCount = Object.entries(step.variables).filter(([n, v]) => v.arrays.length === 0 && !pointerNames.has(n)).length
+  const nonPointerVarCount = countNonPointerVars(step.variables, pointerNames)
   const variablesY = y
   if (nonPointerVarCount > 0) {
     y += getVariablesHeight(nonPointerVarCount)

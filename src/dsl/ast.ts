@@ -216,6 +216,22 @@ export function exprToString(expr: Expr): string {
   }
 }
 
+/** Call `fn` for each child body (body, elseBody) of an AST node. */
+export function forEachChildBody(node: ASTNode, fn: (body: ASTNode[]) => void): void {
+  switch (node.type) {
+    case 'algo':
+    case 'for':
+    case 'while':
+    case 'def':
+      fn(node.body)
+      break
+    case 'if':
+      fn(node.body)
+      fn(node.elseBody)
+      break
+  }
+}
+
 function precedence(op: string): number {
   switch (op) {
     case 'or': return 1

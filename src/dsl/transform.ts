@@ -10,7 +10,7 @@
  * normal scope push/pop during interpretation.
  */
 import type { ASTNode, AlgoNode, DefNode, ForNode, Expr, PointerNode } from './ast.ts'
-import { exprToString } from './ast.ts'
+import { exprToString, forEachChildBody } from './ast.ts'
 
 /** Collect all variable names referenced in an expression. */
 function collectVarNames(expr: Expr): Set<string> {
@@ -58,12 +58,7 @@ function collectExplicitPointers(nodes: ASTNode[], keys: Set<string>): void {
     if (node.type === 'pointer') {
       keys.add(`${node.arrayName}:${node.label}`)
     }
-    if ('body' in node && Array.isArray((node as any).body)) {
-      collectExplicitPointers((node as any).body, keys)
-    }
-    if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
-      collectExplicitPointers((node as any).elseBody, keys)
-    }
+    forEachChildBody(node, body => collectExplicitPointers(body, keys))
   }
 }
 

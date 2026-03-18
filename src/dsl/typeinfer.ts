@@ -22,6 +22,7 @@
  * Finite, monotone → fixed-point iteration terminates.
  */
 import type { ASTNode, AlgoNode, DefNode, Expr } from './ast.ts'
+import { forEachChildBody } from './ast.ts'
 
 // --- Public interfaces ---
 
@@ -95,7 +96,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
   // --- Helpers ---
 
-  /** Merge `additions` into `target` (set-as-sorted-array). Returns true if any new element was added. */
+  /** Merge `additions` into `target` array (set semantics). Returns true if changed. */
   function joinSet(target: string[], additions: string[]): boolean {
     let changed = false
     for (const a of additions) {
@@ -107,30 +108,17 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     return changed
   }
 
+  /** Merge `additions` into a map entry, creating it if absent. Returns true if changed. */
+  function joinInto(map: Map<string, string[]>, key: string, additions: string[]): boolean {
+    if (additions.length === 0) return false
+    const existing = map.get(key)
+    if (!existing) { map.set(key, [...additions]); return true }
+    return joinSet(existing, additions)
+  }
+
   function initVar(key: VarKey): void {
     if (!varAnd.has(key)) varAnd.set(key, [])
     if (!varOr.has(key)) varOr.set(key, [])
-  }
-
-  function joinVarAnd(key: VarKey, arrays: string[]): boolean {
-    if (arrays.length === 0) return false
-    const existing = varAnd.get(key)
-    if (!existing) { varAnd.set(key, [...arrays]); return true }
-    return joinSet(existing, arrays)
-  }
-
-  function joinVarOr(key: VarKey, arrays: string[]): boolean {
-    if (arrays.length === 0) return false
-    const existing = varOr.get(key)
-    if (!existing) { varOr.set(key, [...arrays]); return true }
-    return joinSet(existing, arrays)
-  }
-
-  function joinElemType(arrName: string, arrays: string[]): boolean {
-    if (arrays.length === 0) return false
-    const existing = arrayElemTypes.get(arrName)
-    if (!existing) { arrayElemTypes.set(arrName, [...arrays]); return true }
-    return joinSet(existing, arrays)
   }
 
   function joinReturn(funcName: string, arrays: string[]): boolean {
@@ -257,7 +245,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         const key = scope.define(node.name, node.line)
         initVar(key)
         const exprType = typeOfExpr(node.value, scope)
-        if (joinVarOr(key, exprType)) nodeChanged = true
+        if (joinInto(varOr,key, exprType)) nodeChanged = true
         // Process constraints (arr[var] patterns, retroactive tagging) in the value expression
         if (processExprConstraints(node.value, scope)) nodeChanged = true
         break
@@ -268,7 +256,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
           const key = scope.lookup(node.target.name)
           if (key) {
             const exprType = typeOfExpr(node.value, scope)
-            if (joinVarOr(key, exprType)) nodeChanged = true
+            if (joinInto(varOr,key, exprType)) nodeChanged = true
           }
           // Process constraints in the value expression
           if (processExprConstraints(node.value, scope)) nodeChanged = true
@@ -279,7 +267,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
             if (processIndexExpr(node.target, scope)) nodeChanged = true
             // Array element type absorbs value type
             const valType = typeOfExpr(node.value, scope)
-            if (joinElemType(arrName, valType)) nodeChanged = true
+            if (joinInto(arrayElemTypes,arrName, valType)) nodeChanged = true
           }
           // Process constraints in both the target index and value expressions
           if (processExprConstraints(node.target.index, scope)) nodeChanged = true
@@ -495,7 +483,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     if (expr.index.type === 'identifier') {
       // arr[bareVar] → var.and ⊇ {arr} (structural evidence)
       const key = scope.lookup(expr.index.name)
-      if (key && joinVarAnd(key, [arrName])) changed = true
+      if (key && joinInto(varAnd,key, [arrName])) changed = true
     } else {
       // arr[complexExpr] → bare idents in expr get AND ⊇ {arr} (structural)
       if (propagateToExprBareIdents(expr.index, [arrName], scope, true)) changed = true
@@ -504,7 +492,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     // Retroactive cell tagging: target[source[x]] → elemType(source) ⊇ {target}
     // Only outermost IndexExpr tags its source
     if (expr.index.type === 'index' && expr.index.array.type === 'identifier') {
-      if (joinElemType(expr.index.array.name, [arrName])) changed = true
+      if (joinInto(arrayElemTypes,expr.index.array.name, [arrName])) changed = true
     } else {
       // Walk the index expression for nested IndexExpr at top level
       if (processRetroactiveTags(expr.index, arrName)) changed = true
@@ -513,28 +501,36 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     return changed
   }
 
-  /** Walk an expression to find IndexExpr nodes at the top level (stop at IndexExpr boundaries) */
-  function processRetroactiveTags(expr: Expr, targetArray: string): boolean {
-    let changed = false
-    if (expr.type === 'index' && expr.array.type === 'identifier') {
-      if (joinElemType(expr.array.name, [targetArray])) changed = true
-      return changed  // Stop at IndexExpr boundary
-    }
+  /** Walk expression sub-tree, stopping at IndexExpr boundaries.
+   *  Visitor is called on every node; walker does not recurse into index children. */
+  function walkExprShallow(expr: Expr, visit: (e: Expr) => boolean): boolean {
+    let changed = visit(expr)
     switch (expr.type) {
       case 'binary':
-        if (processRetroactiveTags(expr.left, targetArray)) changed = true
-        if (processRetroactiveTags(expr.right, targetArray)) changed = true
+        if (walkExprShallow(expr.left, visit)) changed = true
+        if (walkExprShallow(expr.right, visit)) changed = true
         break
       case 'unary':
-        if (processRetroactiveTags(expr.operand, targetArray)) changed = true
+        if (walkExprShallow(expr.operand, visit)) changed = true
         break
       case 'call':
         for (const arg of expr.args) {
-          if (processRetroactiveTags(arg, targetArray)) changed = true
+          if (walkExprShallow(arg, visit)) changed = true
         }
         break
+      // index: don't recurse — visitor already saw this node
     }
     return changed
+  }
+
+  /** Walk an expression to find IndexExpr nodes at the top level (stop at IndexExpr boundaries) */
+  function processRetroactiveTags(expr: Expr, targetArray: string): boolean {
+    return walkExprShallow(expr, e => {
+      if (e.type === 'index' && e.array.type === 'identifier') {
+        return joinInto(arrayElemTypes, e.array.name, [targetArray])
+      }
+      return false
+    })
   }
 
   /** Process function call constraints: propagate arg types to param types (OR / value flow) */
@@ -552,7 +548,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       if (!argExpr) continue
       const argType = typeOfExpr(argExpr, scope)
       const paramKey = info.paramKeys[i]
-      if (paramKey && joinVarOr(paramKey, argType)) changed = true
+      if (paramKey && joinInto(varOr, paramKey, argType)) changed = true
     }
 
     return changed
@@ -561,30 +557,14 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
   /** Propagate types to bare identifiers in an expression.
    *  @param definite — true → AND (structural evidence), false → OR (value flow) */
   function propagateToExprBareIdents(expr: Expr, arrays: string[], scope: ScopeStack, definite: boolean): boolean {
-    const join = definite ? joinVarAnd : joinVarOr
-    let changed = false
-    if (expr.type === 'identifier') {
-      const key = scope.lookup(expr.name)
-      if (key && join(key, arrays)) changed = true
-    }
-    switch (expr.type) {
-      case 'binary':
-        if (propagateToExprBareIdents(expr.left, arrays, scope, definite)) changed = true
-        if (propagateToExprBareIdents(expr.right, arrays, scope, definite)) changed = true
-        break
-      case 'unary':
-        if (propagateToExprBareIdents(expr.operand, arrays, scope, definite)) changed = true
-        break
-      case 'call':
-        for (const arg of expr.args) {
-          if (propagateToExprBareIdents(arg, arrays, scope, definite)) changed = true
-        }
-        break
-      case 'index':
-        // Don't recurse through array indexing (stop at IndexExpr boundary)
-        break
-    }
-    return changed
+    const map = definite ? varAnd : varOr
+    return walkExprShallow(expr, e => {
+      if (e.type === 'identifier') {
+        const key = scope.lookup(e.name)
+        return key ? joinInto(map, key, arrays) : false
+      }
+      return false
+    })
   }
 }
 
@@ -596,11 +576,6 @@ function collectPointerLabels(nodes: ASTNode[], labels: Set<string>): void {
     if (node.type === 'pointer') {
       labels.add(node.label)
     }
-    if ('body' in node && Array.isArray((node as any).body)) {
-      collectPointerLabels((node as any).body, labels)
-    }
-    if ('elseBody' in node && Array.isArray((node as any).elseBody)) {
-      collectPointerLabels((node as any).elseBody, labels)
-    }
+    forEachChildBody(node, body => collectPointerLabels(body, labels))
   }
 }

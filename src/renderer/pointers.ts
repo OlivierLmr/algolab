@@ -57,6 +57,15 @@ export function getPointerVarNames(
   return names
 }
 
+/** Count variables that are NOT pointers (shown in the variables panel, not as arrows). */
+export function countNonPointerVars(variables: Record<string, Value>, pointerNames: Set<string>): number {
+  let count = 0
+  for (const [name, val] of Object.entries(variables)) {
+    if (val.arrays.length === 0 && !pointerNames.has(name)) count++
+  }
+  return count
+}
+
 export function drawPointers(
   ctx: CanvasRenderingContext2D,
   pointers: PointerArrow[],
