@@ -85,7 +85,9 @@ class ScopeStack {
 // --- Main inference function ---
 
 export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContext {
-  const varTypes = new Map<VarKey, string[]>()    // all start as Num (empty)
+  // Two-tier type maps: AND = structural evidence, OR = value flow evidence
+  const varAnd = new Map<VarKey, string[]>()    // direct structural: arr[x], dim, undim, pointer, swap
+  const varOr  = new Map<VarKey, string[]>()    // value flow: let x = expr, x = expr, arg→param, backward
   const arrayElemTypes = new Map<string, string[]>()
   const exprPointers: ExprPointerDef[] = []
   const functions = new Map<string, FuncInfo>()
@@ -98,11 +100,16 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     arrayElemTypes.set(name, [])
   }
 
-  // --- Helper: join (add arrays to a var type, return true if changed) ---
+  // --- Helper: join (add arrays to a var type tier, return true if changed) ---
 
-  function joinVar(key: VarKey, arrays: string[]): boolean {
+  function initVar(key: VarKey): void {
+    if (!varAnd.has(key)) varAnd.set(key, [])
+    if (!varOr.has(key)) varOr.set(key, [])
+  }
+
+  function joinVarAnd(key: VarKey, arrays: string[]): boolean {
     if (arrays.length === 0) return false
-    const existing = varTypes.get(key) ?? []
+    const existing = varAnd.get(key) ?? []
     let changed = false
     const merged = [...existing]
     for (const a of arrays) {
@@ -111,7 +118,22 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         changed = true
       }
     }
-    if (changed) varTypes.set(key, merged)
+    if (changed) varAnd.set(key, merged)
+    return changed
+  }
+
+  function joinVarOr(key: VarKey, arrays: string[]): boolean {
+    if (arrays.length === 0) return false
+    const existing = varOr.get(key) ?? []
+    let changed = false
+    const merged = [...existing]
+    for (const a of arrays) {
+      if (!merged.includes(a)) {
+        merged.push(a)
+        changed = true
+      }
+    }
+    if (changed) varOr.set(key, merged)
     return changed
   }
 
@@ -143,8 +165,17 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     return changed
   }
 
+  /** During iteration, return and ∪ or for maximum propagation (monotone). */
   function getVarType(key: VarKey): string[] {
-    return varTypes.get(key) ?? []
+    const a = varAnd.get(key) ?? []
+    const o = varOr.get(key) ?? []
+    if (a.length === 0) return o
+    if (o.length === 0) return a
+    const merged = [...a]
+    for (const x of o) {
+      if (!merged.includes(x)) merged.push(x)
+    }
+    return merged
   }
 
   // --- Phase 0: Collect structure ---
@@ -158,7 +189,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
           if (!p.isArray) {
             const key = varKey(p.name, node.line)
             paramKeys.push(key)
-            varTypes.set(key, [])
+            initVar(key)
           } else {
             paramKeys.push('')  // placeholder for array params
           }
@@ -263,7 +294,18 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     algoScope.pop()
   }
 
-  // --- Phase 2: Collect labels ---
+  // --- Phase 2: Resolve AND/OR to final varTypes ---
+  // resolve(and, or) = and if and ≠ ∅, else or
+
+  const varTypes = new Map<VarKey, string[]>()
+  const allKeys = new Set<VarKey>([...varAnd.keys(), ...varOr.keys()])
+  for (const key of allKeys) {
+    const a = varAnd.get(key) ?? []
+    const o = varOr.get(key) ?? []
+    varTypes.set(key, a.length > 0 ? a : o)
+  }
+
+  // --- Phase 3: Collect labels ---
 
   const labels = new Set<string>()
   for (const [key, arrays] of varTypes) {
@@ -299,9 +341,9 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     switch (node.type) {
       case 'let': {
         const key = scope.define(node.name, node.line)
-        if (!varTypes.has(key)) varTypes.set(key, [])
+        initVar(key)
         const exprType = typeOfExpr(node.value, scope)
-        if (joinVar(key, exprType)) nodeChanged = true
+        if (joinVarOr(key, exprType)) nodeChanged = true
         // Process constraints (arr[var] patterns, retroactive tagging) in the value expression
         if (processExprConstraints(node.value, scope)) nodeChanged = true
         break
@@ -312,7 +354,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
           const key = scope.lookup(node.target.name)
           if (key) {
             const exprType = typeOfExpr(node.value, scope)
-            if (joinVar(key, exprType)) nodeChanged = true
+            if (joinVarOr(key, exprType)) nodeChanged = true
           }
           // Process constraints in the value expression
           if (processExprConstraints(node.value, scope)) nodeChanged = true
@@ -335,7 +377,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       case 'for': {
         scope.push()
         const key = scope.define(node.variable, node.line)
-        if (!varTypes.has(key)) varTypes.set(key, [])
+        initVar(key)
 
         // Process from/to expressions for any constraints
         if (processExprConstraints(node.from, scope)) nodeChanged = true
@@ -344,11 +386,11 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         // Process body (may add constraints to i)
         if (processBody(node.body, scope, currentFunc)) nodeChanged = true
 
-        // Backward propagation: if i is Iter<S>, bare idents in from/to get ⊇ S
+        // Backward propagation: if i is Iter<S>, bare idents in from/to get OR ⊇ S
         const iType = getVarType(key)
         if (iType.length > 0) {
-          if (propagateToExprBareIdents(node.from, iType, scope)) nodeChanged = true
-          if (propagateToExprBareIdents(node.to, iType, scope)) nodeChanged = true
+          if (propagateToExprBareIdents(node.from, iType, scope, false)) nodeChanged = true
+          if (propagateToExprBareIdents(node.to, iType, scope, false)) nodeChanged = true
         }
 
         scope.pop()
@@ -384,15 +426,15 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
       case 'dim':
       case 'undim': {
-        // Bare idents in from/to are iterators on arrayName
-        if (propagateToExprBareIdents(node.from, [node.arrayName], scope)) nodeChanged = true
-        if (propagateToExprBareIdents(node.to, [node.arrayName], scope)) nodeChanged = true
+        // Bare idents in from/to are iterators on arrayName (structural AND evidence)
+        if (propagateToExprBareIdents(node.from, [node.arrayName], scope, true)) nodeChanged = true
+        if (propagateToExprBareIdents(node.to, [node.arrayName], scope, true)) nodeChanged = true
         break
       }
 
       case 'pointer': {
-        // #: pointer label on arr at expr → bare idents in expr ⊇ {arr}
-        if (propagateToExprBareIdents(node.at, [node.arrayName], scope)) nodeChanged = true
+        // #: pointer label on arr at expr → bare idents in expr ⊇ {arr} (structural AND)
+        if (propagateToExprBareIdents(node.at, [node.arrayName], scope, true)) nodeChanged = true
         break
       }
 
@@ -413,7 +455,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
             // Array param: not a variable in the type context
           } else {
             const key = scope.define(p.name, node.line)
-            if (!varTypes.has(key)) varTypes.set(key, [])
+            initVar(key)
           }
         }
         if (processBody(node.body, scope, node.name)) nodeChanged = true
@@ -545,12 +587,12 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
     const arrName = expr.array.name
 
     if (expr.index.type === 'identifier') {
-      // arr[bareVar] → var ⊇ {arr}
+      // arr[bareVar] → var.and ⊇ {arr} (structural evidence)
       const key = scope.lookup(expr.index.name)
-      if (key && joinVar(key, [arrName])) changed = true
+      if (key && joinVarAnd(key, [arrName])) changed = true
     } else {
-      // arr[complexExpr] → expression pointer, bare idents in expr ⊇ {arr}
-      if (propagateToExprBareIdents(expr.index, [arrName], scope)) changed = true
+      // arr[complexExpr] → bare idents in expr get AND ⊇ {arr} (structural)
+      if (propagateToExprBareIdents(expr.index, [arrName], scope, true)) changed = true
     }
 
     // Retroactive cell tagging: target[source[x]] → elemType(source) ⊇ {target}
@@ -604,30 +646,32 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       if (!argExpr) continue
       const argType = typeOfExpr(argExpr, scope)
       const paramKey = info.paramKeys[i]
-      if (paramKey && joinVar(paramKey, argType)) changed = true
+      if (paramKey && joinVarOr(paramKey, argType)) changed = true
     }
 
     return changed
   }
 
-  /** Propagate types to bare identifiers in an expression (for dim/undim, for-loop bounds, pointer at) */
-  function propagateToExprBareIdents(expr: Expr, arrays: string[], scope: ScopeStack): boolean {
+  /** Propagate types to bare identifiers in an expression.
+   *  @param definite — true → AND (structural evidence), false → OR (value flow) */
+  function propagateToExprBareIdents(expr: Expr, arrays: string[], scope: ScopeStack, definite: boolean): boolean {
+    const join = definite ? joinVarAnd : joinVarOr
     let changed = false
     if (expr.type === 'identifier') {
       const key = scope.lookup(expr.name)
-      if (key && joinVar(key, arrays)) changed = true
+      if (key && join(key, arrays)) changed = true
     }
     switch (expr.type) {
       case 'binary':
-        if (propagateToExprBareIdents(expr.left, arrays, scope)) changed = true
-        if (propagateToExprBareIdents(expr.right, arrays, scope)) changed = true
+        if (propagateToExprBareIdents(expr.left, arrays, scope, definite)) changed = true
+        if (propagateToExprBareIdents(expr.right, arrays, scope, definite)) changed = true
         break
       case 'unary':
-        if (propagateToExprBareIdents(expr.operand, arrays, scope)) changed = true
+        if (propagateToExprBareIdents(expr.operand, arrays, scope, definite)) changed = true
         break
       case 'call':
         for (const arg of expr.args) {
-          if (propagateToExprBareIdents(arg, arrays, scope)) changed = true
+          if (propagateToExprBareIdents(arg, arrays, scope, definite)) changed = true
         }
         break
       case 'index':

@@ -201,6 +201,84 @@ describe('Type Inference: swap constraints', () => {
   })
 })
 
+describe('Type Inference: AND/OR two-tier resolution', () => {
+  it('MergeSortAux merge: i/j resolve to {src} only, k to {dst} only', () => {
+    // i gets OR from `let i = lo` (where lo: {src, dst}), but AND from src[i]
+    // k gets OR from `let k = lo` (where lo: {src, dst}), but AND from dst[k]
+    // AND evidence should override OR evidence
+    const ctx = infer(`algo MergeSortAux(src[], dst[])
+  def merge(lo, hi, mid)
+    let i = lo
+    let j = mid + 1
+    let k = lo
+    for step from lo to hi
+      if i <= mid and (j > hi or src[i] <= src[j])
+        dst[k] = src[i]
+        i = i + 1
+      else
+        dst[k] = src[j]
+        j = j + 1
+      k = k + 1
+
+  def msort(lo, hi)
+    if lo < hi
+      let mid = lo + (hi - lo) / 2
+      msort(lo, mid)
+      msort(mid + 1, hi)
+      dim src from 0 to lo - 1
+      dim src from hi + 1 to len(src) - 1
+      dim dst from 0 to lo - 1
+      dim dst from hi + 1 to len(dst) - 1
+      merge(lo, hi, mid)
+      undim dst from 0 to lo - 1
+      undim dst from hi + 1 to len(dst) - 1
+      undim src from 0 to lo - 1
+      undim src from hi + 1 to len(src) - 1
+
+  msort(0, len(src) - 1)`, ['src', 'dst'])
+
+    // i and j index src[] only — AND from src[i], src[j] overrides OR from let i = lo
+    const iType = varType(ctx, 'i')
+    expect(iType).toContain('src')
+    expect(iType).not.toContain('dst')
+
+    const jType = varType(ctx, 'j')
+    expect(jType).toContain('src')
+    expect(jType).not.toContain('dst')
+
+    // k indexes dst[] only — AND from dst[k] overrides OR from let k = lo
+    const kType = varType(ctx, 'k')
+    expect(kType).toContain('dst')
+    expect(kType).not.toContain('src')
+  })
+
+  it('variable with only OR evidence uses OR as fallback', () => {
+    // When there is no structural AND evidence, OR should be used
+    const ctx = infer(`algo T(arr[])
+  def f(lo, hi)
+    let v = arr[lo]
+    return lo
+
+  let result = f(0, len(arr) - 1)`)
+    // result has no AND evidence, only OR from return type → should get {arr}
+    expect(varType(ctx, 'result')).toContain('arr')
+  })
+
+  it('AND evidence from dim/undim is structural', () => {
+    const ctx = infer(`algo T(arr[])
+  alloc brr len(arr)
+  def f(lo, hi)
+    dim arr from lo to hi
+    dim brr from lo to hi
+
+  f(0, len(arr) - 1)`)
+    // lo/hi have AND evidence from both dim statements → {arr, brr}
+    const loType = varType(ctx, 'lo')
+    expect(loType).toContain('arr')
+    expect(loType).toContain('brr')
+  })
+})
+
 describe('Type Inference: len() returns Num', () => {
   it('len(arr) produces Num type', () => {
     const ctx = infer(`algo T(arr[])
