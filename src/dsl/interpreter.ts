@@ -118,7 +118,10 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     let pendingCommentParts: CommentPart[] | null = null
 
     for (const [name, values] of input) {
-      arrays.set(name, values.map(v => plainVal(v)))
+      const elemType = staticElemType(name)
+      arrays.set(name, values.map(v =>
+        elemType.length > 0 ? { num: v, arrays: [...elemType] } : plainVal(v)
+      ))
     }
 
     function getVar(name: string): Value | undefined {

@@ -88,6 +88,30 @@ describe('Type Inference: nested indexing (retroactive cell tagging)', () => {
     expect(ctx.arrayElementTypes.get('count')).toContain('output')
     expect(ctx.arrayElementTypes.get('arr')).toContain('count')
   })
+
+  it('count[arr[i]] alone → arr elem Iter<{count}>', () => {
+    const ctx = infer(`algo T(arr[])
+  alloc count 10
+  for i from 0 to len(arr) - 1
+    count[arr[i]] = count[arr[i]] + 1`)
+    expect(ctx.arrayElementTypes.get('arr')).toContain('count')
+  })
+})
+
+describe('Type Inference: input array cells stamped at runtime', () => {
+  it('input array cells carry element type from count[arr[i]]', async () => {
+    const { compilePipeline } = await import('../src/dsl/index.ts')
+    const { steps } = compilePipeline(`algo T(arr[])
+  alloc count 10
+  for i from 0 to len(arr) - 1
+    count[arr[i]] = count[arr[i]] + 1`, 'arr', [3, 1, 2])
+    // After initialization, arr's cells should be stamped as iterators on count
+    const firstStep = steps[0]
+    const arrCells = firstStep.arrays.find(a => a.name === 'arr')!.values
+    for (const cell of arrCells) {
+      expect(cell.arrays).toContain('count')
+    }
+  })
 })
 
 describe('Type Inference: function parameter propagation', () => {
