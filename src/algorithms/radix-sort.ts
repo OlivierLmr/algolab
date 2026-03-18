@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const radixSort: AlgorithmDefinition = {
   name: 'Radix Sort (LSD)',
-  source: `algo RadixSort(arr: int[])
+  source: `algo RadixSort(arr[])
 
   def countingSortByDigit(exp)
     alloc output len(arr)

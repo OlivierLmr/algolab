@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const mergeSortLR: AlgorithmDefinition = {
   name: 'Merge Sort (L+R copies)',
-  source: `algo MergeSortLR(arr: int[])
+  source: `algo MergeSortLR(arr[])
   #: gauge arr
   #: stepover
   def copy(lo, mid, hi)

@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const insertionSort: AlgorithmDefinition = {
   name: 'Insertion Sort',
-  source: `algo InsertionSort(arr: int[])
+  source: `algo InsertionSort(arr[])
   #: gauge arr
   for i from 1 to len(arr) - 1
     #: comment "Picking arr[{i}] = {arr[i]} as key to insert"

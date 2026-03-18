@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const bubbleSort: AlgorithmDefinition = {
   name: 'Bubble Sort',
-  source: `algo BubbleSort(arr: int[])
+  source: `algo BubbleSort(arr[])
   #: gauge arr
   for i from 0 to len(arr) - 2
     #: comment "Pass {i + 1}: bubbling through arr[0..{len(arr) - 2 - i}]"

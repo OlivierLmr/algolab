@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const quickSortSemi: AlgorithmDefinition = {
   name: 'Quick Sort (Semi-Recursive)',
-  source: `algo QuickSortSemi(arr: int[])
+  source: `algo QuickSortSemi(arr[])
   #: gauge arr
 
   def partition(lo, hi)

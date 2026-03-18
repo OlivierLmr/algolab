@@ -42,7 +42,7 @@ function isInFrame(step: Step, funcName: string): boolean {
 }
 
 describe('Quick Select: renderer pointer visibility', () => {
-  const qs = `algo QuickSelect(arr: int[])
+  const qs = `algo QuickSelect(arr[])
   def partition(lo, hi)
     let i = lo - 1
     let j = hi
@@ -126,7 +126,7 @@ describe('Quick Select: renderer pointer visibility', () => {
 })
 
 describe('Quick Sort: renderer pointer visibility in nested calls', () => {
-  const source = `algo QuickSort(arr: int[])
+  const source = `algo QuickSort(arr[])
   def partition(lo, hi)
     let i = lo - 1
     let j = hi

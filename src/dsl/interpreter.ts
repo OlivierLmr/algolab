@@ -1,10 +1,10 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode,
   Expr, CommentPart,
 } from './ast.ts'
-import { exprToString } from './ast.ts'
 import type { Value } from './value.ts'
-import { plainVal, addArray, mergeArrays, propagateArithmetic } from './value.ts'
+import { plainVal, mergeArrays, propagateArithmetic } from './value.ts'
+import type { TypeContext, ExprPointerDef } from './typeinfer.ts'
 
 /** Sentinel thrown by `return` statements to unwind execution. */
 class ReturnSignal {
@@ -16,14 +16,15 @@ import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame }
 /**
  * Create a runner for the given algorithm AST.
  * colorMap is computed once in the pipeline and shared.
+ * typeContext provides statically inferred iterator types.
  */
-export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (input: Map<string, number[]>) => Step[] {
+export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typeContext: TypeContext): (input: Map<string, number[]>) => Step[] {
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
     const arrays = new Map<string, Value[]>()
     const scopeStack: Map<string, Value>[] = [new Map()]
-    const procedures = new Map<string, { params: { name: string; paramType?: string }[]; body: ASTNode[] }>()
+    const procedures = new Map<string, { params: { name: string; isArray: boolean }[]; body: ASTNode[]; defLine: number }>()
     let callDepth = 0
 
     interface ActiveFrame {
@@ -36,39 +37,8 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
     const callFrameStack: ActiveFrame[] = []
     const arrayAliasStack: Map<string, string>[] = []
 
-    // --- Expression pointer registry ---
-    interface ExprPtrEntry {
-      label: string
-      arrayName: string  // syntactic name (resolved at snapshot time)
-      expr: Expr
-      varNames: string[]
-      explicit: boolean  // true = from #: pointer directive
-    }
-    const exprPointerRegistry: ExprPtrEntry[] = []
-
-    // Stack of pre-scanned iterator associations per scope
-    const associationStack: Map<string, Set<string>>[] = []
-
-    /** Look up pre-scanned associations for a variable name across all active scopes. */
-    function lookupAssociations(varName: string): string[] {
-      const result = new Set<string>()
-      for (const assoc of associationStack) {
-        const arrNames = assoc.get(varName)
-        if (arrNames) {
-          for (const n of arrNames) result.add(n)
-        }
-      }
-      return [...result]
-    }
-
-    /** Apply looked-up associations to a value for a variable name. */
-    function applyAssociations(value: Value, varName: string): Value {
-      const arrNames = lookupAssociations(varName)
-      if (arrNames.length === 0) return value
-      const resolved = arrNames.map(n => resolveArrayName(n)).filter(n => arrays.has(n))
-      if (resolved.length === 0) return value
-      return { num: value.num, arrays: mergeArrays(value.arrays, resolved) }
-    }
+    // Expression pointers loaded from TypeContext
+    const exprPointerDefs: ExprPointerDef[] = typeContext.expressionPointers
 
     function resolveArrayName(name: string): string {
       const seen = new Set<string>()
@@ -87,6 +57,34 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         if (!found) return current
       }
     }
+
+    // --- Static type lookup helpers ---
+
+    /** Look up the static type for a variable by name and declaration line. */
+    function staticVarType(name: string, line: number): string[] {
+      return typeContext.varTypes.get(`${name}@${line}`) ?? []
+    }
+
+    /** Look up the static element type for an array. */
+    function staticElemType(arrName: string): string[] {
+      return typeContext.arrayElementTypes.get(arrName) ?? []
+    }
+
+    /** Stamp a value with static type arrays (resolved through aliases). */
+    function stampValue(num: number, staticArrays: string[]): Value {
+      if (staticArrays.length === 0) return plainVal(num)
+      const resolved = staticArrays.map(n => resolveArrayName(n))
+      return { num, arrays: resolved }
+    }
+
+    /** Stamp a cell value with the element type of an array. */
+    function stampCell(num: number, arrName: string): Value {
+      const elemType = staticElemType(arrName)
+      if (elemType.length === 0) return plainVal(num)
+      const resolved = elemType.map(n => resolveArrayName(n))
+      return { num, arrays: resolved }
+    }
+
     // --- Visualization state (highlights, dims) ---
     let currentHighlights: Highlight[] = []
     let currentVarHighlights: VarHighlight[] = []
@@ -197,146 +195,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       return true
     }
 
-    /** Register an expression pointer (from arr[complex_expr] or #: pointer directive). */
-    function registerExprPointer(label: string, arrayName: string, expr: Expr, explicit: boolean): void {
-      const key = `${arrayName}:${label}`
-      const existing = exprPointerRegistry.find(e => `${e.arrayName}:${e.label}` === key)
-      if (existing) {
-        // Explicit overrides implicit
-        if (explicit && !existing.explicit) {
-          existing.explicit = true
-          existing.expr = expr
-          const varNames = new Set<string>()
-          collectVarNames(expr, varNames)
-          existing.varNames = [...varNames]
-        }
-        return
-      }
-      const varNames = new Set<string>()
-      collectVarNames(expr, varNames)
-      exprPointerRegistry.push({ label, arrayName, expr, varNames: [...varNames], explicit })
-    }
-
-    /** Pre-scan a body for expression pointers and register them. */
-    function prescanExpressionPointers(body: ASTNode[]): void {
-      function scanExpr(expr: Expr): void {
-        if (expr.type === 'index' && expr.array.type === 'identifier' && expr.index.type !== 'identifier') {
-          const label = exprToString(expr.index)
-          registerExprPointer(label, expr.array.name, expr.index, false)
-        }
-        switch (expr.type) {
-          case 'binary': scanExpr(expr.left); scanExpr(expr.right); break
-          case 'unary': scanExpr(expr.operand); break
-          case 'call': expr.args.forEach(scanExpr); break
-          case 'index': scanExpr(expr.array); scanExpr(expr.index); break
-        }
-      }
-      function scanBody(stmts: ASTNode[]): void {
-        for (const stmt of stmts) {
-          switch (stmt.type) {
-            case 'let': scanExpr(stmt.value); break
-            case 'assign': scanExpr(stmt.target); scanExpr(stmt.value); break
-            case 'swap': scanExpr(stmt.left); scanExpr(stmt.right); break
-            case 'if': scanExpr(stmt.condition); scanBody(stmt.body); scanBody(stmt.elseBody); break
-            case 'while': scanExpr(stmt.condition); scanBody(stmt.body); break
-            case 'for': scanExpr(stmt.from); scanExpr(stmt.to); scanBody(stmt.body); break
-            case 'exprStmt': scanExpr(stmt.expr); break
-            case 'return': scanExpr(stmt.value); break
-            case 'pointer': registerExprPointer(stmt.label, stmt.arrayName, stmt.at, true); break
-          }
-        }
-      }
-      scanBody(body)
-    }
-
-    /** Pre-scan a body for bare identifier indexing patterns: arr[var],
-     *  and dim/undim expressions (variables in dim/undim ranges are iterators).
-     *  Returns map: variable_name → set of syntactic array names. */
-    function prescanIteratorAssociations(body: ASTNode[]): Map<string, Set<string>> {
-      const assoc = new Map<string, Set<string>>()
-      function addAssoc(varName: string, arrName: string): void {
-        if (!assoc.has(varName)) assoc.set(varName, new Set())
-        assoc.get(varName)!.add(arrName)
-      }
-      function scanExpr(expr: Expr): void {
-        if (expr.type === 'index' && expr.array.type === 'identifier' && expr.index.type === 'identifier') {
-          addAssoc(expr.index.name, expr.array.name)
-        }
-        switch (expr.type) {
-          case 'binary': scanExpr(expr.left); scanExpr(expr.right); break
-          case 'unary': scanExpr(expr.operand); break
-          case 'call': expr.args.forEach(scanExpr); break
-          case 'index': scanExpr(expr.array); scanExpr(expr.index); break
-        }
-      }
-      /** Extract bare identifiers from dim/undim range expressions as iterator associations. */
-      function scanDimExpr(expr: Expr, arrName: string): void {
-        if (expr.type === 'identifier') {
-          addAssoc(expr.name, arrName)
-        }
-        switch (expr.type) {
-          case 'binary': scanDimExpr(expr.left, arrName); scanDimExpr(expr.right, arrName); break
-          case 'unary': scanDimExpr(expr.operand, arrName); break
-          case 'call': expr.args.forEach(a => scanDimExpr(a, arrName)); break
-          case 'index': break // don't recurse through array indexing
-        }
-      }
-      function scanBody(stmts: ASTNode[]): void {
-        for (const stmt of stmts) {
-          switch (stmt.type) {
-            case 'let': scanExpr(stmt.value); break
-            case 'assign': scanExpr(stmt.target); scanExpr(stmt.value); break
-            case 'swap': scanExpr(stmt.left); scanExpr(stmt.right); break
-            case 'if': scanExpr(stmt.condition); scanBody(stmt.body); scanBody(stmt.elseBody); break
-            case 'while': scanExpr(stmt.condition); scanBody(stmt.body); break
-            case 'for': scanExpr(stmt.from); scanExpr(stmt.to); scanBody(stmt.body); break
-            case 'exprStmt': scanExpr(stmt.expr); break
-            case 'return': scanExpr(stmt.value); break
-            case 'dim': scanDimExpr(stmt.from, stmt.arrayName); scanDimExpr(stmt.to, stmt.arrayName); break
-            case 'undim': scanDimExpr(stmt.from, stmt.arrayName); scanDimExpr(stmt.to, stmt.arrayName); break
-          }
-        }
-      }
-      scanBody(body)
-      return assoc
-    }
-
-    /** Tag a variable as iterator on an array (runtime tagging). */
-    function tagVar(varName: string, arrayName: string): void {
-      const val = getVar(varName)
-      if (!val) return
-      if (!val.arrays.includes(arrayName)) {
-        updateVar(varName, addArray(val, arrayName))
-      }
-    }
-
-    /** Retroactively tag array cells that are used as indices into another array.
-     *  Walks the expression to find IndexExpr nodes and tags those cells.
-     *  Stops at IndexExpr boundaries (doesn't recurse through nested IndexExpr). */
-    function retroactivelyTagCells(expr: Expr, targetArrayName: string): void {
-      if (expr.type === 'index' && expr.array.type === 'identifier') {
-        const arrName = resolveArrayName(expr.array.name)
-        const arr = arrays.get(arrName)
-        if (arr) {
-          try {
-            const idx = evalExpr(expr.index).num
-            if (idx >= 0 && idx < arr.length) {
-              if (!arr[idx].arrays.includes(targetArrayName)) {
-                arr[idx] = addArray(arr[idx], targetArrayName)
-              }
-            }
-          } catch { /* skip */ }
-        }
-        // Stop — don't recurse past this IndexExpr
-        return
-      }
-      switch (expr.type) {
-        case 'binary': retroactivelyTagCells(expr.left, targetArrayName); retroactivelyTagCells(expr.right, targetArrayName); break
-        case 'unary': retroactivelyTagCells(expr.operand, targetArrayName); break
-        case 'call': expr.args.forEach(a => retroactivelyTagCells(a, targetArrayName)); break
-      }
-    }
-
     function evaluateCommentParts(parts: CommentPart[]): string {
       return parts.map(part => {
         switch (part.type) {
@@ -362,7 +220,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
 
       // Evaluate expression pointers
       const allExprPointers: Record<string, Value> = {}
-      for (const entry of exprPointerRegistry) {
+      for (const entry of exprPointerDefs) {
         // Check all varNames are in current scope
         const allInScope = entry.varNames.every(name => hasVar(name))
         if (!allInScope) continue
@@ -545,19 +403,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
             const name = expr.array.type === 'identifier' ? expr.array.name : 'array'
             throw new Error(`Index ${idx} out of bounds for ${name}[0..${arr.length - 1}]`)
           }
-
-          // Direct variable tagging: arr[var] with bare identifier
-          if (expr.index.type === 'identifier' && expr.array.type === 'identifier') {
-            const arrayName = resolveArrayName(expr.array.name)
-            tagVar(expr.index.name, arrayName)
-          }
-
-          // Retroactive cell tagging: if the index expression contains an IndexExpr
-          if (expr.array.type === 'identifier') {
-            const targetArray = resolveArrayName(expr.array.name)
-            retroactivelyTagCells(expr.index, targetArray)
-          }
-
           return arr[idx]
         }
         case 'call': return evalCall(expr.callee, expr.args)
@@ -600,12 +445,12 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
 
         // Phase 1: evaluate args — array params get aliases, scalar params get values
         const aliasMap = new Map<string, string>()
-        const scalarBindings: { name: string; value: Value }[] = []
+        const scalarBindings: { name: string; value: Value; defLine: number }[] = []
         const argStrings: string[] = []
 
         for (let i = 0; i < proc.params.length; i++) {
           const param = proc.params[i]
-          if (param.paramType === 'int[]') {
+          if (param.isArray) {
             // Array reference param: extract identifier name and resolve
             const arg = args[i]
             if (arg.type !== 'identifier') throw new Error(`Expected array identifier for param ${param.name}`)
@@ -613,10 +458,12 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
             aliasMap.set(param.name, resolved)
             argStrings.push(resolved)
           } else {
-            // Scalar param
-            const val = evalExpr(args[i])
-            scalarBindings.push({ name: param.name, value: val })
-            argStrings.push(String(val.num))
+            // Scalar param — stamp with static type
+            const rawVal = evalExpr(args[i])
+            const paramType = staticVarType(param.name, proc.defLine)
+            const val = stampValue(rawVal.num, paramType)
+            scalarBindings.push({ name: param.name, value: val, defLine: proc.defLine })
+            argStrings.push(String(rawVal.num))
           }
         }
 
@@ -627,23 +474,13 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         pushScope()
         frame.scopeBase = scopeStack.length - 1
 
-        // Pre-scan function body for iterator associations
-        const funcAssociations = prescanIteratorAssociations(proc.body)
-        associationStack.push(funcAssociations)
-
         for (const binding of scalarBindings) {
-          const tagged = applyAssociations(binding.value, binding.name)
-          setVar(binding.name, tagged)
+          setVar(binding.name, binding.value)
         }
 
-        // Save caller's expression pointer registry and dim ranges
-        const savedExprPtrLen = exprPointerRegistry.length
+        // Save caller's dim ranges and gauge arrays
         const savedDimRanges = [...dimRanges]
         const savedGaugeArrays = new Set(gaugeArrays)
-        const savedAssocStackLen = associationStack.length
-
-        // Pre-scan function body for expression pointers
-        prescanExpressionPointers(proc.body)
 
         // Execute body
         let returnValue: Value = plainVal(0)
@@ -659,8 +496,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         }
 
         // Restore caller's state
-        exprPointerRegistry.length = savedExprPtrLen
-        associationStack.length = savedAssocStackLen
         dimRanges = savedDimRanges
         gaugeArrays = savedGaugeArrays
 
@@ -732,7 +567,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         const argDisplayParts: string[] = []
         for (let i = 0; i < expr.args.length; i++) {
           const param = proc.params[i]
-          if (param?.paramType === 'int[]') {
+          if (param?.isArray) {
             const arg = expr.args[i]
             argDisplayParts.push(arg.type === 'identifier' ? resolveArrayName(arg.name) : '?')
           } else {
@@ -755,7 +590,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         case 'undim': execUndim(node); break
         case 'gauge': execGauge(node); break
         case 'ungauge': execUngauge(node); break
-        case 'pointer': execPointer(node); break
+        case 'pointer': break  // Handled statically by type inference
         case 'stepover': break
         case 'comment': execComment(node); break
         case 'alloc': execAlloc(node); break
@@ -779,13 +614,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       if (toVal - fromVal > 10000) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
       pushScope()
 
-      // Pre-scan body for iterator associations and expression pointers
-      const associations = prescanIteratorAssociations(node.body)
-      associationStack.push(associations)
-      prescanExpressionPointers(node.body)
+      // Static type for the loop variable
+      const loopVarType = staticVarType(node.variable, node.line)
 
       for (let i = fromVal; i <= toVal; i++) {
-        const val = applyAssociations(plainVal(i), node.variable)
+        const val = stampValue(i, loopVarType)
         setVar(node.variable, val)
         highlightComparisonSide({ type: 'identifier', name: node.variable })
         highlightComparisonSide(node.to)
@@ -793,16 +626,12 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
       }
-      associationStack.pop()
       popScope()
     }
 
     function execWhile(node: WhileNode): void {
       let guard = 0
       pushScope()
-      const whileAssoc = prescanIteratorAssociations(node.body)
-      associationStack.push(whileAssoc)
-      prescanExpressionPointers(node.body)
       while (evalExpr(node.condition).num !== 0) {
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -812,7 +641,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       }
       addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')
-      associationStack.pop()
       popScope()
     }
 
@@ -844,7 +672,9 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
     function execLet(node: LetNode): void {
       snapshotCallIfProcedure(node.value, node.line)
       const rawVal = evalExpr(node.value)
-      const val = applyAssociations(rawVal, node.name)
+      // Stamp with static type
+      const letType = staticVarType(node.name, node.line)
+      const val = stampValue(rawVal.num, letType)
       setVar(node.name, val)
       if (val.arrays.length === 0) {
         currentVarHighlights.push({ varName: node.name, type: 'active' })
@@ -859,8 +689,13 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       snapshotCallIfProcedure(node.value, node.line)
       const val = evalExpr(node.value)
       if (node.target.type === 'identifier') {
-        updateVar(node.target.name, val)
-        if (val.arrays.length === 0) {
+        // For variable updates, preserve the existing type (from initial declaration)
+        const existing = getVar(node.target.name)
+        const updatedVal = existing && existing.arrays.length > 0
+          ? { num: val.num, arrays: existing.arrays }
+          : val
+        updateVar(node.target.name, updatedVal)
+        if (updatedVal.arrays.length === 0) {
           currentVarHighlights.push({ varName: node.target.name, type: 'active' })
         }
         snapshot(node.line, `Set ${node.target.name} = ${val.num}`)
@@ -868,18 +703,10 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
         const arr = getArray(node.target.array)
         const idx = evalExpr(node.target.index).num
 
-        // Direct variable tagging for assignment target: arr[var]
-        if (node.target.index.type === 'identifier' && node.target.array.type === 'identifier') {
-          tagVar(node.target.index.name, resolveArrayName(node.target.array.name))
-        }
-
-        // Retroactive cell tagging for assignment target: targetArr[sourceArr[x]]
-        if (node.target.array.type === 'identifier') {
-          retroactivelyTagCells(node.target.index, resolveArrayName(node.target.array.name))
-        }
-
-        arr[idx] = val
+        // Stamp stored cell value with static element type
         const arrayName = getArrayName(node.target.array)
+        arr[idx] = stampCell(val.num, arrayName)
+
         setArrayHighlight(arrayName, [idx], 'active')
         if (node.value.type === 'identifier') {
           const srcVal = getVar(node.value.name)
@@ -913,11 +740,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       gaugeArrays.delete(resolveArrayName(node.arrayName))
     }
 
-    function execPointer(node: PointerNode): void {
-      // Register explicit expression pointer from #: pointer directive
-      registerExprPointer(node.label, node.arrayName, node.at, true)
-    }
-
     function execComment(node: CommentNode): void {
       pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]
     }
@@ -930,14 +752,18 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
 
     function execAlloc(node: AllocNode): void {
       const size = evalExpr(node.size).num
-      arrays.set(node.arrayName, new Array(size).fill(null).map(() => plainVal(0)))
+      // Stamp allocated cells with static element type
+      const elemType = staticElemType(node.arrayName)
+      arrays.set(node.arrayName, new Array(size).fill(null).map(() =>
+        elemType.length > 0 ? { num: 0, arrays: [...elemType] } : plainVal(0)
+      ))
       if (callFrameStack.length > 0) {
         callFrameStack[callFrameStack.length - 1].allocatedArrays.add(node.arrayName)
       }
     }
 
     function execDef(node: DefNode): void {
-      procedures.set(node.name, { params: node.params, body: node.body })
+      procedures.set(node.name, { params: node.params, body: node.body, defLine: node.line })
     }
 
     function execReturn(node: ReturnNode): void {
@@ -964,14 +790,17 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>): (i
       arr[i] = arr[j]
       arr[j] = tmp
 
+      // Re-stamp swapped cells with element type
+      const elemType = staticElemType(arrayName)
+      if (elemType.length > 0) {
+        arr[i] = { num: arr[i].num, arrays: [...elemType] }
+        arr[j] = { num: arr[j].num, arrays: [...elemType] }
+      }
+
       snapshot(node.line, desc)
     }
 
     // Execute
-    const algoAssociations = prescanIteratorAssociations(algo.body)
-    associationStack.push(algoAssociations)
-    prescanExpressionPointers(algo.body)
-
     snapshot(algo.line, `Start ${algo.name}`)
     for (const stmt of algo.body) execNode(stmt)
     flushPendingComment(algo.body[algo.body.length - 1].line)

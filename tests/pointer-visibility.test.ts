@@ -32,7 +32,7 @@ function innermostIterVars(step: Step): string[] {
 
 describe('Quick Select: pivotIdx not visible during partition()', () => {
   // Simplified version without directives for testing core behavior
-  const source = `algo QuickSelect(arr: int[])
+  const source = `algo QuickSelect(arr[])
   def partition(lo, hi)
     let i = lo - 1
     let j = hi
@@ -122,7 +122,7 @@ describe('Quick Select: pivotIdx not visible during partition()', () => {
 })
 
 describe('Quick Sort: pivotIdx scoping in nested calls', () => {
-  const source = `algo QuickSort(arr: int[])
+  const source = `algo QuickSort(arr[])
   def partition(lo, hi)
     let i = lo - 1
     let j = hi
@@ -180,7 +180,7 @@ describe('Quick Sort: pivotIdx scoping in nested calls', () => {
 })
 
 describe('Function return propagates iterator metadata', () => {
-  const source = `algo Test(arr: int[])
+  const source = `algo Test(arr[])
   def getIdx(x)
     let result = x
     return result
@@ -200,7 +200,7 @@ describe('Function return propagates iterator metadata', () => {
 
 describe('Direct variable tagging', () => {
   it('arr[i] tags i as iterator on arr', () => {
-    const source = `algo Test(arr: int[])
+    const source = `algo Test(arr[])
   let i = 0
   let v = arr[i]`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30])
@@ -209,7 +209,7 @@ describe('Direct variable tagging', () => {
   })
 
   it('arr[i+1] creates expression pointer "i + 1"', () => {
-    const source = `algo Test(arr: int[])
+    const source = `algo Test(arr[])
   let i = 0
   let v = arr[i + 1]`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30])
@@ -220,7 +220,7 @@ describe('Direct variable tagging', () => {
 
 describe('Expression pointers', () => {
   it('arr[i-1] creates an expression pointer with correct value', () => {
-    const source = `algo Test(arr: int[])
+    const source = `algo Test(arr[])
   for i from 1 to len(arr) - 1
     let v = arr[i - 1]`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30])
@@ -230,7 +230,7 @@ describe('Expression pointers', () => {
   })
 
   it('explicit #: pointer creates an expression pointer', () => {
-    const source = `algo Test(arr: int[])
+    const source = `algo Test(arr[])
   let boundary = 3
   #: pointer boundary on arr at boundary`
     const steps = runAlgorithm(source, 'arr', [10, 20, 30, 40, 50])
@@ -241,7 +241,7 @@ describe('Expression pointers', () => {
 })
 
 describe('Merge Sort: iterator tagging in function calls', () => {
-  const source = `algo MergeSortLR(arr: int[])
+  const source = `algo MergeSortLR(arr[])
   def msort(lo, hi)
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1

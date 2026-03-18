@@ -6,7 +6,7 @@ export function DslDocs() {
         <div class="dsl-docs-col">
           <h4 class="dsl-docs-heading">Language</h4>
           <table class="dsl-docs-table">
-            <tr><td><code>algo Name(arr: int[])</code></td><td>Algorithm entry point</td></tr>
+            <tr><td><code>algo Name(arr[])</code></td><td>Algorithm entry point</td></tr>
             <tr><td><code>let x = expr</code></td><td>Declare a variable</td></tr>
             <tr><td><code>x = expr</code></td><td>Assign to variable</td></tr>
             <tr><td><code>arr[i] = expr</code></td><td>Assign to array element</td></tr>

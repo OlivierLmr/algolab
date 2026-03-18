@@ -59,7 +59,7 @@ describe('hitTestCell', () => {
 })
 
 describe('Counting sort: cells acquire iterator metadata for hover', () => {
-  const source = `algo CountingSort(arr: int[])
+  const source = `algo CountingSort(arr[])
   let max = arr[0]
   for i from 1 to len(arr) - 1
     if arr[i] > max

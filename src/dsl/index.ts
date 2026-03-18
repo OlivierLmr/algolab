@@ -5,7 +5,7 @@ import { preprocessSource } from './preprocess.ts'
 import type { DisplayInfo } from './preprocess.ts'
 import type { Step } from '../types.ts'
 import type { ASTNode, AlgoNode, CommentPart, Expr } from './ast.ts'
-import { collectIteratorVarNames } from './analysis.ts'
+import { inferTypes } from './typeinfer.ts'
 import { assignPointerColors } from '../renderer/colors.ts'
 import { validateAST } from './validate.ts'
 
@@ -30,9 +30,9 @@ export function compilePipeline(source: string, paramName: string, input: number
     throw new Error(`Line ${validationErrors[0].line + 1}: ${validationErrors[0].message}`)
   }
 
-  // Collect iterator variable names for color assignment
-  const labels = collectIteratorVarNames(ast.body)
-  const colorMap = assignPointerColors(labels)
+  // Static type inference (replaces runtime tagging and analysis.ts)
+  const typeContext = inferTypes(ast, [paramName])
+  const colorMap = assignPointerColors(typeContext.iteratorLabels)
 
   // Pre-parse comment templates
   preParseCommentTemplates(ast.body)
@@ -40,8 +40,8 @@ export function compilePipeline(source: string, paramName: string, input: number
   // Compute block ranges from AST
   const blockRanges = getBlockRangesFromAST(ast)
 
-  // Run interpreter with shared colorMap
-  const runner = createRunner(ast, colorMap)
+  // Run interpreter with shared colorMap and type context
+  const runner = createRunner(ast, colorMap, typeContext)
   const inputMap = new Map([[paramName, input]])
   const steps = runner(inputMap)
 
@@ -111,7 +111,7 @@ function parseCommentTemplate(text: string): CommentPart[] {
 }
 
 function parseExprFromString(exprStr: string): Expr {
-  const tokens = lex(`algo _(_: int[])\n  let _r = ${exprStr}`)
+  const tokens = lex(`algo _(_[])\n  let _r = ${exprStr}`)
   const ast = parse(tokens)
   const node = ast.body[0]
   if (node.type === 'let') return node.value

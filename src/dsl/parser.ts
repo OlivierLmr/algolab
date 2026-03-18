@@ -34,26 +34,24 @@ export function parse(tokens: Token[]): AlgoNode {
     while (peek() && peek().type === 'newline') advance()
   }
 
-  // algo Name(param: type)
+  // algo Name(arr[], x, y)
   function parseAlgo(): AlgoNode {
     skipNewlines()
     const tok = expect('keyword', 'algo')
     const line = tok.line
     const name = expect('ident').value
     expect('paren', '(')
-    const params: { name: string; paramType: string }[] = []
+    const params: { name: string; isArray: boolean }[] = []
     while (!match('paren', ')')) {
       if (params.length > 0) expect('comma')
       const pName = expect('ident').value
-      expect('colon')
-      let pType = expect('ident').value
-      // Handle int[] type
+      let isArray = false
       if (match('bracket', '[')) {
         advance()
         expect('bracket', ']')
-        pType += '[]'
+        isArray = true
       }
-      params.push({ name: pName, paramType: pType })
+      params.push({ name: pName, isArray })
     }
     expect('paren', ')')
     skipNewlines()
@@ -203,21 +201,17 @@ export function parse(tokens: Token[]): AlgoNode {
     const tok = expect('keyword', 'def')
     const name = expect('ident').value
     expect('paren', '(')
-    const params: { name: string; paramType?: string }[] = []
+    const params: { name: string; isArray: boolean }[] = []
     while (!match('paren', ')')) {
       if (params.length > 0) expect('comma')
       const pName = expect('ident').value
-      let pType: string | undefined
-      if (match('colon')) {
+      let isArray = false
+      if (match('bracket', '[')) {
         advance()
-        pType = expect('ident').value
-        if (match('bracket', '[')) {
-          advance()
-          expect('bracket', ']')
-          pType += '[]'
-        }
+        expect('bracket', ']')
+        isArray = true
       }
-      params.push({ name: pName, paramType: pType })
+      params.push({ name: pName, isArray })
     }
     expect('paren', ')')
     skipNewlines()

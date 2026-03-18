@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const countingSort: AlgorithmDefinition = {
   name: 'Counting Sort',
-  source: `algo CountingSort(arr: int[])
+  source: `algo CountingSort(arr[])
   #: gauge arr
 
   let max = arr[0]

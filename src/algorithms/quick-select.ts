@@ -2,7 +2,7 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const quickSelect: AlgorithmDefinition = {
   name: 'Quick Select',
-  source: `algo QuickSelect(arr: int[])
+  source: `algo QuickSelect(arr[])
   #: gauge arr
 
   def partition(lo, hi)

@@ -8,7 +8,7 @@ export interface ValidationError {
 type SymbolType = 'scalar' | 'array'
 
 interface FunctionInfo {
-  params: { name: string; paramType?: string }[]
+  params: { name: string; isArray: boolean }[]
 }
 
 const BUILTIN_FUNCTIONS: Record<string, { paramCount: number; arrayArgs: number[] }> = {
@@ -145,7 +145,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
       const arg = args[i]
       const param = func.params[i]
       if (!param) continue
-      if (param.paramType === 'int[]') {
+      if (param.isArray) {
         // Must pass an array identifier
         if (arg.type === 'identifier') {
           const sym = lookupSymbol(arg.name)
@@ -317,7 +317,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
   function validateFunction(node: DefNode): void {
     pushScope()
     for (const param of node.params) {
-      defineSymbol(param.name, param.paramType === 'int[]' ? 'array' : 'scalar')
+      defineSymbol(param.name, param.isArray ? 'array' : 'scalar')
     }
     validateStatements(node.body)
     popScope()
@@ -328,7 +328,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
   // Initialize global scope with algo params
   pushScope()
   for (const param of ast.params) {
-    defineSymbol(param.name, param.paramType === 'int[]' ? 'array' : 'scalar')
+    defineSymbol(param.name, param.isArray ? 'array' : 'scalar')
   }
 
   // Second pass: validate all statements

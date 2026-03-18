@@ -6,7 +6,7 @@ import type { PipelineResult } from './dsl/index.ts'
 
 export const algorithmList = algorithms
 
-const CUSTOM_TEMPLATE = `algo MySort(arr: int[])
+const CUSTOM_TEMPLATE = `algo MySort(arr[])
   #: comment "Custom algorithm"
   for i from 0 to len(arr) - 2
     for j from 0 to len(arr) - 2 - i
@@ -273,7 +273,7 @@ export function toggleRunMode(): void {
 export function tryParseCustom(): string | null {
   try {
     const source = customSource.value
-    const match = source.match(/algo \w+\((\w+):/)
+    const match = source.match(/algo \w+\((\w+)\[/)
     const paramName = match ? match[1] : 'arr'
     const raw = customInput.value
     const nums = raw

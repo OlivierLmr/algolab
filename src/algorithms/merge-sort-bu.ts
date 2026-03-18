@@ -2,12 +2,12 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const mergeSortBU: AlgorithmDefinition = {
   name: 'Merge Sort (two arrays)',
-  source: `algo MergeSortAux(arr: int[])
+  source: `algo MergeSortAux(arr[])
   #: gauge arr
   alloc aux len(arr)
   #: gauge aux
 
-  def merge(src: int[], dst: int[], lo, mid, hi)
+  def merge(src[], dst[], lo, mid, hi)
     let i = lo
     let j = mid + 1
     #: comment "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
@@ -19,7 +19,7 @@ export const mergeSortBU: AlgorithmDefinition = {
         dst[k] = src[j]
         j = j + 1
 
-  def msort(src: int[], dst: int[], lo, hi)
+  def msort(src[], dst[], lo, hi)
     #: dim src from 0 to lo - 1
     #: dim src from hi + 1 to len(src) - 1
     #: dim dst from 0 to lo - 1

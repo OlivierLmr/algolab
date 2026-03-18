@@ -21,7 +21,7 @@ export type ASTNode =
 export interface AlgoNode {
   type: 'algo'
   name: string
-  params: { name: string; paramType: string }[]
+  params: { name: string; isArray: boolean }[]
   body: ASTNode[]
   line: number
 }
@@ -123,7 +123,7 @@ export interface AllocNode {
 export interface DefNode {
   type: 'def'
   name: string
-  params: { name: string; paramType?: string }[]
+  params: { name: string; isArray: boolean }[]
   body: ASTNode[]
   line: number
 }
