@@ -1,11 +1,12 @@
 import './styles.css'
+import './styles/visualizer.css'
 import { useEffect } from 'preact/hooks'
 import { Header } from './components/Header.tsx'
 import { ChangelogBanner } from './components/ChangelogBanner.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
 import { EditorPanel } from './components/EditorPanel.tsx'
 import { ResizeHandle } from './components/ResizeHandle.tsx'
-import { CanvasVisualizer } from './components/CanvasVisualizer.tsx'
+import { StepVisualizer } from './components/visualizer/StepVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
 import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
@@ -39,7 +40,7 @@ export function App() {
         {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
         <ResizeHandle />
         <div class={`canvas-wrapper ${editMode ? 'dimmed' : ''}`}>
-          <CanvasVisualizer />
+          <StepVisualizer />
         </div>
         <div class={`description ${editMode ? 'dimmed' : ''}`}>
           {recentDescriptions.value.map((d) => (

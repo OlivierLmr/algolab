@@ -205,19 +205,6 @@ body {
   overflow-x: auto;
 }
 
-.canvas-container {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  display: flex;
-  align-items: flex-start;
-  justify-content: safe center;
-  padding: 16px;
-  min-height: 300px;
-  min-width: 0;
-  overflow-x: auto;
-}
-
 .controls {
   display: flex;
   align-items: center;
