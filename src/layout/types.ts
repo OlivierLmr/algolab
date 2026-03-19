@@ -63,10 +63,24 @@ export interface LayoutEdge {
   highlightType?: 'compare' | 'swap' | 'sorted' | 'active'
 }
 
+// --- Flat element for rendering ---
+
+export interface FlatElement {
+  id: NodeId
+  x: number
+  y: number
+  width: number
+  height: number
+  kind: LayoutNode['kind']
+  data: NodeData
+  opacity: number
+}
+
 // --- Scene layout (top-level output) ---
 
 export interface SceneLayout {
   nodes: LayoutNode[]
+  flatElements: FlatElement[]
   edges: LayoutEdge[]
   width: number
   height: number

@@ -18,15 +18,17 @@
 
 /* === Array label === */
 .viz-array-label {
+  position: absolute;
   font: bold 14px monospace;
   color: #333;
   white-space: nowrap;
-  transition: transform 200ms ease;
+  transition: transform 200ms ease, opacity 200ms;
 }
 
 /* === Cell === */
 .viz-cell-wrapper {
-  transition: transform 200ms ease;
+  position: absolute;
+  transition: transform 200ms ease, opacity 200ms;
 }
 
 .viz-cell {
@@ -37,10 +39,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  transition:
-    border-color 150ms,
-    background-color 150ms,
-    opacity 200ms;
+  transition: border-color 150ms, background-color 150ms;
 }
 
 .viz-cell-value {
@@ -80,7 +79,8 @@
 
 /* === Variable cell === */
 .viz-variable-wrapper {
-  transition: transform 200ms ease;
+  position: absolute;
+  transition: transform 200ms ease, opacity 200ms;
 }
 
 .viz-variable-label {
@@ -91,22 +91,23 @@
 
 /* === Frame === */
 .viz-frame {
+  position: absolute;
   border: 1.5px solid #bbb;
-  transition: transform 200ms ease;
+  padding: 10px;
+  transition: transform 200ms ease, opacity 200ms;
 }
 
 .viz-frame-label {
   font: bold 13px monospace;
   color: #555;
   white-space: nowrap;
-  transition: transform 200ms ease;
 }
 
 .viz-frame-refs {
   font: 11px monospace;
   color: #888;
   white-space: nowrap;
-  transition: transform 200ms ease;
+  margin-top: 4px;
 }
 
 /* === Pointer arrows (SVG) === */

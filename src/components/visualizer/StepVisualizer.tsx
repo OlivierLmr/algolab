@@ -2,11 +2,9 @@ import { useMemo, useCallback } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
-import type { LayoutNode, GroupData } from '../../layout/types.ts'
-import { RefRegistryProvider } from './RefRegistry.tsx'
-import { ArrayGroup } from './ArrayGroup.tsx'
-import { VariableGroup } from './VariableGroup.tsx'
-import { CallFrameGroup } from './CallFrameGroup.tsx'
+import type { FlatElement, CellData, LabelData, VariableData, FrameData } from '../../layout/types.ts'
+import { CELL_SIZE, VARIABLE_LABEL_HEIGHT, FRAME_BORDER_RADIUS } from '../../layout/constants.ts'
+import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
 
 export function StepVisualizer() {
@@ -36,66 +34,180 @@ export function StepVisualizer() {
     return <div class="viz-container" />
   }
 
-  // Categorize top-level nodes
-  const arrayGroups: LayoutNode[] = []
-  const varGroups: LayoutNode[] = []
-  const frameNodes: LayoutNode[] = []
-
-  for (const node of layout.nodes) {
-    if (node.kind === 'group') {
-      const groupData = node.data as GroupData
-      if (groupData.role === 'array-row') arrayGroups.push(node)
-      else if (groupData.role === 'variables-row') varGroups.push(node)
-    } else if (node.kind === 'frame') {
-      frameNodes.push(node)
-    }
-  }
-
   return (
     <div class="viz-container">
-      <RefRegistryProvider>
-        <div
-          class="viz-scene"
-          style={{
-            position: 'relative',
-            width: layout.width,
-            height: layout.height,
-          }}
-          onMouseLeave={onLeaveCell}
-        >
-          {/* Global arrays */}
-          {arrayGroups.map(node => (
-            <ArrayGroup
-              key={node.id}
-              node={node}
-              onHoverCell={onHoverCell}
-              onLeaveCell={onLeaveCell}
-            />
-          ))}
-
-          {/* Call stack frames */}
-          {frameNodes.map(node => (
-            <CallFrameGroup
-              key={node.id}
-              node={node}
-              onHoverCell={onHoverCell}
-              onLeaveCell={onLeaveCell}
-            />
-          ))}
-
-          {/* Global variables */}
-          {varGroups.map(node => (
-            <VariableGroup key={node.id} node={node} />
-          ))}
-
-          {/* Arrow overlay (pointer arrows + hover arrows) */}
-          <ArrowOverlay
-            layout={layout}
-            step={step}
-            hoveredCell={hoveredCell.value}
+      <div
+        class="viz-scene"
+        style={{
+          position: 'relative',
+          width: layout.width,
+          height: layout.height,
+        }}
+        onMouseLeave={onLeaveCell}
+      >
+        {layout.flatElements.map(el => (
+          <SceneElement
+            key={el.id}
+            el={el}
+            onHoverCell={onHoverCell}
+            onLeaveCell={onLeaveCell}
           />
-        </div>
-      </RefRegistryProvider>
+        ))}
+
+        <ArrowOverlay
+          layout={layout}
+          step={step}
+          hoveredCell={hoveredCell.value}
+        />
+      </div>
+    </div>
+  )
+}
+
+interface SceneElementProps {
+  el: FlatElement
+  onHoverCell: (arrayName: string, cellIndex: number) => void
+  onLeaveCell: () => void
+}
+
+function SceneElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
+  switch (el.kind) {
+    case 'cell':
+      return <CellElement el={el} onHoverCell={onHoverCell} onLeaveCell={onLeaveCell} />
+    case 'array-label':
+      return <ArrayLabelElement el={el} />
+    case 'variable':
+      return <VariableElement el={el} />
+    case 'frame':
+      return <FrameElement el={el} />
+    default:
+      return null
+  }
+}
+
+function CellElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
+  const data = el.data as CellData
+  const hasIteratorMeta = data.value.arrays.length > 0
+  const displayVal = data.value.num === Infinity ? '\u221E' : String(data.value.num)
+
+  const borderColor = data.highlightType
+    ? getHighlightColor(data.highlightType)
+    : hasIteratorMeta ? '#6ab0de' : '#999'
+  const borderWidth = data.highlightType ? 3 : hasIteratorMeta ? 2 : 1.5
+
+  let gaugeFillHeight = 0
+  if (data.gaugeRatio !== undefined) {
+    const clamped = 0.15 + Math.max(0, Math.min(1, data.gaugeRatio)) * 0.7
+    gaugeFillHeight = clamped * CELL_SIZE
+  }
+
+  const onMouseEnter = useCallback(() => {
+    if (hasIteratorMeta) {
+      onHoverCell(data.arrayName, data.index)
+    }
+  }, [hasIteratorMeta, data.arrayName, data.index, onHoverCell])
+
+  return (
+    <div
+      class="viz-cell-wrapper"
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: CELL_SIZE,
+        opacity: data.dimmed ? 0.3 * el.opacity : el.opacity,
+      }}
+    >
+      <div
+        class="viz-cell"
+        style={{
+          width: CELL_SIZE,
+          height: CELL_SIZE,
+          borderColor,
+          borderWidth,
+          cursor: hasIteratorMeta ? 'pointer' : undefined,
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onLeaveCell}
+      >
+        {data.gaugeRatio !== undefined && (
+          <div class="viz-cell-gauge" style={{ height: gaugeFillHeight }} />
+        )}
+        {hasIteratorMeta && !data.highlightType && (
+          <div class="viz-cell-dot" />
+        )}
+        <span class="viz-cell-value">{displayVal}</span>
+      </div>
+      <div class="viz-cell-index">{data.index}</div>
+    </div>
+  )
+}
+
+function ArrayLabelElement({ el }: { el: FlatElement }) {
+  const data = el.data as LabelData
+  return (
+    <div
+      class="viz-array-label"
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        opacity: el.opacity,
+      }}
+    >
+      {data.text}
+    </div>
+  )
+}
+
+function VariableElement({ el }: { el: FlatElement }) {
+  const data = el.data as VariableData
+  const borderColor = data.highlightType ? getHighlightColor(data.highlightType) : '#999'
+  const borderWidth = data.highlightType ? 3 : 1.5
+
+  return (
+    <div
+      class="viz-variable-wrapper"
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: CELL_SIZE,
+        opacity: el.opacity,
+      }}
+    >
+      <div class="viz-variable-label">{data.name}</div>
+      <div
+        class="viz-cell"
+        style={{
+          width: CELL_SIZE,
+          height: CELL_SIZE,
+          borderColor,
+          borderWidth,
+          marginTop: VARIABLE_LABEL_HEIGHT,
+        }}
+      >
+        <span class="viz-cell-value">{String(data.value.num)}</span>
+      </div>
+    </div>
+  )
+}
+
+function FrameElement({ el }: { el: FlatElement }) {
+  const data = el.data as FrameData
+  const bgAlpha = 0.4 + data.nestingIndex * 0.1
+  const refText = data.arrayRefs.length > 0
+    ? data.arrayRefs.map(r => `${r.paramName} \u2192 ${r.targetName}`).join('   ')
+    : null
+
+  return (
+    <div
+      class="viz-frame"
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: el.width,
+        height: el.height,
+        borderRadius: FRAME_BORDER_RADIUS,
+        background: `rgba(245, 245, 250, ${bgAlpha})`,
+        opacity: el.opacity,
+      }}
+    >
+      <div class="viz-frame-label">{data.label}</div>
+      {refText && <div class="viz-frame-refs">{refText}</div>}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { Step, Value } from '../types.ts'
-import type { SceneLayout, LayoutNode, LayoutEdge } from './types.ts'
+import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData } from './types.ts'
 import { layoutArray, arrayGroupHeight } from './array-layout.ts'
 import { layoutVariables, variablesRowHeight } from './variables-layout.ts'
 import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
@@ -70,11 +70,75 @@ export function computeSceneLayout(
   // Derive pointer edges
   const edges = derivePointerEdges(step, colorMap, pointerNames)
 
+  // Flatten tree into a single list of positioned elements
+  const flatElements = flattenNodes(nodes)
+
   return {
     nodes,
+    flatElements,
     edges,
     width: 600,
     height: y,
+  }
+}
+
+/**
+ * Flatten the node tree into a single list of leaf elements.
+ * Each element carries its own opacity (inherited from frame nesting).
+ * This guarantees stable identity for DOM rendering — all elements
+ * are rendered as keyed siblings in a flat list, so Preact always
+ * preserves DOM nodes across renders, enabling CSS transitions.
+ */
+function flattenNodes(nodes: LayoutNode[]): FlatElement[] {
+  const elements: FlatElement[] = []
+  for (const node of nodes) {
+    collectElements(node, 1.0, elements)
+  }
+  return elements
+}
+
+function collectElements(
+  node: LayoutNode,
+  parentOpacity: number,
+  out: FlatElement[],
+): void {
+  if (node.kind === 'frame') {
+    const frameData = node.data as FrameData
+    const contentOpacity = frameData.isInnermost ? 1.0 : 0.35
+
+    // The frame box itself is always full opacity
+    out.push({
+      id: node.id,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      kind: 'frame',
+      data: node.data,
+      opacity: parentOpacity,
+    })
+
+    // Recurse children with frame's content opacity
+    for (const child of node.children ?? []) {
+      collectElements(child, contentOpacity, out)
+    }
+  } else if (node.kind === 'group') {
+    // Groups are containers — don't render, just recurse children
+    for (const child of node.children ?? []) {
+      collectElements(child, parentOpacity, out)
+    }
+  } else {
+    // Leaf elements: cell, array-label, variable
+    out.push({
+      id: node.id,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      kind: node.kind,
+      data: node.data,
+      opacity: parentOpacity,
+    })
   }
 }
 

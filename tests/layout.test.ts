@@ -6,7 +6,7 @@ import { callStackHeight } from '../src/layout/callstack-layout.ts'
 import { CELL_SIZE, CELL_GAP, CONTENT_X, CONTENT_Y, POINTER_SPACE } from '../src/layout/constants.ts'
 import { compilePipeline } from '../src/dsl/index.ts'
 import type { Step, TrackedArray, CallFrame } from '../src/types.ts'
-import type { CellData, VariableData, FrameData } from '../src/layout/types.ts'
+import type { CellData, VariableData, FrameData, FlatElement } from '../src/layout/types.ts'
 
 function makeArray(name: string, values: number[]): TrackedArray {
   return { name, values: values.map(n => ({ num: n, arrays: [] })) }
@@ -303,5 +303,109 @@ describe('computeSceneLayout: pointer visibility scoping', () => {
       const pivotEdge = layout.edges.find(e => e.id.startsWith('ptr:pivotIdx'))
       expect(pivotEdge).toBeUndefined()
     }
+  })
+})
+
+describe('flatElements', () => {
+  it('contains all leaf elements with unique ids', () => {
+    const step = makeStep({
+      arrays: [makeArray('arr', [5, 3, 1])],
+      variables: { max: { num: 5, arrays: [] } },
+    })
+    const layout = computeSceneLayout(step, new Map())
+    const ids = layout.flatElements.map(e => e.id)
+
+    // All ids unique
+    expect(new Set(ids).size).toBe(ids.length)
+
+    // Contains expected elements
+    expect(ids).toContain('label:arr')
+    expect(ids).toContain('cell:arr:0')
+    expect(ids).toContain('cell:arr:1')
+    expect(ids).toContain('cell:arr:2')
+    expect(ids).toContain('var:max')
+  })
+
+  it('does not contain group nodes (only leaves)', () => {
+    const step = makeStep({
+      arrays: [makeArray('arr', [1, 2])],
+    })
+    const layout = computeSceneLayout(step, new Map())
+    const kinds = new Set(layout.flatElements.map(e => e.kind))
+    expect(kinds).not.toContain('group')
+  })
+
+  it('all leaf elements have opacity 1.0 when no call stack', () => {
+    const step = makeStep({
+      arrays: [makeArray('arr', [1])],
+      variables: { x: { num: 0, arrays: [] } },
+    })
+    const layout = computeSceneLayout(step, new Map())
+    for (const el of layout.flatElements) {
+      expect(el.opacity).toBe(1.0)
+    }
+  })
+
+  it('frame contents have dimmed opacity for non-innermost frames', () => {
+    const outerFrame: CallFrame = {
+      label: 'qsort(0, 4)',
+      variables: { lo: { num: 0, arrays: [] } },
+      arrayRefs: [],
+      arrays: [],
+      highlights: [],
+      varHighlights: [],
+      dimRanges: [],
+      gaugeArrays: [],
+    }
+    const innerFrame: CallFrame = {
+      label: 'partition(0, 4)',
+      variables: { i: { num: 0, arrays: [] } },
+      arrayRefs: [],
+      arrays: [],
+      highlights: [],
+      varHighlights: [],
+      dimRanges: [],
+      gaugeArrays: [],
+    }
+    const step = makeStep({
+      arrays: [makeArray('arr', [1, 2])],
+      callStack: [outerFrame, innerFrame],
+    })
+    const layout = computeSceneLayout(step, new Map())
+
+    // Outer frame box itself has opacity 1.0
+    const outerFrameEl = layout.flatElements.find(e => e.id === 'frame:0')
+    expect(outerFrameEl).toBeDefined()
+    expect(outerFrameEl!.opacity).toBe(1.0)
+
+    // Outer frame's variables have dimmed opacity (0.35)
+    const outerVar = layout.flatElements.find(e => e.id === 'frame:0:var:lo')
+    expect(outerVar).toBeDefined()
+    expect(outerVar!.opacity).toBe(0.35)
+
+    // Inner frame's variables have full opacity (1.0)
+    const innerVar = layout.flatElements.find(e => e.id === 'frame:1:var:i')
+    expect(innerVar).toBeDefined()
+    expect(innerVar!.opacity).toBe(1.0)
+  })
+
+  it('ids are stable across steps with same arrays', () => {
+    const step1 = makeStep({
+      arrays: [makeArray('arr', [5, 3, 1])],
+      variables: { i: { num: 0, arrays: ['arr'] } },
+    })
+    const step2 = makeStep({
+      arrays: [makeArray('arr', [5, 1, 3])],
+      variables: { i: { num: 1, arrays: ['arr'] } },
+    })
+    const colorMap = new Map([['i', '#e74c3c']])
+    const layout1 = computeSceneLayout(step1, colorMap)
+    const layout2 = computeSceneLayout(step2, colorMap)
+
+    const ids1 = new Set(layout1.flatElements.map(e => e.id))
+    const ids2 = new Set(layout2.flatElements.map(e => e.id))
+
+    // Same structural elements present in both
+    expect(ids1).toEqual(ids2)
   })
 })
