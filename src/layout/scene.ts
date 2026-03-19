@@ -6,7 +6,6 @@ import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
 import { derivePointers, getPointerVarNames, countNonPointerVars } from '../renderer/pointers.ts'
 import {
   CONTENT_X, CONTENT_Y, POINTER_SPACE, CALLSTACK_GAP, ARRAY_GROUP_GAP,
-  CELL_SIZE, CELL_GAP,
 } from './constants.ts'
 
 /**
@@ -116,41 +115,4 @@ function derivePointerEdges(
     color: p.color,
     highlightType: p.highlight,
   }))
-}
-
-/**
- * Compute the cell center position for a given array cell.
- * Used by ArrowOverlay to position pointer arrows and hover arrows.
- */
-export function cellCenter(
-  arrayName: string,
-  cellIndex: number,
-  layout: SceneLayout,
-): { x: number; y: number } | null {
-  for (const node of layout.nodes) {
-    if (node.kind === 'group' && node.children) {
-      for (const child of node.children) {
-        if (child.id === `cell:${arrayName}:${cellIndex}`) {
-          return {
-            x: child.x + CELL_SIZE / 2,
-            y: child.y + CELL_SIZE / 2,
-          }
-        }
-      }
-    }
-  }
-  return null
-}
-
-/**
- * Find the Y position of a specific array group's cell row.
- */
-export function arrayCellY(arrayName: string, layout: SceneLayout): number | null {
-  for (const node of layout.nodes) {
-    if (node.id === `array:${arrayName}` && node.children) {
-      const firstCell = node.children.find(c => c.kind === 'cell')
-      if (firstCell) return firstCell.y
-    }
-  }
-  return null
 }

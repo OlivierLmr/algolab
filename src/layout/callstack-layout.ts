@@ -1,4 +1,4 @@
-import type { CallFrame, VarHighlight } from '../types.ts'
+import type { CallFrame } from '../types.ts'
 import type { LayoutNode, FrameData } from './types.ts'
 import { layoutArray, arrayGroupHeight } from './array-layout.ts'
 import { layoutVariables, variablesRowHeight } from './variables-layout.ts'

@@ -1,0 +1,111 @@
+/* === Visualizer container === */
+.viz-container {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: flex-start;
+  justify-content: safe center;
+  padding: 16px;
+  min-height: 300px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.viz-scene {
+  font-family: monospace;
+}
+
+/* === Array label === */
+.viz-array-label {
+  font: bold 14px monospace;
+  color: #333;
+  white-space: nowrap;
+}
+
+/* === Cell === */
+.viz-cell-wrapper {
+  /* positioned absolutely by layout */
+}
+
+.viz-cell {
+  position: relative;
+  background: #fff;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition:
+    border-color 150ms,
+    background-color 150ms,
+    opacity 200ms;
+}
+
+.viz-cell-value {
+  font: bold 18px monospace;
+  color: #222;
+  position: relative;
+  z-index: 1;
+  user-select: none;
+}
+
+.viz-cell-index {
+  font: 11px monospace;
+  color: #999;
+  text-align: center;
+  margin-top: 2px;
+  user-select: none;
+}
+
+.viz-cell-gauge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(52, 152, 219, 0.35);
+  transition: height 200ms;
+}
+
+.viz-cell-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6ab0de;
+}
+
+/* === Variable cell === */
+.viz-variable-wrapper {
+  /* positioned absolutely by layout */
+}
+
+.viz-variable-label {
+  font: bold 14px monospace;
+  color: #333;
+  white-space: nowrap;
+}
+
+/* === Frame === */
+.viz-frame {
+  border: 1.5px solid #bbb;
+}
+
+.viz-frame-label {
+  font: bold 13px monospace;
+  color: #555;
+  white-space: nowrap;
+}
+
+.viz-frame-refs {
+  font: 11px monospace;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* === Arrow overlay === */
+.viz-arrow-overlay {
+  /* positioned absolutely, pointer-events: none */
+}
