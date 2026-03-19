@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'preact/hooks'
+import { useMemo, useCallback, useRef, useLayoutEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
@@ -214,8 +214,13 @@ function FrameElement({ el }: { el: FlatElement }) {
   )
 }
 
+const ANIMATION_DURATION = 200
+
 function PointerElement({ el }: { el: FlatElement }) {
   const data = el.data as PointerData
+  const ref = useRef<HTMLDivElement>(null)
+  const prevX = useRef<number | null>(null)
+
   const arrowTop = data.arrayCellY - 4
   const lineHeight = ARROW_Y_GAP * (data.stackIndex + 1)
   const arrowBottom = arrowTop - lineHeight
@@ -225,8 +230,29 @@ function PointerElement({ el }: { el: FlatElement }) {
     ? getHighlightColor(data.highlightType)
     : undefined
 
+  // Animate horizontal movement using Web Animations API.
+  // CSS transitions are unreliable when Preact re-renders via signals
+  // because the DOM element may be replaced or its transition state reset.
+  useLayoutEffect(() => {
+    const div = ref.current
+    if (!div || prevX.current === null || prevX.current === el.x) {
+      prevX.current = el.x
+      return
+    }
+    const delta = prevX.current - el.x
+    prevX.current = el.x
+    div.animate(
+      [
+        { transform: `translate(${el.x + delta}px, 0px)` },
+        { transform: `translate(${el.x}px, 0px)` },
+      ],
+      { duration: ANIMATION_DURATION, easing: 'ease' },
+    )
+  }, [el.x])
+
   return (
     <div
+      ref={ref}
       class="viz-pointer-arrow"
       style={{
         transform: `translate(${el.x}px, 0px)`,

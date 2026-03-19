@@ -11,8 +11,22 @@ import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
 import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
-export function App() {
+/** Isolated component that subscribes to step-related signals,
+ *  preventing App from re-rendering the entire tree on each step change. */
+function DescriptionPanel() {
   const step = currentStep.value
+  const descriptions = recentDescriptions.value
+  return (
+    <>
+      {descriptions.map((d) => (
+        <div class="description-previous">{d}</div>
+      ))}
+      <div class="description-current">{step?.description || ''}</div>
+    </>
+  )
+}
+
+export function App() {
   const editMode = isCustomMode.value && !isRunMode.value
 
   useEffect(() => {
@@ -43,10 +57,7 @@ export function App() {
           <StepVisualizer />
         </div>
         <div class={`description ${editMode ? 'dimmed' : ''}`}>
-          {recentDescriptions.value.map((d) => (
-            <div class="description-previous">{d}</div>
-          ))}
-          <div class="description-current">{step?.description || ''}</div>
+          <DescriptionPanel />
         </div>
       </div>
       <Controls />
