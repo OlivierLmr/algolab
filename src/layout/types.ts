@@ -32,11 +32,23 @@ export interface FrameData {
   nestingIndex: number
 }
 
+export interface PointerData {
+  name: string
+  arrayName: string
+  index: number
+  color: string
+  highlightType?: 'compare' | 'swap' | 'sorted' | 'active'
+  /** Y coordinate of the target array's cell row */
+  arrayCellY: number
+  /** Vertical stacking position among pointers on the same array */
+  stackIndex: number
+}
+
 export interface GroupData {
   role: 'array-row' | 'variables-row' | 'callstack'
 }
 
-export type NodeData = CellData | LabelData | VariableData | FrameData | GroupData
+export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | GroupData
 
 // --- Layout node ---
 
@@ -46,7 +58,7 @@ export interface LayoutNode {
   y: number
   width: number
   height: number
-  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'group'
+  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'group'
   data: NodeData
   children?: LayoutNode[]
 }

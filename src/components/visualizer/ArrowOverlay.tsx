@@ -2,25 +2,14 @@ import { useMemo } from 'preact/hooks'
 import type { SceneLayout, CellData } from '../../layout/types.ts'
 import type { Step } from '../../types.ts'
 import {
-  CELL_SIZE, CELL_GAP, CONTENT_X, ARROW_Y_GAP,
+  CELL_SIZE, CELL_GAP, CONTENT_X,
   INDEX_LABEL_HEIGHT,
 } from '../../layout/constants.ts'
-import { getHighlightColor } from '../../renderer/colors.ts'
 
 interface ArrowOverlayProps {
   layout: SceneLayout
   step: Step
   hoveredCell: { arrayName: string; cellIndex: number } | null
-}
-
-interface PointerArrowInfo {
-  name: string
-  arrayName: string
-  index: number
-  color: string
-  highlightType?: string
-  arrayCellY: number
-  x: number
 }
 
 export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
@@ -37,53 +26,6 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     }
     return map
   }, [layout])
-
-  // Group pointer edges by array for stacking, preserving stable identity
-  const pointerArrows = useMemo(() => {
-    const grouped = new Map<string, PointerArrowInfo[]>()
-
-    for (const edge of layout.edges) {
-      if (edge.style !== 'pointer') continue
-      const parts = edge.to.split(':')
-      if (parts.length < 3) continue
-      const arrayName = parts[1]
-      const index = parseInt(parts[2], 10)
-      const cellY = arrayCellYMap.get(arrayName)
-      if (cellY === undefined) continue
-
-      const name = edge.label?.split('=')[0] ?? ''
-      const x = CONTENT_X + index * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-
-      if (!grouped.has(arrayName)) grouped.set(arrayName, [])
-      grouped.get(arrayName)!.push({
-        name,
-        arrayName,
-        index,
-        color: edge.color,
-        highlightType: edge.highlightType,
-        arrayCellY: cellY,
-        x,
-      })
-    }
-
-    // Sort within each group by index for stacking
-    for (const ptrs of grouped.values()) {
-      ptrs.sort((a, b) => a.index - b.index)
-    }
-
-    return grouped
-  }, [layout.edges, arrayCellYMap])
-
-  // Flatten for rendering — compute stack position (pi) per pointer
-  const flatPointers = useMemo(() => {
-    const result: (PointerArrowInfo & { stackIndex: number })[] = []
-    for (const ptrs of pointerArrows.values()) {
-      ptrs.forEach((p, pi) => {
-        result.push({ ...p, stackIndex: pi })
-      })
-    }
-    return result
-  }, [pointerArrows])
 
   // Hover arrows
   const hoverArrows = useMemo(() => {
@@ -149,60 +91,6 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
           <path d="M0,0 L10,4 L0,8 Z" fill="#3498db" />
         </marker>
       </defs>
-
-      {/* Pointer arrows — keyed by (name, array) for stable identity */}
-      {flatPointers.map(p => {
-        const arrowTop = p.arrayCellY - 4
-        const lineHeight = ARROW_Y_GAP * (p.stackIndex + 1)
-        const arrowBottom = arrowTop - lineHeight
-        const labelText = `${p.name}=${p.index}`
-
-        return (
-          <g
-            key={`ptr:${p.name}:${p.arrayName}`}
-            class="viz-pointer-arrow"
-            style={{ transform: `translate(${p.x}px, 0px)` }}
-          >
-            {/* Arrow line */}
-            <line
-              x1={0} y1={arrowBottom}
-              x2={0} y2={arrowTop}
-              stroke={p.color}
-              stroke-width="2"
-            />
-            {/* Arrow head */}
-            <polygon
-              points={`0,${arrowTop} -5,${arrowTop - 8} 5,${arrowTop - 8}`}
-              fill={p.color}
-            />
-            {/* Highlight box */}
-            {p.highlightType && (
-              <rect
-                x={-30}
-                y={arrowBottom - 14}
-                width="60"
-                height="16"
-                rx="2"
-                fill="none"
-                stroke={getHighlightColor(p.highlightType)}
-                stroke-width="2"
-              />
-            )}
-            {/* Label */}
-            <text
-              x={0}
-              y={arrowBottom - 4 + (p.highlightType ? 1 : 0)}
-              text-anchor="middle"
-              fill={p.color}
-              font-size="12"
-              font-weight="bold"
-              font-family="monospace"
-            >
-              {labelText}
-            </text>
-          </g>
-        )
-      })}
 
       {/* Hover arrows */}
       {hoverArrows?.map((ha, i) => {

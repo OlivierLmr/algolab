@@ -2,8 +2,8 @@ import { useMemo, useCallback } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
-import type { FlatElement, CellData, LabelData, VariableData, FrameData } from '../../layout/types.ts'
-import { CELL_SIZE, VARIABLE_LABEL_HEIGHT, FRAME_BORDER_RADIUS } from '../../layout/constants.ts'
+import type { FlatElement, CellData, LabelData, VariableData, FrameData, PointerData } from '../../layout/types.ts'
+import { CELL_SIZE, VARIABLE_LABEL_HEIGHT, FRAME_BORDER_RADIUS, ARROW_Y_GAP } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
 
@@ -80,6 +80,8 @@ function SceneElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
       return <VariableElement el={el} />
     case 'frame':
       return <FrameElement el={el} />
+    case 'pointer':
+      return <PointerElement el={el} />
     default:
       return null
   }
@@ -208,6 +210,81 @@ function FrameElement({ el }: { el: FlatElement }) {
     >
       <div class="viz-frame-label">{data.label}</div>
       {refText && <div class="viz-frame-refs">{refText}</div>}
+    </div>
+  )
+}
+
+function PointerElement({ el }: { el: FlatElement }) {
+  const data = el.data as PointerData
+  const arrowTop = data.arrayCellY - 4
+  const lineHeight = ARROW_Y_GAP * (data.stackIndex + 1)
+  const arrowBottom = arrowTop - lineHeight
+  const labelText = `${data.name}=${data.index}`
+
+  const highlightColor = data.highlightType
+    ? getHighlightColor(data.highlightType)
+    : undefined
+
+  return (
+    <div
+      class="viz-pointer-arrow"
+      style={{
+        transform: `translate(${el.x}px, 0px)`,
+      }}
+    >
+      {/* Arrow line */}
+      <svg
+        style={{
+          position: 'absolute',
+          left: -1,
+          top: arrowBottom,
+          width: 2,
+          height: arrowTop - arrowBottom,
+          overflow: 'visible',
+        }}
+      >
+        <line
+          x1={1} y1={0}
+          x2={1} y2={arrowTop - arrowBottom}
+          stroke={data.color}
+          stroke-width="2"
+        />
+        {/* Arrow head */}
+        <polygon
+          points={`1,${arrowTop - arrowBottom} -4,${arrowTop - arrowBottom - 8} 6,${arrowTop - arrowBottom - 8}`}
+          fill={data.color}
+        />
+      </svg>
+      {/* Highlight box */}
+      {highlightColor && (
+        <div
+          class="viz-pointer-highlight"
+          style={{
+            position: 'absolute',
+            left: -30,
+            top: arrowBottom - 14,
+            width: 60,
+            height: 16,
+            borderRadius: 2,
+            border: `2px solid ${highlightColor}`,
+          }}
+        />
+      )}
+      {/* Label */}
+      <div
+        class="viz-pointer-label"
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: arrowBottom - 18 + (data.highlightType ? 1 : 0),
+          transform: 'translateX(-50%)',
+          color: data.color,
+          font: 'bold 12px monospace',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {labelText}
+      </div>
     </div>
   )
 }

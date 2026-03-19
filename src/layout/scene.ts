@@ -1,11 +1,12 @@
 import type { Step, Value } from '../types.ts'
-import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData } from './types.ts'
+import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData, PointerData, CellData } from './types.ts'
 import { layoutArray, arrayGroupHeight } from './array-layout.ts'
 import { layoutVariables, variablesRowHeight } from './variables-layout.ts'
 import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
 import { derivePointers, getPointerVarNames, countNonPointerVars } from '../renderer/pointers.ts'
 import {
   CONTENT_X, CONTENT_Y, POINTER_SPACE, CALLSTACK_GAP, ARRAY_GROUP_GAP,
+  CELL_SIZE, CELL_GAP,
 } from './constants.ts'
 
 /**
@@ -72,6 +73,10 @@ export function computeSceneLayout(
 
   // Flatten tree into a single list of positioned elements
   const flatElements = flattenNodes(nodes)
+
+  // Add pointer arrows as positioned flat elements (for CSS transition animation)
+  const pointerElements = derivePointerElements(edges, nodes)
+  flatElements.push(...pointerElements)
 
   return {
     nodes,
@@ -140,6 +145,82 @@ function collectElements(
       opacity: parentOpacity,
     })
   }
+}
+
+/**
+ * Convert pointer edges into positioned flat elements.
+ * Each pointer becomes an HTML element with x = cell center,
+ * positioned above the target array. Keyed by `ptr:${name}:${arrayName}`
+ * so the DOM element persists across steps, enabling CSS transitions.
+ */
+function derivePointerElements(
+  edges: LayoutEdge[],
+  nodes: LayoutNode[],
+): FlatElement[] {
+  // Build map of arrayName → first cell Y from layout nodes
+  const arrayCellYMap = new Map<string, number>()
+  for (const node of nodes) {
+    if (node.id.startsWith('array:') && node.children) {
+      const firstCell = node.children.find(c => c.kind === 'cell')
+      if (firstCell) {
+        arrayCellYMap.set((firstCell.data as CellData).arrayName, firstCell.y)
+      }
+    }
+  }
+
+  // Group pointer edges by target array for stacking
+  const grouped = new Map<string, { edge: LayoutEdge; index: number }[]>()
+  for (const edge of edges) {
+    if (edge.style !== 'pointer') continue
+    const parts = edge.to.split(':')
+    if (parts.length < 3) continue
+    const arrayName = parts[1]
+    const index = parseInt(parts[2], 10)
+    if (!grouped.has(arrayName)) grouped.set(arrayName, [])
+    grouped.get(arrayName)!.push({ edge, index })
+  }
+
+  // Sort within each group by index for deterministic stacking
+  for (const ptrs of grouped.values()) {
+    ptrs.sort((a, b) => a.index - b.index)
+  }
+
+  // Create flat elements
+  const elements: FlatElement[] = []
+  for (const ptrs of grouped.values()) {
+    ptrs.forEach((p, stackIndex) => {
+      const parts = p.edge.to.split(':')
+      const arrayName = parts[1]
+      const cellY = arrayCellYMap.get(arrayName)
+      if (cellY === undefined) return
+
+      const x = CONTENT_X + p.index * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const name = p.edge.label?.split('=')[0] ?? ''
+
+      const data: PointerData = {
+        name,
+        arrayName,
+        index: p.index,
+        color: p.edge.color,
+        highlightType: p.edge.highlightType,
+        arrayCellY: cellY,
+        stackIndex,
+      }
+
+      elements.push({
+        id: p.edge.id, // ptr:${name}:${arrayName} — stable identity
+        x,
+        y: 0, // y is managed internally by the pointer renderer
+        width: 0,
+        height: 0,
+        kind: 'pointer',
+        data,
+        opacity: 1.0,
+      })
+    })
+  }
+
+  return elements
 }
 
 /**

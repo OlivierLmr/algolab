@@ -114,9 +114,9 @@ function layoutFrame(
     )
     if (varsNode) {
       // Namespace variable node ids within frame
-      varsNode.id = `frame:${index}:variables`
+      varsNode.id = `frame:${frame.label}:variables`
       for (const child of varsNode.children ?? []) {
-        child.id = `frame:${index}:${child.id}`
+        child.id = `frame:${frame.label}:${child.id}`
       }
       children.push(varsNode)
     }
@@ -136,7 +136,7 @@ function layoutFrame(
   }
 
   return {
-    id: `frame:${index}`,
+    id: `frame:${frame.label}`,
     x,
     y,
     width: availableWidth,

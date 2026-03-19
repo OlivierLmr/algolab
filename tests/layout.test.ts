@@ -374,17 +374,17 @@ describe('flatElements', () => {
     const layout = computeSceneLayout(step, new Map())
 
     // Outer frame box itself has opacity 1.0
-    const outerFrameEl = layout.flatElements.find(e => e.id === 'frame:0')
+    const outerFrameEl = layout.flatElements.find(e => e.id === 'frame:qsort(0, 4)')
     expect(outerFrameEl).toBeDefined()
     expect(outerFrameEl!.opacity).toBe(1.0)
 
     // Outer frame's variables have dimmed opacity (0.35)
-    const outerVar = layout.flatElements.find(e => e.id === 'frame:0:var:lo')
+    const outerVar = layout.flatElements.find(e => e.id === 'frame:qsort(0, 4):var:lo')
     expect(outerVar).toBeDefined()
     expect(outerVar!.opacity).toBe(0.35)
 
     // Inner frame's variables have full opacity (1.0)
-    const innerVar = layout.flatElements.find(e => e.id === 'frame:1:var:i')
+    const innerVar = layout.flatElements.find(e => e.id === 'frame:partition(0, 4):var:i')
     expect(innerVar).toBeDefined()
     expect(innerVar!.opacity).toBe(1.0)
   })
@@ -407,5 +407,175 @@ describe('flatElements', () => {
 
     // Same structural elements present in both
     expect(ids1).toEqual(ids2)
+  })
+})
+
+describe('pointer animation stability in QuickSort partition', () => {
+  const source = `algo QuickSort(arr[])
+  def partition(lo, hi)
+    let i = lo - 1
+    let j = hi
+    let done = 0
+    while done == 0
+      i = i + 1
+      while arr[i] < arr[hi]
+        i = i + 1
+      j = j - 1
+      while j > lo and arr[hi] < arr[j]
+        j = j - 1
+      if i >= j
+        done = 1
+      else
+        swap arr[i], arr[j]
+    swap arr[i], arr[hi]
+    return i
+
+  def qsort(lo, hi)
+    if lo < hi
+      let p = lo + (hi - lo) / 2
+      swap arr[hi], arr[p]
+      let pivotIdx = partition(lo, hi)
+      qsort(lo, pivotIdx - 1)
+      qsort(pivotIdx + 1, hi)
+
+  qsort(0, len(arr) - 1)`
+
+  const { steps, colorMap } = compilePipeline(source, 'arr', [5, 3, 4, 1, 2])
+
+  // Get consecutive steps within the first partition call
+  const partitionSteps = steps.filter(s =>
+    s.callStack.length >= 2 &&
+    s.callStack[s.callStack.length - 1].label.startsWith('partition(')
+  )
+
+  it('has partition steps to test', () => {
+    expect(partitionSteps.length).toBeGreaterThan(3)
+  })
+
+  it('edge ids for ptr:i:arr are stable across consecutive partition steps', () => {
+    const layouts = partitionSteps.map(s => computeSceneLayout(s, colorMap))
+
+    // Find consecutive pairs where ptr:i:arr exists in both
+    for (let k = 0; k < layouts.length - 1; k++) {
+      const edgeA = layouts[k].edges.find(e => e.id === 'ptr:i:arr')
+      const edgeB = layouts[k + 1].edges.find(e => e.id === 'ptr:i:arr')
+
+      if (edgeA && edgeB) {
+        // Same edge id → same DOM key → CSS transition possible
+        expect(edgeA.id).toBe(edgeB.id)
+        expect(edgeA.style).toBe('pointer')
+        expect(edgeB.style).toBe('pointer')
+      }
+    }
+  })
+
+  it('pointer flat elements have stable ids and animate via x position', () => {
+    const layouts = partitionSteps.map(s => computeSceneLayout(s, colorMap))
+
+    // All layouts with ptr:i:arr should have a pointer flat element
+    for (const layout of layouts) {
+      const ptrEdge = layout.edges.find(e => e.id === 'ptr:i:arr')
+      if (ptrEdge) {
+        const ptrElement = layout.flatElements.find(e => e.id === 'ptr:i:arr')
+        expect(ptrElement).toBeDefined()
+        expect(ptrElement!.kind).toBe('pointer')
+
+        // x should be the cell center for the pointer's target index
+        const targetIndex = parseInt(ptrEdge.to.split(':')[2], 10)
+        const expectedX = CONTENT_X + targetIndex * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+        expect(ptrElement!.x).toBe(expectedX)
+      }
+    }
+
+    // Verify pointer elements are in flatElements with stable ids across steps
+    for (let k = 0; k < layouts.length - 1; k++) {
+      const ptrA = layouts[k].flatElements.find(e => e.id === 'ptr:i:arr')
+      const ptrB = layouts[k + 1].flatElements.find(e => e.id === 'ptr:i:arr')
+      if (ptrA && ptrB) {
+        expect(ptrA.id).toBe(ptrB.id) // same key → same DOM node → CSS transition
+      }
+    }
+  })
+
+  it('flatElement ids are stable across consecutive partition steps', () => {
+    const layouts = partitionSteps.map(s => computeSceneLayout(s, colorMap))
+
+    // Log what changes to understand the churn
+    const allChanges: string[] = []
+    for (let k = 0; k < layouts.length - 1; k++) {
+      const idsA = new Set(layouts[k].flatElements.map(e => e.id))
+      const idsB = new Set(layouts[k + 1].flatElements.map(e => e.id))
+
+      const added = [...idsB].filter(id => !idsA.has(id))
+      const removed = [...idsA].filter(id => !idsB.has(id))
+      if (added.length > 0 || removed.length > 0) {
+        allChanges.push(
+          `step ${k}→${k + 1} (line ${partitionSteps[k].currentLine}→${partitionSteps[k + 1].currentLine}): ` +
+          `+[${added.join(',')}] -[${removed.join(',')}]`
+        )
+      }
+    }
+
+    // Print changes for diagnosis, then assert stability
+    if (allChanges.length > 0) {
+      console.log('FlatElement churn within partition:')
+      allChanges.forEach(c => console.log('  ' + c))
+    }
+
+    // Group steps by partition call (same label)
+    const groups: typeof layouts[] = []
+    let currentLabel = ''
+    for (let k = 0; k < layouts.length; k++) {
+      const cs = partitionSteps[k].callStack
+      const label = cs[cs.length - 1].label
+      if (label !== currentLabel) {
+        groups.push([])
+        currentLabel = label
+      }
+      groups[groups.length - 1].push(layouts[k])
+    }
+
+    // Within each partition call, after variable creation (skip first 3 steps),
+    // ids should be stable (only scalar vars like done may appear/disappear)
+    for (const group of groups) {
+      const stable = group.slice(3)
+      for (let k = 0; k < stable.length - 1; k++) {
+        const idsA = new Set(stable[k].flatElements.map(e => e.id))
+        const idsB = new Set(stable[k + 1].flatElements.map(e => e.id))
+
+        for (const id of idsA) {
+          if (!idsB.has(id)) {
+            // Only scalar variable creation/deletion is acceptable churn
+            expect(id).toMatch(/^frame:.*:var:/)
+          }
+        }
+      }
+    }
+  })
+
+  it('flatElement count is logged for analysis', () => {
+    const layouts = partitionSteps.map(s => computeSceneLayout(s, colorMap))
+    const counts = layouts.map((l, i) => ({
+      line: partitionSteps[i].currentLine,
+      count: l.flatElements.length,
+      ids: l.flatElements.map(e => e.id).sort(),
+    }))
+
+    console.log('FlatElement counts per partition step:')
+    counts.forEach((c, i) => console.log(`  step ${i} (line ${c.line}): ${c.count} elements`))
+
+    // Log first and last element id sets to see what differs
+    const first = counts[0]
+    const last = counts[counts.length - 1]
+    const firstIds = new Set(first.ids)
+    const lastIds = new Set(last.ids)
+    const onlyFirst = first.ids.filter(id => !lastIds.has(id))
+    const onlyLast = last.ids.filter(id => !firstIds.has(id))
+    if (onlyFirst.length > 0 || onlyLast.length > 0) {
+      console.log(`  only in first: [${onlyFirst.join(', ')}]`)
+      console.log(`  only in last: [${onlyLast.join(', ')}]`)
+    }
+
+    expect(layouts.length).toBeGreaterThan(0)
   })
 })

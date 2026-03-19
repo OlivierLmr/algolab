@@ -112,7 +112,8 @@
 
 /* === Pointer arrows (SVG) === */
 .viz-pointer-arrow {
-  transition: transform 200ms ease;
+  position: absolute;
+  transition: transform 200ms ease, opacity 200ms;
 }
 
 /* === Arrow overlay === */
