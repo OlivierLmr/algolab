@@ -24,8 +24,7 @@ export function VariableCell({ node }: VariableCellProps) {
       class="viz-variable-wrapper"
       style={{
         position: 'absolute',
-        left: node.x,
-        top: node.y,
+        transform: `translate(${node.x}px, ${node.y}px)`,
         width: CELL_SIZE,
       }}
     >

@@ -21,11 +21,12 @@
   font: bold 14px monospace;
   color: #333;
   white-space: nowrap;
+  transition: transform 200ms ease;
 }
 
 /* === Cell === */
 .viz-cell-wrapper {
-  /* positioned absolutely by layout */
+  transition: transform 200ms ease;
 }
 
 .viz-cell {
@@ -79,7 +80,7 @@
 
 /* === Variable cell === */
 .viz-variable-wrapper {
-  /* positioned absolutely by layout */
+  transition: transform 200ms ease;
 }
 
 .viz-variable-label {
@@ -91,18 +92,26 @@
 /* === Frame === */
 .viz-frame {
   border: 1.5px solid #bbb;
+  transition: transform 200ms ease;
 }
 
 .viz-frame-label {
   font: bold 13px monospace;
   color: #555;
   white-space: nowrap;
+  transition: transform 200ms ease;
 }
 
 .viz-frame-refs {
   font: 11px monospace;
   color: #888;
   white-space: nowrap;
+  transition: transform 200ms ease;
+}
+
+/* === Pointer arrows (SVG) === */
+.viz-pointer-arrow {
+  transition: transform 200ms ease;
 }
 
 /* === Arrow overlay === */

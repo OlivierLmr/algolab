@@ -15,6 +15,7 @@ interface ArrowOverlayProps {
 
 interface PointerArrowInfo {
   name: string
+  arrayName: string
   index: number
   color: string
   highlightType?: string
@@ -37,13 +38,12 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     return map
   }, [layout])
 
-  // Group pointer edges by array for stacking
+  // Group pointer edges by array for stacking, preserving stable identity
   const pointerArrows = useMemo(() => {
     const grouped = new Map<string, PointerArrowInfo[]>()
 
     for (const edge of layout.edges) {
       if (edge.style !== 'pointer') continue
-      // Parse target cell id: "cell:arrayName:index"
       const parts = edge.to.split(':')
       if (parts.length < 3) continue
       const arrayName = parts[1]
@@ -51,13 +51,13 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
       const cellY = arrayCellYMap.get(arrayName)
       if (cellY === undefined) continue
 
-      // Parse label: "name=index"
       const name = edge.label?.split('=')[0] ?? ''
       const x = CONTENT_X + index * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
 
       if (!grouped.has(arrayName)) grouped.set(arrayName, [])
       grouped.get(arrayName)!.push({
         name,
+        arrayName,
         index,
         color: edge.color,
         highlightType: edge.highlightType,
@@ -66,13 +66,24 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
       })
     }
 
-    // Sort within each group by index
+    // Sort within each group by index for stacking
     for (const ptrs of grouped.values()) {
       ptrs.sort((a, b) => a.index - b.index)
     }
 
     return grouped
   }, [layout.edges, arrayCellYMap])
+
+  // Flatten for rendering — compute stack position (pi) per pointer
+  const flatPointers = useMemo(() => {
+    const result: (PointerArrowInfo & { stackIndex: number })[] = []
+    for (const ptrs of pointerArrows.values()) {
+      ptrs.forEach((p, pi) => {
+        result.push({ ...p, stackIndex: pi })
+      })
+    }
+    return result
+  }, [pointerArrows])
 
   // Hover arrows
   const hoverArrows = useMemo(() => {
@@ -139,56 +150,59 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
         </marker>
       </defs>
 
-      {/* Pointer arrows */}
-      {Array.from(pointerArrows.entries()).map(([_arrayName, ptrs]) =>
-        ptrs.map((p, pi) => {
-          const arrowTop = p.arrayCellY - 4
-          const arrowBottom = p.arrayCellY - 4 - ARROW_Y_GAP * (pi + 1)
-          const labelText = `${p.name}=${p.index}`
+      {/* Pointer arrows — keyed by (name, array) for stable identity */}
+      {flatPointers.map(p => {
+        const arrowTop = p.arrayCellY - 4
+        const lineHeight = ARROW_Y_GAP * (p.stackIndex + 1)
+        const arrowBottom = arrowTop - lineHeight
+        const labelText = `${p.name}=${p.index}`
 
-          return (
-            <g key={`ptr-${p.name}-${p.index}`}>
-              {/* Arrow line */}
-              <line
-                x1={p.x} y1={arrowBottom}
-                x2={p.x} y2={arrowTop}
-                stroke={p.color}
+        return (
+          <g
+            key={`ptr:${p.name}:${p.arrayName}`}
+            class="viz-pointer-arrow"
+            style={{ transform: `translate(${p.x}px, 0px)` }}
+          >
+            {/* Arrow line */}
+            <line
+              x1={0} y1={arrowBottom}
+              x2={0} y2={arrowTop}
+              stroke={p.color}
+              stroke-width="2"
+            />
+            {/* Arrow head */}
+            <polygon
+              points={`0,${arrowTop} -5,${arrowTop - 8} 5,${arrowTop - 8}`}
+              fill={p.color}
+            />
+            {/* Highlight box */}
+            {p.highlightType && (
+              <rect
+                x={-30}
+                y={arrowBottom - 14}
+                width="60"
+                height="16"
+                rx="2"
+                fill="none"
+                stroke={getHighlightColor(p.highlightType)}
                 stroke-width="2"
               />
-              {/* Arrow head */}
-              <polygon
-                points={`${p.x},${arrowTop} ${p.x - 5},${arrowTop - 8} ${p.x + 5},${arrowTop - 8}`}
-                fill={p.color}
-              />
-              {/* Highlight box */}
-              {p.highlightType && (
-                <rect
-                  x={p.x - 30}
-                  y={arrowBottom - 14}
-                  width="60"
-                  height="16"
-                  rx="2"
-                  fill="none"
-                  stroke={getHighlightColor(p.highlightType)}
-                  stroke-width="2"
-                />
-              )}
-              {/* Label */}
-              <text
-                x={p.x}
-                y={arrowBottom - 4 + (p.highlightType ? 1 : 0)}
-                text-anchor="middle"
-                fill={p.color}
-                font-size="12"
-                font-weight="bold"
-                font-family="monospace"
-              >
-                {labelText}
-              </text>
-            </g>
-          )
-        })
-      )}
+            )}
+            {/* Label */}
+            <text
+              x={0}
+              y={arrowBottom - 4 + (p.highlightType ? 1 : 0)}
+              text-anchor="middle"
+              fill={p.color}
+              font-size="12"
+              font-weight="bold"
+              font-family="monospace"
+            >
+              {labelText}
+            </text>
+          </g>
+        )
+      })}
 
       {/* Hover arrows */}
       {hoverArrows?.map((ha, i) => {

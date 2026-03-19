@@ -44,8 +44,7 @@ export function Cell({ node, onHoverCell, onLeaveCell }: CellProps) {
       class="viz-cell-wrapper"
       style={{
         position: 'absolute',
-        left: node.x,
-        top: node.y,
+        transform: `translate(${node.x}px, ${node.y}px)`,
         width: CELL_SIZE,
       }}
     >

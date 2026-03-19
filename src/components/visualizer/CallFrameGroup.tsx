@@ -31,8 +31,7 @@ export function CallFrameGroup({ node, onHoverCell, onLeaveCell }: CallFrameGrou
         class="viz-frame"
         style={{
           position: 'absolute',
-          left: node.x,
-          top: node.y,
+          transform: `translate(${node.x}px, ${node.y}px)`,
           width: node.width,
           height: node.height,
           borderRadius: FRAME_BORDER_RADIUS,
@@ -47,8 +46,7 @@ export function CallFrameGroup({ node, onHoverCell, onLeaveCell }: CallFrameGrou
           class="viz-frame-label"
           style={{
             position: 'absolute',
-            left: node.x + 10,
-            top: node.y + 14,
+            transform: `translate(${node.x + 10}px, ${node.y + 14}px)`,
           }}
         >
           {data.label}
@@ -60,8 +58,7 @@ export function CallFrameGroup({ node, onHoverCell, onLeaveCell }: CallFrameGrou
             class="viz-frame-refs"
             style={{
               position: 'absolute',
-              left: node.x + 10,
-              top: node.y + 42,
+              transform: `translate(${node.x + 10}px, ${node.y + 42}px)`,
             }}
           >
             {refText}

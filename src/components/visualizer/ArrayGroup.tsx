@@ -19,8 +19,7 @@ export function ArrayGroup({ node, onHoverCell, onLeaveCell }: ArrayGroupProps) 
           class="viz-array-label"
           style={{
             position: 'absolute',
-            left: label.x,
-            top: label.y,
+            transform: `translate(${label.x}px, ${label.y}px)`,
           }}
         >
           {(label.data as LabelData).text}
