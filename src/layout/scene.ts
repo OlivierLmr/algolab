@@ -120,7 +120,7 @@ function collectElements(
       height: node.height,
       kind: 'frame',
       data: node.data,
-      opacity: parentOpacity,
+      opacity: 1.0,
     })
 
     // Recurse children with frame's content opacity

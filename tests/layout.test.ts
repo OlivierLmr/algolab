@@ -383,6 +383,11 @@ describe('flatElements', () => {
     expect(outerVar).toBeDefined()
     expect(outerVar!.opacity).toBe(0.35)
 
+    // Inner frame box also has full opacity (frame boxes are always visible)
+    const innerFrameEl = layout.flatElements.find(e => e.id === 'frame:partition(0, 4)')
+    expect(innerFrameEl).toBeDefined()
+    expect(innerFrameEl!.opacity).toBe(1.0)
+
     // Inner frame's variables have full opacity (1.0)
     const innerVar = layout.flatElements.find(e => e.id === 'frame:partition(0, 4):var:i')
     expect(innerVar).toBeDefined()
