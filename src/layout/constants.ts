@@ -5,7 +5,7 @@ export const CELL_SIZE = 48
 export const CELL_GAP = 2
 
 /** Height of the array label above cells. */
-export const ARRAY_LABEL_HEIGHT = 8
+export const ARRAY_LABEL_HEIGHT = 20
 
 /** Height of the index labels below cells. */
 export const INDEX_LABEL_HEIGHT = 22
