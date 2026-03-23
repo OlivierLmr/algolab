@@ -125,7 +125,7 @@ function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }
     case 'frame':
       return <FrameElement el={el} />
     case 'pointer':
-      return <PointerElement el={el} />
+      return <PointerElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} />
     default:
       return null
   }
@@ -286,9 +286,10 @@ function FrameElement({ el }: { el: FlatElement }) {
 
 const ANIMATION_DURATION = 200
 
-function PointerElement({ el }: { el: FlatElement }) {
+function PointerElement({ el, showTooltip, hideTooltip }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip'] }) {
   const data = el.data as PointerData
   const ref = useRef<HTMLDivElement>(null)
+  const labelRef = useRef<HTMLDivElement>(null)
   const prevX = useRef<number | null>(null)
 
   const arrowTop = data.arrayCellY - 4
@@ -368,6 +369,7 @@ function PointerElement({ el }: { el: FlatElement }) {
       )}
       {/* Label */}
       <div
+        ref={labelRef}
         class="viz-pointer-label"
         style={{
           position: 'absolute',
@@ -377,7 +379,17 @@ function PointerElement({ el }: { el: FlatElement }) {
           color: data.color,
           font: 'bold 12px monospace',
           whiteSpace: 'nowrap',
+          cursor: 'help',
+          pointerEvents: 'auto',
         }}
+        onMouseEnter={() => {
+          if (labelRef.current) {
+            showTooltip(data.name, labelRef.current.getBoundingClientRect(), {
+              value: data.index,
+            })
+          }
+        }}
+        onMouseLeave={hideTooltip}
       >
         {labelText}
       </div>
