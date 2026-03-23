@@ -23,6 +23,7 @@ function makeStep(overrides: Partial<Step> = {}): Step {
     callStack: [],
     currentLine: 1,
     description: '',
+    isComment: false,
     blockDescriptions: [],
     tooltips: {},
     scopeDepth: 1,

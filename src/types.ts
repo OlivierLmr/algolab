@@ -49,6 +49,7 @@ export interface Step {
   callStack: CallFrame[]
   currentLine: number
   description: string
+  isComment: boolean
   blockDescriptions: BlockDescription[]
   tooltips: Record<string, string>
   scopeDepth: number

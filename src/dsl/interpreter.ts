@@ -233,9 +233,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     }
 
     function snapshot(line: number, description: string): void {
+      let isComment = false
       if (pendingCommentParts !== null) {
         description = evaluateCommentParts(pendingCommentParts)
         pendingCommentParts = null
+        isComment = true
       }
 
       const allDimRanges: DimRange[] = [...dimRanges]
@@ -353,6 +355,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         callStack: callStackFrames,
         currentLine: line,
         description,
+        isComment,
         blockDescriptions: blockDescs.map((bd, i) => ({
           text: bd.text,
           depth: i,

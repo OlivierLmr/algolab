@@ -209,7 +209,8 @@ export const recentDescriptions = computed<string[]>(() => {
   if (idx >= all.length) return []
   const currentBlockDepth = all[idx].blockDescriptions.length
   const result: string[] = []
-  // Look back for one-shot descriptions at the same block depth.
+  // Look back for one-shot #: comment descriptions at the same block depth.
+  // Only collect steps explicitly marked as comments (not auto-generated descriptions).
   // - Lower depth means we left the current block → stop (boundary).
   // - Higher depth means a function call went deeper → skip over those
   //   steps but keep scanning (the call returned to our level).
@@ -217,7 +218,7 @@ export const recentDescriptions = computed<string[]>(() => {
     const stepDepth = all[i].blockDescriptions.length
     if (stepDepth < currentBlockDepth) break
     if (stepDepth > currentBlockDepth) continue
-    if (all[i].description) {
+    if (all[i].isComment) {
       result.unshift(all[i].description)
     }
   }
