@@ -3,7 +3,7 @@ import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
 import type { FlatElement, CellData, LabelData, VariableData, FrameData, PointerData } from '../../layout/types.ts'
-import { CELL_SIZE, VARIABLE_LABEL_HEIGHT, FRAME_BORDER_RADIUS, ARROW_Y_GAP } from '../../layout/constants.ts'
+import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
 
@@ -180,7 +180,7 @@ function VariableElement({ el }: { el: FlatElement }) {
           height: CELL_SIZE,
           borderColor,
           borderWidth,
-          marginTop: VARIABLE_LABEL_HEIGHT,
+          marginTop: 2,
         }}
       >
         <span class="viz-cell-value">{String(data.value.num)}</span>

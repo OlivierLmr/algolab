@@ -50,7 +50,7 @@ export const FRAME_BORDER_RADIUS = 8
 export const VARIABLE_GAP = 20
 
 /** Height of the variable label above the cell. */
-export const VARIABLE_LABEL_HEIGHT = 8
+export const VARIABLE_LABEL_HEIGHT = 20
 
 /** Vertical gap between pointer arrow tiers. */
 export const ARROW_Y_GAP = 18
