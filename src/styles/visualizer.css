@@ -115,6 +115,21 @@
   position: absolute;
 }
 
+/* === Tooltip === */
+.viz-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin-top: -6px;
+  padding: 4px 10px;
+  background: #333;
+  color: #fff;
+  font-size: 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
 /* === Arrow overlay === */
 .viz-arrow-overlay {
   /* positioned absolutely, pointer-events: none */

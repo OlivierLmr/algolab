@@ -6,11 +6,20 @@ import type { FlatElement, CellData, LabelData, VariableData, FrameData, Pointer
 import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
+import { evaluateTooltip } from '../../tooltip.ts'
+
+interface TooltipInfo {
+  text: string
+  x: number
+  y: number
+}
 
 export function StepVisualizer() {
   const step = currentStep.value
   const colorMap = pipelineColorMap.value
   const hoveredCell = useSignal<{ arrayName: string; cellIndex: number } | null>(null)
+  const tooltip = useSignal<TooltipInfo | null>(null)
+  const sceneRef = useRef<HTMLDivElement>(null)
 
   const layout = useMemo(() => {
     if (!step) return null
@@ -30,6 +39,24 @@ export function StepVisualizer() {
     }
   }, [])
 
+  const showTooltip = useCallback((name: string, rect: DOMRect, context: { index?: number; value?: number }) => {
+    if (!step) return
+    const template = step.tooltips[name]
+    if (!template) { tooltip.value = null; return }
+    const sceneRect = sceneRef.current?.getBoundingClientRect()
+    if (!sceneRect) return
+    const text = evaluateTooltip(template, step, context)
+    tooltip.value = {
+      text,
+      x: rect.left + rect.width / 2 - sceneRect.left,
+      y: rect.top - sceneRect.top,
+    }
+  }, [step])
+
+  const hideTooltip = useCallback(() => {
+    tooltip.value = null
+  }, [])
+
   if (!step || !layout) {
     return <div class="viz-container" />
   }
@@ -37,13 +64,14 @@ export function StepVisualizer() {
   return (
     <div class="viz-container">
       <div
+        ref={sceneRef}
         class="viz-scene"
         style={{
           position: 'relative',
           width: layout.width,
           height: layout.height,
         }}
-        onMouseLeave={onLeaveCell}
+        onMouseLeave={() => { onLeaveCell(); hideTooltip() }}
       >
         {layout.flatElements.map(el => (
           <SceneElement
@@ -51,6 +79,8 @@ export function StepVisualizer() {
             el={el}
             onHoverCell={onHoverCell}
             onLeaveCell={onLeaveCell}
+            showTooltip={showTooltip}
+            hideTooltip={hideTooltip}
           />
         ))}
 
@@ -59,6 +89,18 @@ export function StepVisualizer() {
           step={step}
           hoveredCell={hoveredCell.value}
         />
+
+        {tooltip.value && (
+          <div
+            class="viz-tooltip"
+            style={{
+              left: tooltip.value.x,
+              top: tooltip.value.y,
+            }}
+          >
+            {tooltip.value.text}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -68,16 +110,18 @@ interface SceneElementProps {
   el: FlatElement
   onHoverCell: (arrayName: string, cellIndex: number) => void
   onLeaveCell: () => void
+  showTooltip: (name: string, rect: DOMRect, context: { index?: number; value?: number }) => void
+  hideTooltip: () => void
 }
 
-function SceneElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
+function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }: SceneElementProps) {
   switch (el.kind) {
     case 'cell':
-      return <CellElement el={el} onHoverCell={onHoverCell} onLeaveCell={onLeaveCell} />
+      return <CellElement el={el} onHoverCell={onHoverCell} onLeaveCell={onLeaveCell} showTooltip={showTooltip} hideTooltip={hideTooltip} />
     case 'array-label':
       return <ArrayLabelElement el={el} />
     case 'variable':
-      return <VariableElement el={el} />
+      return <VariableElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} />
     case 'frame':
       return <FrameElement el={el} />
     case 'pointer':
@@ -87,7 +131,7 @@ function SceneElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
   }
 }
 
-function CellElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
+function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }: SceneElementProps) {
   const data = el.data as CellData
   const hasIteratorMeta = data.value.arrays.length > 0
   const displayVal = data.value.num === Infinity ? '\u221E' : String(data.value.num)
@@ -103,14 +147,28 @@ function CellElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
     gaugeFillHeight = clamped * CELL_SIZE
   }
 
+  const cellRef = useRef<HTMLDivElement>(null)
+
   const onMouseEnter = useCallback(() => {
     if (hasIteratorMeta) {
       onHoverCell(data.arrayName, data.index)
     }
-  }, [hasIteratorMeta, data.arrayName, data.index, onHoverCell])
+    if (cellRef.current) {
+      showTooltip(data.arrayName, cellRef.current.getBoundingClientRect(), {
+        index: data.index,
+        value: data.value.num,
+      })
+    }
+  }, [hasIteratorMeta, data.arrayName, data.index, data.value.num, onHoverCell, showTooltip])
+
+  const onMouseLeave = useCallback(() => {
+    onLeaveCell()
+    hideTooltip()
+  }, [onLeaveCell, hideTooltip])
 
   return (
     <div
+      ref={cellRef}
       class="viz-cell-wrapper"
       style={{
         transform: `translate(${el.x}px, ${el.y}px)`,
@@ -128,7 +186,7 @@ function CellElement({ el, onHoverCell, onLeaveCell }: SceneElementProps) {
           cursor: hasIteratorMeta ? 'pointer' : undefined,
         }}
         onMouseEnter={onMouseEnter}
-        onMouseLeave={onLeaveCell}
+        onMouseLeave={onMouseLeave}
       >
         {data.gaugeRatio !== undefined && (
           <div class="viz-cell-gauge" style={{ height: gaugeFillHeight }} />
@@ -158,19 +216,31 @@ function ArrayLabelElement({ el }: { el: FlatElement }) {
   )
 }
 
-function VariableElement({ el }: { el: FlatElement }) {
+function VariableElement({ el, showTooltip, hideTooltip }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip'] }) {
   const data = el.data as VariableData
   const borderColor = data.highlightType ? getHighlightColor(data.highlightType) : '#999'
   const borderWidth = data.highlightType ? 3 : 1.5
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const onMouseEnter = useCallback(() => {
+    if (wrapperRef.current) {
+      showTooltip(data.name, wrapperRef.current.getBoundingClientRect(), {
+        value: data.value.num,
+      })
+    }
+  }, [data.name, data.value.num, showTooltip])
 
   return (
     <div
+      ref={wrapperRef}
       class="viz-variable-wrapper"
       style={{
         transform: `translate(${el.x}px, ${el.y}px)`,
         width: CELL_SIZE,
         opacity: el.opacity,
       }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={hideTooltip}
     >
       <div class="viz-variable-label">{data.name}</div>
       <div

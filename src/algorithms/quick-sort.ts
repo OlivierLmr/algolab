@@ -8,7 +8,9 @@ export const quickSort: AlgorithmDefinition = {
   def partition(lo, hi)
     #: describe "Partitioning arr[{lo}..{hi}] with pivot {arr[hi]}"
     #: dim arr from hi to hi
+    #: tooltip "left scan pointer"
     let i = lo - 1
+    #: tooltip "right scan pointer"
     let j = hi
     let done = 0
     while done == 0
@@ -34,9 +36,11 @@ export const quickSort: AlgorithmDefinition = {
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
     if lo < hi
+      #: tooltip "median-of-range pivot index"
       let p = lo + (hi - lo) / 2
       #: comment "Choosing pivot at index {p}, value {arr[p]}"
       swap arr[hi], arr[p]
+      #: tooltip "final position of the pivot"
       let pivotIdx = partition(lo, hi)
       #: comment "Pivot {arr[pivotIdx]} placed at index {pivotIdx}"
       qsort(lo, pivotIdx - 1)

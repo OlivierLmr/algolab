@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { compilePipeline } from '../src/dsl/index.ts'
+import { evaluateTooltip } from '../src/tooltip.ts'
 
 function compile(source: string, input: number[] = [5, 3, 4, 1, 2]) {
   return compilePipeline(source, 'arr', input)
@@ -126,6 +127,36 @@ describe('tooltips (tooltip directive)', () => {
       expect(stepsWithTooltip.length).toBeGreaterThan(0)
       // Template should be stored as-is, not evaluated
       expect(stepsWithTooltip[0].tooltips['count']).toBe('count[{index}] has {value} items')
+    })
+  })
+
+  describe('render-time evaluation', () => {
+    it('evaluateTooltip substitutes {index} and {value} for array cells', () => {
+      const { steps } = compile(`algo Test(arr[])
+  #: tooltip "count[{index}] has {value} items"
+  alloc count 5
+  let x = 0`)
+
+      const step = steps.find(s => s.tooltips['count'])!
+      const result = evaluateTooltip(step.tooltips['count'], step, { index: 2, value: 42 })
+      expect(result).toBe('count[2] has 42 items')
+    })
+
+    it('evaluateTooltip substitutes {varname} from step variables', () => {
+      const { steps } = compile(`algo Test(arr[])
+  let lo = 0
+  #: tooltip "scanning from {lo}"
+  let i = 0
+  i = 1`)
+
+      const step = steps.find(s => s.tooltips['i'] && 'lo' in s.variables)!
+      const result = evaluateTooltip(step.tooltips['i'], step, { value: 1 })
+      expect(result).toBe('scanning from 0')
+    })
+
+    it('evaluateTooltip leaves unknown placeholders as-is', () => {
+      const result = evaluateTooltip('{unknown} text', { variables: {}, callStack: [] } as any, {})
+      expect(result).toBe('{unknown} text')
     })
   })
 })
