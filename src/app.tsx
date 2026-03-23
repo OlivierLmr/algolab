@@ -9,7 +9,24 @@ import { ResizeHandle } from './components/ResizeHandle.tsx'
 import { StepVisualizer } from './components/visualizer/StepVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
+import type { DescriptionSegment } from './types.ts'
 import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
+
+function renderSegments(segments: DescriptionSegment[]) {
+  return segments.map((seg, i) => {
+    if (seg.type === 'text') return <span key={i}>{seg.text}</span>
+    return (
+      <span
+        key={i}
+        class="var-pill"
+        style={{ borderColor: seg.color, color: seg.color }}
+      >
+        <span class="var-pill-name">{seg.name}</span>
+        <span class="var-pill-value">{seg.value}</span>
+      </span>
+    )
+  })
+}
 
 /** Isolated component that subscribes to step-related signals,
  *  preventing App from re-rendering the entire tree on each step change. */
@@ -28,14 +45,14 @@ function DescriptionPanel() {
           class="description-block"
           style={{ paddingLeft: bd.depth * 16 }}
         >
-          {bd.text}
+          {renderSegments(bd.parts)}
         </div>
       ))}
-      {descriptions.map((d) => (
-        <div class="description-previous" style={{ paddingLeft: oneShotIndent }}>{d}</div>
+      {descriptions.map((d, i) => (
+        <div key={i} class="description-previous" style={{ paddingLeft: oneShotIndent }}>{renderSegments(d)}</div>
       ))}
       {step?.description ? (
-        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{step.description}</div>
+        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{renderSegments(step.descriptionParts)}</div>
       ) : null}
     </>
   )

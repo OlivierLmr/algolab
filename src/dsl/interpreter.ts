@@ -15,14 +15,14 @@ class ReturnSignal {
   value: Value
   constructor(value: Value) { this.value = value }
 }
-import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame } from '../types.ts'
+import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment } from '../types.ts'
 
 /**
  * Create a runner for the given algorithm AST.
  * colorMap is computed once in the pipeline and shared.
  * typeContext provides statically inferred iterator types.
  */
-export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typeContext: TypeContext): (input: Map<string, number[]>) => Step[] {
+export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, typeContext: TypeContext): (input: Map<string, number[]>) => Step[] {
 
   return function run(input: Map<string, number[]>): Step[] {
     const steps: Step[] = []
@@ -54,7 +54,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     // --- Block descriptions (sticky per-block comments) ---
     // Each entry has the evaluated text and the scope depth at which it was registered.
     // On scope pop, entries at deeper scope depths are removed.
-    const blockDescs: { text: string; scopeDepth: number }[] = []
+    const blockDescs: { text: string; parts: DescriptionSegment[]; scopeDepth: number }[] = []
 
     // --- Tooltips (hover descriptions for variables/arrays) ---
     // Each scope level maps variable names to their tooltip template strings.
@@ -202,8 +202,34 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
               return val.num !== 0 ? part.trueText : part.falseText
             }
             catch { return '{?}' }
+          case 'pill':
+            try { return `${part.name}=${evalExpr(part.expr).num}` }
+            catch { return `${part.name}=?` }
         }
       }).join('')
+    }
+
+    function evaluateCommentSegments(parts: CommentPart[]): DescriptionSegment[] {
+      return parts.map(part => {
+        switch (part.type) {
+          case 'text': return { type: 'text' as const, text: part.text }
+          case 'expr':
+            try { return { type: 'text' as const, text: String(evalExpr(part.expr).num) } }
+            catch { return { type: 'text' as const, text: '{?}' } }
+          case 'ternary':
+            try {
+              const val = evalExpr(part.condition)
+              return { type: 'text' as const, text: val.num !== 0 ? part.trueText : part.falseText }
+            }
+            catch { return { type: 'text' as const, text: '{?}' } }
+          case 'pill':
+            try {
+              const val = evalExpr(part.expr)
+              return { type: 'pill' as const, name: part.name, value: val.num, color: colorMap.get(part.name) }
+            }
+            catch { return { type: 'text' as const, text: `${part.name}=?` } }
+        }
+      })
     }
 
     /**
@@ -234,7 +260,9 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
     function snapshot(line: number, description: string): void {
       let isComment = false
+      let descriptionParts: DescriptionSegment[] = [{ type: 'text', text: description }]
       if (pendingCommentParts !== null) {
+        descriptionParts = evaluateCommentSegments(pendingCommentParts)
         description = evaluateCommentParts(pendingCommentParts)
         pendingCommentParts = null
         isComment = true
@@ -355,9 +383,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         callStack: callStackFrames,
         currentLine: line,
         description,
+        descriptionParts,
         isComment,
         blockDescriptions: blockDescs.map((bd, i) => ({
           text: bd.text,
+          parts: bd.parts,
           depth: i,
         })),
         tooltips: collectTooltips(),
@@ -769,15 +799,16 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
     /** Evaluate a describe annotation and push/upsert it in blockDescs. */
     function applyDescribe(describe: { text: string; parts?: CommentPart[] }): void {
-      const parts = describe.parts ?? [{ type: 'text', text: describe.text }]
-      const text = evaluateCommentParts(parts)
+      const rawParts = describe.parts ?? [{ type: 'text', text: describe.text }]
+      const text = evaluateCommentParts(rawParts)
+      const segments = evaluateCommentSegments(rawParts)
       const depth = scopeStack.length
       // Upsert: replace existing entry at same depth, or push new
       const existing = blockDescs.findIndex(bd => bd.scopeDepth === depth)
       if (existing !== -1) {
-        blockDescs[existing] = { text, scopeDepth: depth }
+        blockDescs[existing] = { text, parts: segments, scopeDepth: depth }
       } else {
-        blockDescs.push({ text, scopeDepth: depth })
+        blockDescs.push({ text, parts: segments, scopeDepth: depth })
       }
     }
 

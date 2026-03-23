@@ -34,8 +34,13 @@ export interface CallFrame {
   gaugeArrays: string[]
 }
 
+export type DescriptionSegment =
+  | { type: 'text'; text: string }
+  | { type: 'pill'; name: string; value: number; color: string | undefined }
+
 export interface BlockDescription {
   text: string
+  parts: DescriptionSegment[]
   depth: number
 }
 
@@ -49,10 +54,15 @@ export interface Step {
   callStack: CallFrame[]
   currentLine: number
   description: string
+  descriptionParts: DescriptionSegment[]
   isComment: boolean
   blockDescriptions: BlockDescription[]
   tooltips: Record<string, string>
   scopeDepth: number
+}
+
+export function segmentsToString(parts: DescriptionSegment[]): string {
+  return parts.map(p => p.type === 'text' ? p.text : `${p.name}=${p.value}`).join('')
 }
 
 export interface AlgorithmDefinition {

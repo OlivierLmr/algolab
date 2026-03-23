@@ -87,6 +87,14 @@ function parseCommentTemplate(text: string): CommentPart[] {
     }
     const inner = match[1]
     try {
+      // Check for pill syntax: {$varname} or {$expr}
+      if (inner.startsWith('$')) {
+        const pillInner = inner.slice(1).trim()
+        const expr = parseExprFromString(pillInner)
+        parts.push({ type: 'pill', name: pillInner, expr })
+        lastIndex = regex.lastIndex
+        continue
+      }
       // Check for ternary: expr ? 'trueText' : 'falseText'
       const qIdx = inner.indexOf('?')
       if (qIdx !== -1) {

@@ -1,5 +1,5 @@
 import { signal, computed, effect } from '@preact/signals'
-import type { Step, AlgorithmDefinition } from './types.ts'
+import type { Step, AlgorithmDefinition, DescriptionSegment } from './types.ts'
 import { algorithms } from './algorithms/index.ts'
 import { compilePipeline, runAlgorithm } from './dsl/index.ts'
 import type { PipelineResult } from './dsl/index.ts'
@@ -203,12 +203,12 @@ export function stepOutBack(): void {
   currentStepIndex.value = i
 }
 
-export const recentDescriptions = computed<string[]>(() => {
+export const recentDescriptions = computed<DescriptionSegment[][]>(() => {
   const idx = currentStepIndex.value
   const all = steps.value
   if (idx >= all.length) return []
   const currentBlockDepth = all[idx].blockDescriptions.length
-  const result: string[] = []
+  const result: DescriptionSegment[][] = []
   // Look back for one-shot #: comment descriptions at the same block depth.
   // Only collect steps explicitly marked as comments (not auto-generated descriptions).
   // - Lower depth means we left the current block → stop (boundary).
@@ -219,7 +219,7 @@ export const recentDescriptions = computed<string[]>(() => {
     if (stepDepth < currentBlockDepth) break
     if (stepDepth > currentBlockDepth) continue
     if (all[i].isComment) {
-      result.unshift(all[i].description)
+      result.unshift(all[i].descriptionParts)
     }
   }
   return result
