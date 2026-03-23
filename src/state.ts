@@ -209,12 +209,14 @@ export const recentDescriptions = computed<string[]>(() => {
   if (idx >= all.length) return []
   const currentBlockDepth = all[idx].blockDescriptions.length
   const result: string[] = []
-  // Look back for one-shot descriptions, stopping at any block boundary.
-  // A block boundary is a step where blockDescriptions.length differs from
-  // the current step — this prevents comments from sibling recursive calls
-  // or parent/child blocks from leaking through.
+  // Look back for one-shot descriptions at the same block depth.
+  // - Lower depth means we left the current block → stop (boundary).
+  // - Higher depth means a function call went deeper → skip over those
+  //   steps but keep scanning (the call returned to our level).
   for (let i = idx - 1; i >= 0 && result.length < 3; i--) {
-    if (all[i].blockDescriptions.length !== currentBlockDepth) break
+    const stepDepth = all[i].blockDescriptions.length
+    if (stepDepth < currentBlockDepth) break
+    if (stepDepth > currentBlockDepth) continue
     if (all[i].description) {
       result.unshift(all[i].description)
     }
