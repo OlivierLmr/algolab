@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, DescribeNode, AllocNode, DefNode, ReturnNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, DescribeNode, TooltipNode, AllocNode, DefNode, ReturnNode, PointerNode,
   Expr, CommentPart,
 } from './ast.ts'
 import type { Value } from './value.ts'
@@ -55,6 +55,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     // Each entry has the evaluated text and the scope depth at which it was registered.
     // On scope pop, entries at deeper scope depths are removed.
     const blockDescs: { text: string; scopeDepth: number }[] = []
+
+    // --- Tooltips (hover descriptions for variables/arrays) ---
+    // Each scope level maps variable names to their tooltip template strings.
+    // Parallel to scopeStack: tooltipStack[i] contains tooltips registered at scope level i.
+    const tooltipStack: Map<string, string>[] = [new Map()]
 
     function resolveArrayName(name: string): string {
       const seen = new Set<string>()
@@ -171,11 +176,13 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     function pushScope(): void {
       scopeStack.push(new Map())
       liveExprVars.push([])
+      tooltipStack.push(new Map())
     }
 
     function popScope(): void {
       scopeStack.pop()
       liveExprVars.pop()
+      tooltipStack.pop()
       // Remove block descriptions registered at the popped scope depth or deeper
       while (blockDescs.length > 0 && blockDescs[blockDescs.length - 1].scopeDepth > scopeStack.length) {
         blockDescs.pop()
@@ -346,12 +353,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         callStack: callStackFrames,
         currentLine: line,
         description,
-        blockDescriptions: blockDescs.length > 0
-          ? blockDescs.map(bd => ({
-              text: bd.text,
-              depth: bd.scopeDepth - (blockDescs[0]?.scopeDepth ?? 0),
-            }))
-          : [],
+        blockDescriptions: blockDescs.map((bd, i) => ({
+          text: bd.text,
+          depth: i,
+        })),
+        tooltips: collectTooltips(),
         scopeDepth: scopeStack.length,
       })
       clearHighlights()
@@ -586,6 +592,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         case 'stepover': break
         case 'comment': execComment(node); break
         case 'describe': execDescribe(node); break
+        case 'tooltip': execTooltip(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break
         case 'return': execReturn(node); break
@@ -758,6 +765,22 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       } else {
         blockDescs.push({ text, scopeDepth: depth })
       }
+    }
+
+    function execTooltip(node: TooltipNode): void {
+      // Register tooltip template for the target variable in the current scope
+      tooltipStack[tooltipStack.length - 1].set(node.target, node.text)
+    }
+
+    /** Collect all active tooltips from the tooltip stack (inner scopes shadow outer). */
+    function collectTooltips(): Record<string, string> {
+      const result: Record<string, string> = {}
+      for (const scope of tooltipStack) {
+        for (const [name, text] of scope) {
+          result[name] = text
+        }
+      }
+      return result
     }
 
     function flushPendingComment(line: number): void {

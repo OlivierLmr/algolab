@@ -374,6 +374,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
 
       case 'comment':
       case 'describe':
+      case 'tooltip':
       case 'gauge':
       case 'ungauge':
       case 'stepover':

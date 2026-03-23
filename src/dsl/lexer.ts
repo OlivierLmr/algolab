@@ -22,7 +22,7 @@ export type TokenType =
 const KEYWORDS = new Set([
   'algo', 'let', 'for', 'from', 'to', 'while', 'if', 'else', 'swap', 'and', 'or', 'not',
   'dim', 'undim', 'pointer', 'on', 'at', 'comment', 'describe', 'alloc', 'def', 'inf', 'return',
-  'gauge', 'ungauge', 'stepover',
+  'gauge', 'ungauge', 'stepover', 'tooltip',
 ])
 
 const OPERATORS = ['<=', '>=', '==', '!=', '<', '>', '+', '-', '*', '/', '%', '=']

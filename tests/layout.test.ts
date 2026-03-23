@@ -24,6 +24,7 @@ function makeStep(overrides: Partial<Step> = {}): Step {
     currentLine: 1,
     description: '',
     blockDescriptions: [],
+    tooltips: {},
     scopeDepth: 1,
     ...overrides,
   }

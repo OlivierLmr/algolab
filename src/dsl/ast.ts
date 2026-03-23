@@ -18,6 +18,7 @@ export type ASTNode =
   | GaugeNode
   | UngaugeNode
   | StepoverNode
+  | TooltipNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -156,6 +157,13 @@ export interface UngaugeNode {
 
 export interface StepoverNode {
   type: 'stepover'
+  line: number
+}
+
+export interface TooltipNode {
+  type: 'tooltip'
+  target: string
+  text: string
   line: number
 }
 

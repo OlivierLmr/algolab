@@ -50,6 +50,7 @@ export interface Step {
   currentLine: number
   description: string
   blockDescriptions: BlockDescription[]
+  tooltips: Record<string, string>
   scopeDepth: number
 }
 

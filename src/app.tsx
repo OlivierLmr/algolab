@@ -16,6 +16,10 @@ import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut,
 function DescriptionPanel() {
   const step = currentStep.value
   const descriptions = recentDescriptions.value
+  const maxBlockDepth = step?.blockDescriptions.length
+    ? Math.max(...step.blockDescriptions.map(bd => bd.depth)) + 1
+    : 0
+  const oneShotIndent = maxBlockDepth * 16
   return (
     <>
       {step?.blockDescriptions.map((bd, i) => (
@@ -28,10 +32,10 @@ function DescriptionPanel() {
         </div>
       ))}
       {descriptions.map((d) => (
-        <div class="description-previous">{d}</div>
+        <div class="description-previous" style={{ paddingLeft: oneShotIndent }}>{d}</div>
       ))}
       {step?.description ? (
-        <div class="description-current">{step.description}</div>
+        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{step.description}</div>
       ) : null}
     </>
   )

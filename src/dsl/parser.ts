@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, DescribeNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, DescribeNode, TooltipNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
   Expr,
 } from './ast.ts'
 
@@ -92,6 +92,7 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'gauge': return parseGauge()
         case 'ungauge': return parseUngauge()
         case 'stepover': return parseStepover()
+        case 'tooltip': return parseTooltip()
       }
     }
 
@@ -203,6 +204,31 @@ export function parse(tokens: Token[]): AlgoNode {
     const text = expect('string').value
     expectNewline()
     return { type: 'describe', text, line: tok.line }
+  }
+
+  function parseTooltip(): TooltipNode {
+    const tok = expect('keyword', 'tooltip')
+    const text = expect('string').value
+    expectNewline()
+    skipNewlines()
+    // Peek at the next statement to determine which variable this tooltip attaches to
+    const next = peek()
+    let target: string
+    if (next.type === 'keyword' && next.value === 'let') {
+      // let name = ...
+      target = tokens[pos + 1].value
+    } else if (next.type === 'keyword' && next.value === 'for') {
+      // for name from ...
+      target = tokens[pos + 1].value
+    } else if (next.type === 'keyword' && next.value === 'alloc') {
+      // alloc name[...]
+      target = tokens[pos + 1].value
+    } else {
+      throw new Error(
+        `tooltip directive must be followed by let, for, or alloc statement at line ${tok.line + 1}`
+      )
+    }
+    return { type: 'tooltip', target, text, line: tok.line }
   }
 
   function parseDef(): DefNode {
