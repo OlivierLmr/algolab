@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, DescribeNode, TooltipNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, TooltipNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
   Expr,
 } from './ast.ts'
 
@@ -199,11 +199,20 @@ export function parse(tokens: Token[]): AlgoNode {
     return { type: 'comment', text, line: tok.line }
   }
 
-  function parseDescribe(): DescribeNode {
+  function parseDescribe(): ASTNode {
     const tok = expect('keyword', 'describe')
     const text = expect('string').value
     expectNewline()
-    return { type: 'describe', text, line: tok.line }
+    skipNewlines()
+    // Parse the following block statement and attach describe to it
+    const next = parseStatement()
+    if (next.type === 'for' || next.type === 'while' || next.type === 'if' || next.type === 'def') {
+      next.describe = { text }
+      return next
+    }
+    throw new Error(
+      `describe directive must be followed by for, while, if, or def at line ${tok.line + 1}`
+    )
   }
 
   function parseTooltip(): TooltipNode {
@@ -211,18 +220,29 @@ export function parse(tokens: Token[]): AlgoNode {
     const text = expect('string').value
     expectNewline()
     skipNewlines()
-    // Peek at the next statement to determine which variable this tooltip attaches to
-    const next = peek()
+    // Peek ahead to find the target statement, skipping over any describe directives
+    let peekPos = pos
+    while (peekPos < tokens.length) {
+      const t = tokens[peekPos]
+      if (t.type === 'newline') {
+        peekPos++
+        continue
+      }
+      if (t.type === 'keyword' && t.value === 'describe') {
+        // Skip: describe keyword + string literal
+        peekPos += 2
+        continue
+      }
+      break
+    }
+    const next = peekPos < tokens.length ? tokens[peekPos] : undefined
     let target: string
-    if (next.type === 'keyword' && next.value === 'let') {
-      // let name = ...
-      target = tokens[pos + 1].value
-    } else if (next.type === 'keyword' && next.value === 'for') {
-      // for name from ...
-      target = tokens[pos + 1].value
-    } else if (next.type === 'keyword' && next.value === 'alloc') {
-      // alloc name[...]
-      target = tokens[pos + 1].value
+    if (next?.type === 'keyword' && next.value === 'let') {
+      target = tokens[peekPos + 1].value
+    } else if (next?.type === 'keyword' && next.value === 'for') {
+      target = tokens[peekPos + 1].value
+    } else if (next?.type === 'keyword' && next.value === 'alloc') {
+      target = tokens[peekPos + 1].value
     } else {
       throw new Error(
         `tooltip directive must be followed by let, for, or alloc statement at line ${tok.line + 1}`

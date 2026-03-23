@@ -4,8 +4,8 @@ export const radixSort: AlgorithmDefinition = {
   name: 'Radix Sort (LSD)',
   source: `algo RadixSort(arr[])
 
+  #: describe "Stable sort by digit at place value {exp}"
   def countingSortByDigit(exp)
-    #: describe "Stable sort by digit at place value {exp}"
     #: tooltip "sorted result being built"
     alloc output len(arr)
     #: tooltip "count[{index}] = occurrences of digit {index}"
@@ -17,9 +17,9 @@ export const radixSort: AlgorithmDefinition = {
       let digit = (arr[i] / exp) % 10
       count[digit] = count[digit] + 1
 
-    #: describe "Converting counts to starting positions"
     #: tooltip "running total of elements placed so far"
     let sum = 0
+    #: describe "Converting counts to starting positions"
     for i from 0 to 9
       #: tooltip "saved count before overwriting with prefix sum"
       let c = count[i]
@@ -47,8 +47,8 @@ export const radixSort: AlgorithmDefinition = {
   #: comment "Max value is {max}"
   #: tooltip "current place value being sorted (1=ones, 10=tens, ...)"
   let exp = 1
+  #: describe "Sorting by digit at place value {exp}"
   while exp <= max
-    #: describe "Sorting by digit at place value {exp}"
     #: comment "Sorting by digit at position exp={exp}"
     countingSortByDigit(exp)
     exp = exp * 10`,

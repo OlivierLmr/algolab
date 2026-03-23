@@ -11,7 +11,6 @@ export type ASTNode =
   | UndimNode
   | PointerNode
   | CommentNode
-  | DescribeNode
   | AllocNode
   | DefNode
   | ReturnNode
@@ -28,12 +27,18 @@ export interface AlgoNode {
   line: number
 }
 
+export interface DescribeAnnotation {
+  text: string
+  parts?: CommentPart[]
+}
+
 export interface ForNode {
   type: 'for'
   variable: string
   from: Expr
   to: Expr
   body: ASTNode[]
+  describe?: DescribeAnnotation
   line: number
 }
 
@@ -41,6 +46,7 @@ export interface WhileNode {
   type: 'while'
   condition: Expr
   body: ASTNode[]
+  describe?: DescribeAnnotation
   line: number
 }
 
@@ -49,6 +55,7 @@ export interface IfNode {
   condition: Expr
   body: ASTNode[]
   elseBody: ASTNode[]
+  describe?: DescribeAnnotation
   line: number
 }
 
@@ -115,13 +122,6 @@ export interface CommentNode {
   line: number
 }
 
-export interface DescribeNode {
-  type: 'describe'
-  text: string
-  parts?: CommentPart[]
-  line: number
-}
-
 export interface AllocNode {
   type: 'alloc'
   arrayName: string
@@ -134,6 +134,7 @@ export interface DefNode {
   name: string
   params: { name: string; isArray: boolean }[]
   body: ASTNode[]
+  describe?: DescribeAnnotation
   line: number
 }
 

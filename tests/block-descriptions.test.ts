@@ -9,8 +9,8 @@ describe('block descriptions (describe directive)', () => {
   describe('basic functionality', () => {
     it('attaches a block description that persists while inside the block', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "Working on range {lo} to {hi}"
   def doWork(lo, hi)
-    #: describe "Working on range {lo} to {hi}"
     let i = lo
     i = i + 1
 
@@ -27,8 +27,8 @@ describe('block descriptions (describe directive)', () => {
 
     it('removes block description when exiting the block', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "Working on {lo} to {hi}"
   def doWork(lo, hi)
-    #: describe "Working on {lo} to {hi}"
     let i = lo
 
   doWork(0, 4)
@@ -43,12 +43,13 @@ describe('block descriptions (describe directive)', () => {
       }
     })
 
-    it('evaluates template once on entry (not re-evaluated each step)', () => {
+    it('evaluates template with values at block entry', () => {
       const { steps } = compile(`algo Test(arr[])
   let i = 0
   #: describe "Starting with i={i}"
-  i = 1
-  i = 2`)
+  if i == 0
+    i = 1
+    i = 2`)
 
       // The describe should capture i=0 at evaluation time
       const stepsWithDesc = steps.filter(s =>
@@ -65,11 +66,11 @@ describe('block descriptions (describe directive)', () => {
   describe('nesting and stacking', () => {
     it('stacks nested block descriptions with increasing depth', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "Partitioning {lo} to {hi}"
   def partition(lo, hi)
-    #: describe "Partitioning {lo} to {hi}"
     let done = 0
+    #: describe "Finding swap pair"
     while done == 0
-      #: describe "Finding swap pair"
       done = 1
 
   partition(0, 4)`)
@@ -90,10 +91,10 @@ describe('block descriptions (describe directive)', () => {
 
     it('removes inner block description when exiting inner block', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "In work"
   def work(n)
-    #: describe "In work"
+    #: describe "Positive branch"
     if n > 0
-      #: describe "Positive branch"
       let x = n
     let y = 0
 
@@ -112,8 +113,8 @@ describe('block descriptions (describe directive)', () => {
   describe('interaction with one-shot comments', () => {
     it('one-shot comments appear alongside block descriptions', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "Working on {lo}..{hi}"
   def work(lo, hi)
-    #: describe "Working on {lo}..{hi}"
     #: comment "Step one"
     let i = lo
 
@@ -145,10 +146,10 @@ describe('block descriptions (describe directive)', () => {
   })
 
   describe('loop describe re-evaluation', () => {
-    it('describe in a for loop re-evaluates with current loop variable', () => {
+    it('describe on a for loop re-evaluates with current loop variable', () => {
       const { steps } = compile(`algo Test(arr[])
+  #: describe "Iteration {i}"
   for i from 0 to 1
-    #: describe "Iteration {i}"
     let x = i`)
 
       const iter0 = steps.find(s =>

@@ -7,15 +7,15 @@ export const mergeSortBU: AlgorithmDefinition = {
   alloc aux len(arr)
   #: gauge aux
 
+  #: describe "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
   def merge(src[], dst[], lo, mid, hi)
-    #: describe "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
     #: tooltip "read position in left half"
     let i = lo
     #: tooltip "read position in right half"
     let j = mid + 1
     #: tooltip "write position in dst"
+    #: describe "Picking the smaller of the two front elements"
     for k from lo to hi
-      #: describe "Picking the smaller of the two front elements"
       if i <= mid and (j > hi or src[i] <= src[j])
         dst[k] = src[i]
         i = i + 1
@@ -23,8 +23,8 @@ export const mergeSortBU: AlgorithmDefinition = {
         dst[k] = src[j]
         j = j + 1
 
+  #: describe "Sorting [{lo}..{hi}] from src into dst"
   def msort(src[], dst[], lo, hi)
-    #: describe "Sorting [{lo}..{hi}] from src into dst"
     #: dim src from 0 to lo - 1
     #: dim src from hi + 1 to len(src) - 1
     #: dim dst from 0 to lo - 1

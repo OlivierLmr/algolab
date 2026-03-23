@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, DescribeNode, TooltipNode, AllocNode, DefNode, ReturnNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, TooltipNode, AllocNode, DefNode, ReturnNode, PointerNode,
   Expr, CommentPart,
 } from './ast.ts'
 import type { Value } from './value.ts'
@@ -28,7 +28,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     const steps: Step[] = []
     const arrays = new Map<string, Value[]>()
     const scopeStack: Map<string, Value>[] = [new Map()]
-    const procedures = new Map<string, { params: { name: string; isArray: boolean }[]; body: ASTNode[]; defLine: number }>()
+    const procedures = new Map<string, { params: { name: string; isArray: boolean }[]; body: ASTNode[]; defLine: number; describe?: { text: string; parts?: CommentPart[] } }>()
     let callDepth = 0
 
     interface ActiveFrame {
@@ -476,6 +476,9 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
           setVar(binding.name, binding.value)
         }
 
+        // Apply describe annotation if present on the def
+        if (proc.describe) applyDescribe(proc.describe)
+
         // Save caller's dim ranges and gauge arrays
         const savedDimRanges = [...dimRanges]
         const savedGaugeArrays = new Set(gaugeArrays)
@@ -591,7 +594,6 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         case 'pointer': execPointer(node); break
         case 'stepover': break
         case 'comment': execComment(node); break
-        case 'describe': execDescribe(node); break
         case 'tooltip': execTooltip(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break
@@ -630,6 +632,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       for (let i = fromVal; i <= toVal; i++) {
         const val = stampValue(i, loopVarType)
         setVar(node.variable, val)
+        if (node.describe) applyDescribe(node.describe)
         highlightComparisonSide({ type: 'identifier', name: node.variable })
         highlightComparisonSide(node.to)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
@@ -643,6 +646,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       let guard = 0
       pushScope()
       while (evalExpr(node.condition).num !== 0) {
+        if (node.describe) applyDescribe(node.describe)
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
@@ -668,6 +672,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
       if (cond !== 0) {
         pushScope()
+        if (node.describe) applyDescribe(node.describe)
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
         popScope()
@@ -754,8 +759,9 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]
     }
 
-    function execDescribe(node: DescribeNode): void {
-      const parts = node.parts ?? [{ type: 'text', text: node.text }]
+    /** Evaluate a describe annotation and push/upsert it in blockDescs. */
+    function applyDescribe(describe: { text: string; parts?: CommentPart[] }): void {
+      const parts = describe.parts ?? [{ type: 'text', text: describe.text }]
       const text = evaluateCommentParts(parts)
       const depth = scopeStack.length
       // Upsert: replace existing entry at same depth, or push new
@@ -802,7 +808,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     }
 
     function execDef(node: DefNode): void {
-      procedures.set(node.name, { params: node.params, body: node.body, defLine: node.line })
+      procedures.set(node.name, { params: node.params, body: node.body, defLine: node.line, describe: node.describe })
     }
 
     function execReturn(node: ReturnNode): void {

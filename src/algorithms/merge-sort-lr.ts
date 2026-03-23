@@ -15,8 +15,8 @@ export const mergeSortLR: AlgorithmDefinition = {
     L[leftLen] = inf
     R[rightLen] = inf
 
+  #: describe "Merging arr[{lo}..{mid}] and arr[{mid + 1}..{hi}]"
   def merge(lo, mid, hi)
-    #: describe "Merging arr[{lo}..{mid}] and arr[{mid + 1}..{hi}]"
     alloc L mid - lo + 2
     alloc R hi - mid + 1
     #: gauge L
@@ -29,8 +29,8 @@ export const mergeSortLR: AlgorithmDefinition = {
     let j = 0
     #: comment "Merging L and R back into arr[{lo}..{hi}]"
     #: tooltip "write position in arr"
+    #: describe "Picking the smaller of L[{i}] and R[{j}]"
     for k from lo to hi
-      #: describe "Picking the smaller of L[{i}] and R[{j}]"
       #: comment "L[{i}]={L[i]} vs R[{j}]={R[j]}: {L[i] <= R[j] ? 'taking from L' : 'taking from R'}"
       if L[i] <= R[j]
         arr[k] = L[i]
@@ -39,8 +39,8 @@ export const mergeSortLR: AlgorithmDefinition = {
         arr[k] = R[j]
         j = j + 1
 
+  #: describe "Sorting arr[{lo}..{hi}]"
   def msort(lo, hi)
-    #: describe "Sorting arr[{lo}..{hi}]"
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
     #: comment "The subarray has {hi - lo + 1} elements, {lo < hi ? 'it needs to be sorted recursively.' : 'it is already sorted.'}"

@@ -5,14 +5,14 @@ export const insertionSort: AlgorithmDefinition = {
   source: `algo InsertionSort(arr[])
   #: gauge arr
   #: tooltip "index of the element being inserted"
+  #: describe "Inserting arr[{i}] = {arr[i]} into sorted prefix"
   for i from 1 to len(arr) - 1
-    #: describe "Inserting arr[{i}] = {arr[i]} into sorted prefix"
     #: tooltip "value being inserted into the sorted portion"
     let key = arr[i]
     #: tooltip "position being checked for insertion"
     let j = i - 1
+    #: describe "Shifting elements right to make room"
     while j >= 0 and arr[j] > key
-      #: describe "Shifting elements right to make room"
       #: comment "Shifting {arr[j]} right to make room for {key}"
       arr[j + 1] = arr[j]
       j = j - 1

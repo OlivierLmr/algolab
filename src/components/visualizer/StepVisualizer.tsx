@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useLayoutEffect } from 'preact/hooks'
+import { useMemo, useCallback, useRef, useLayoutEffect, useEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
@@ -20,6 +20,7 @@ export function StepVisualizer() {
   const hoveredCell = useSignal<{ arrayName: string; cellIndex: number } | null>(null)
   const tooltip = useSignal<TooltipInfo | null>(null)
   const sceneRef = useRef<HTMLDivElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
 
   const layout = useMemo(() => {
     if (!step) return null
@@ -57,6 +58,23 @@ export function StepVisualizer() {
     tooltip.value = null
   }, [])
 
+  // Clamp tooltip position so it stays within the scene bounds
+  useEffect(() => {
+    const el = tooltipRef.current
+    const scene = sceneRef.current
+    if (!el || !scene || !tooltip.value) return
+    const tooltipWidth = el.offsetWidth
+    const sceneWidth = scene.offsetWidth
+    const halfWidth = tooltipWidth / 2
+    const x = tooltip.value.x
+    // The tooltip is centered (transform: translateX(-50%)), so its left edge is at x - halfWidth
+    if (x - halfWidth < 0) {
+      el.style.left = `${halfWidth}px`
+    } else if (x + halfWidth > sceneWidth) {
+      el.style.left = `${sceneWidth - halfWidth}px`
+    }
+  })
+
   if (!step || !layout) {
     return <div class="viz-container" />
   }
@@ -93,6 +111,7 @@ export function StepVisualizer() {
 
         {tooltip.value && (
           <div
+            ref={tooltipRef}
             class="viz-tooltip"
             style={{
               left: tooltip.value.x,

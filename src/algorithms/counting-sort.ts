@@ -22,9 +22,9 @@ export const countingSort: AlgorithmDefinition = {
     #: comment "Incrementing count[{arr[i]}]"
     count[arr[i]] = count[arr[i]] + 1
 
-  #: describe "Phase 2: Converting counts to starting positions"
   #: tooltip "running total of elements placed so far"
   let sum = 0
+  #: describe "Phase 2: Converting counts to starting positions"
   for i from 0 to max
     #: tooltip "saved count before overwriting with prefix sum"
     let c = count[i]

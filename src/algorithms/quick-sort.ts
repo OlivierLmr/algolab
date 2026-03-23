@@ -5,16 +5,16 @@ export const quickSort: AlgorithmDefinition = {
   source: `algo QuickSort(arr[])
   #: gauge arr
 
+  #: describe "Partitioning arr[{lo}..{hi}] with pivot {arr[hi]}"
   def partition(lo, hi)
-    #: describe "Partitioning arr[{lo}..{hi}] with pivot {arr[hi]}"
     #: dim arr from hi to hi
     #: tooltip "left scan pointer"
     let i = lo - 1
     #: tooltip "right scan pointer"
     let j = hi
     let done = 0
+    #: describe "Scanning for elements to swap"
     while done == 0
-      #: describe "Scanning for elements to swap"
       i = i + 1
       while arr[i] < arr[hi]
         i = i + 1
@@ -31,8 +31,8 @@ export const quickSort: AlgorithmDefinition = {
     swap arr[i], arr[hi]
     return i
 
+  #: describe "Sorting arr[{lo}..{hi}]"
   def qsort(lo, hi)
-    #: describe "Sorting arr[{lo}..{hi}]"
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
     if lo < hi
