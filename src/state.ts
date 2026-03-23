@@ -206,11 +206,16 @@ export function stepOutBack(): void {
 export const recentDescriptions = computed<string[]>(() => {
   const idx = currentStepIndex.value
   const all = steps.value
+  if (idx >= all.length) return []
+  const currentDepth = all[idx].scopeDepth
   const result: string[] = []
-  for (let i = Math.max(0, idx - 3); i < idx; i++) {
-    if (all[i].description) result.push(all[i].description)
+  // Look back for one-shot descriptions at the same scope depth (same block)
+  for (let i = Math.max(0, idx - 4); i < idx; i++) {
+    if (all[i].description && all[i].scopeDepth === currentDepth) {
+      result.push(all[i].description)
+    }
   }
-  return result
+  return result.slice(-3)
 })
 
 // Clamp initial step to valid range and apply default disabled lines

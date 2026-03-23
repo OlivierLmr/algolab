@@ -1,5 +1,5 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, AllocNode, DefNode, ReturnNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, DescribeNode, AllocNode, DefNode, ReturnNode, PointerNode,
   Expr, CommentPart,
 } from './ast.ts'
 import type { Value } from './value.ts'
@@ -50,6 +50,11 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
       expr: Expr
     }
     const liveExprVars: ExprVarReg[][] = [[]]  // parallel to scopeStack
+
+    // --- Block descriptions (sticky per-block comments) ---
+    // Each entry has the evaluated text and the scope depth at which it was registered.
+    // On scope pop, entries at deeper scope depths are removed.
+    const blockDescs: { text: string; scopeDepth: number }[] = []
 
     function resolveArrayName(name: string): string {
       const seen = new Set<string>()
@@ -171,6 +176,10 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
     function popScope(): void {
       scopeStack.pop()
       liveExprVars.pop()
+      // Remove block descriptions registered at the popped scope depth or deeper
+      while (blockDescs.length > 0 && blockDescs[blockDescs.length - 1].scopeDepth > scopeStack.length) {
+        blockDescs.pop()
+      }
     }
 
     function evaluateCommentParts(parts: CommentPart[]): string {
@@ -337,6 +346,13 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         callStack: callStackFrames,
         currentLine: line,
         description,
+        blockDescriptions: blockDescs.length > 0
+          ? blockDescs.map(bd => ({
+              text: bd.text,
+              depth: bd.scopeDepth - (blockDescs[0]?.scopeDepth ?? 0),
+            }))
+          : [],
+        scopeDepth: scopeStack.length,
       })
       clearHighlights()
     }
@@ -569,6 +585,7 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
         case 'pointer': execPointer(node); break
         case 'stepover': break
         case 'comment': execComment(node); break
+        case 'describe': execDescribe(node); break
         case 'alloc': execAlloc(node); break
         case 'def': execDef(node); break
         case 'return': execReturn(node); break
@@ -728,6 +745,19 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
     function execComment(node: CommentNode): void {
       pendingCommentParts = node.parts ?? [{ type: 'text', text: node.text }]
+    }
+
+    function execDescribe(node: DescribeNode): void {
+      const parts = node.parts ?? [{ type: 'text', text: node.text }]
+      const text = evaluateCommentParts(parts)
+      const depth = scopeStack.length
+      // Upsert: replace existing entry at same depth, or push new
+      const existing = blockDescs.findIndex(bd => bd.scopeDepth === depth)
+      if (existing !== -1) {
+        blockDescs[existing] = { text, scopeDepth: depth }
+      } else {
+        blockDescs.push({ text, scopeDepth: depth })
+      }
     }
 
     function flushPendingComment(line: number): void {

@@ -11,6 +11,7 @@ export type ASTNode =
   | UndimNode
   | PointerNode
   | CommentNode
+  | DescribeNode
   | AllocNode
   | DefNode
   | ReturnNode
@@ -108,6 +109,13 @@ export type CommentPart =
 
 export interface CommentNode {
   type: 'comment'
+  text: string
+  parts?: CommentPart[]
+  line: number
+}
+
+export interface DescribeNode {
+  type: 'describe'
   text: string
   parts?: CommentPart[]
   line: number

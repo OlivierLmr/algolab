@@ -34,6 +34,11 @@ export interface CallFrame {
   gaugeArrays: string[]
 }
 
+export interface BlockDescription {
+  text: string
+  depth: number
+}
+
 export interface Step {
   arrays: TrackedArray[]
   highlights: Highlight[]
@@ -44,6 +49,8 @@ export interface Step {
   callStack: CallFrame[]
   currentLine: number
   description: string
+  blockDescriptions: BlockDescription[]
+  scopeDepth: number
 }
 
 export interface AlgorithmDefinition {

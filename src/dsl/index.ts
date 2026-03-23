@@ -65,7 +65,7 @@ export function runAlgorithm(source: string, paramName: string, input: number[])
 
 function preParseCommentTemplates(nodes: ASTNode[]): void {
   for (const node of nodes) {
-    if (node.type === 'comment') {
+    if (node.type === 'comment' || node.type === 'describe') {
       node.parts = parseCommentTemplate(node.text)
     }
     forEachChildBody(node, preParseCommentTemplates)

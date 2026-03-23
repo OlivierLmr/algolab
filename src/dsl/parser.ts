@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, DescribeNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
   Expr,
 } from './ast.ts'
 
@@ -85,6 +85,7 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'undim': return parseUndim()
         case 'pointer': return parsePointer()
         case 'comment': return parseComment()
+        case 'describe': return parseDescribe()
         case 'alloc': return parseAlloc()
         case 'def': return parseDef()
         case 'return': return parseReturn()
@@ -195,6 +196,13 @@ export function parse(tokens: Token[]): AlgoNode {
     const text = expect('string').value
     expectNewline()
     return { type: 'comment', text, line: tok.line }
+  }
+
+  function parseDescribe(): DescribeNode {
+    const tok = expect('keyword', 'describe')
+    const text = expect('string').value
+    expectNewline()
+    return { type: 'describe', text, line: tok.line }
   }
 
   function parseDef(): DefNode {

@@ -309,6 +309,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         break
       }
       case 'comment':
+      case 'describe':
       case 'algo':
         break
     }

@@ -18,10 +18,21 @@ function DescriptionPanel() {
   const descriptions = recentDescriptions.value
   return (
     <>
+      {step?.blockDescriptions.map((bd, i) => (
+        <div
+          key={i}
+          class="description-block"
+          style={{ paddingLeft: bd.depth * 16 }}
+        >
+          {bd.text}
+        </div>
+      ))}
       {descriptions.map((d) => (
         <div class="description-previous">{d}</div>
       ))}
-      <div class="description-current">{step?.description || ''}</div>
+      {step?.description ? (
+        <div class="description-current">{step.description}</div>
+      ) : null}
     </>
   )
 }
