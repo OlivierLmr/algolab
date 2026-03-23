@@ -34,7 +34,7 @@ function DescriptionPanel() {
       {descriptions.map((d) => (
         <div class="description-previous" style={{ paddingLeft: oneShotIndent }}>{d}</div>
       ))}
-      {step?.description ? (
+      {step?.isComment ? (
         <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{step.description}</div>
       ) : null}
     </>
