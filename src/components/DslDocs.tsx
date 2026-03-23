@@ -15,7 +15,7 @@ export function DslDocs() {
             <tr><td><code>if cond</code> / <code>else</code></td><td>Conditional branch</td></tr>
             <tr><td><code>swap arr[i], arr[j]</code></td><td>Swap two array elements</td></tr>
             <tr><td><code>alloc name size</code></td><td>Allocate a new array</td></tr>
-            <tr><td><code>def fn(params)</code></td><td>Define a function</td></tr>
+            <tr><td><code>def fn(x, arr[])</code></td><td>Define a function (<code>[]</code> = array param)</td></tr>
             <tr><td><code>return expr</code></td><td>Return from function</td></tr>
             <tr><td><code>len(arr)</code></td><td>Get array length</td></tr>
             <tr><td><code>inf</code></td><td>Infinity value</td></tr>
@@ -25,12 +25,14 @@ export function DslDocs() {
         <div class="dsl-docs-col">
           <h4 class="dsl-docs-heading">Directives <code class="dsl-docs-prefix">#:</code></h4>
           <table class="dsl-docs-table">
-            <tr><td><code>comment "text"</code></td><td>Set step description</td></tr>
-            <tr><td><code>comment "&#123;expr&#125;"</code></td><td>Interpolate expression in text</td></tr>
-            <tr><td><code>comment "&#123;x ? 'a' : 'b'&#125;"</code></td><td>Conditional text</td></tr>
+            <tr><td><code>comment "text"</code></td><td>Step description (<code>&#123;expr&#125;</code> interpolation, <code>&#123;x ? 'a' : 'b'&#125;</code> ternary)</td></tr>
+            <tr><td><code>describe "text"</code></td><td>Block description (before <code>for</code>/<code>while</code>/<code>if</code>/<code>def</code>)</td></tr>
+            <tr><td><code>tooltip "text"</code></td><td>Hover tooltip (before <code>let</code>/<code>for</code>/<code>alloc</code>)</td></tr>
             <tr><td><code>pointer lbl on arr at expr</code></td><td>Show pointer arrow on array</td></tr>
+            <tr><td><code>gauge arr</code> / <code>ungauge arr</code></td><td>Show/hide value gauge on cells</td></tr>
             <tr><td><code>dim arr from i to j</code></td><td>Gray out array range</td></tr>
             <tr><td><code>undim arr from i to j</code></td><td>Restore grayed-out range</td></tr>
+            <tr><td><code>stepover</code></td><td>Hide next function from step-by-step view</td></tr>
           </table>
           <p class="dsl-docs-note">
             Directives are prefixed with <code>#:</code> and control
