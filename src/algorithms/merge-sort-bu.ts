@@ -8,10 +8,14 @@ export const mergeSortBU: AlgorithmDefinition = {
   #: gauge aux
 
   def merge(src[], dst[], lo, mid, hi)
+    #: describe "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
+    #: tooltip "read position in left half"
     let i = lo
+    #: tooltip "read position in right half"
     let j = mid + 1
-    #: comment "Merging src[{lo}..{mid}] and src[{mid + 1}..{hi}] into dst"
+    #: tooltip "write position in dst"
     for k from lo to hi
+      #: describe "Picking the smaller of the two front elements"
       if i <= mid and (j > hi or src[i] <= src[j])
         dst[k] = src[i]
         i = i + 1
@@ -20,12 +24,14 @@ export const mergeSortBU: AlgorithmDefinition = {
         j = j + 1
 
   def msort(src[], dst[], lo, hi)
+    #: describe "Sorting [{lo}..{hi}] from src into dst"
     #: dim src from 0 to lo - 1
     #: dim src from hi + 1 to len(src) - 1
     #: dim dst from 0 to lo - 1
     #: dim dst from hi + 1 to len(dst) - 1
     #: comment "Subarray [{lo}..{hi}]: {lo < hi ? 'needs splitting' : 'single element, already sorted'}"
     if lo < hi
+      #: tooltip "midpoint splitting the subarray"
       let mid = lo + (hi - lo) / 2
       #: comment "Sorting left half from {lo} to {mid}"
       msort(dst, src, lo, mid)

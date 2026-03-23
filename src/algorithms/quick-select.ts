@@ -6,12 +6,15 @@ export const quickSelect: AlgorithmDefinition = {
   #: gauge arr
 
   def partition(lo, hi)
+    #: describe "Partitioning arr[{lo}..{hi}] with pivot {arr[hi]}"
     #: dim arr from hi to hi
+    #: tooltip "left scan pointer"
     let i = lo - 1
+    #: tooltip "right scan pointer"
     let j = hi
     let done = 0
-    #: comment "Partitioning arr[{lo}..{hi - 1}] with pivot {arr[hi]}"
     while done == 0
+      #: describe "Scanning for elements to swap"
       i = i + 1
       while arr[i] < arr[hi]
         i = i + 1
@@ -28,17 +31,23 @@ export const quickSelect: AlgorithmDefinition = {
     swap arr[i], arr[hi]
     return i
 
+  #: tooltip "target rank (0-based): looking for the (k+1)-th smallest"
   let k = 2
   #: pointer k on arr at k
+  #: tooltip "left boundary of search range"
   let lo = 0
+  #: tooltip "right boundary of search range"
   let hi = len(arr) - 1
   let found = 0
   while hi > lo and found == 0
+    #: describe "Searching for rank {k} in arr[{lo}..{hi}]"
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
+    #: tooltip "median-of-range pivot index"
     let p = lo + (hi - lo) / 2
     #: comment "Choosing pivot at index {p}, value {arr[p]}"
     swap arr[hi], arr[p]
+    #: tooltip "final position of the pivot"
     let pivotIdx = partition(lo, hi)
     #: undim arr from 0 to lo - 1
     #: undim arr from hi + 1 to len(arr) - 1
