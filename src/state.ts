@@ -207,11 +207,12 @@ export const recentDescriptions = computed<string[]>(() => {
   const idx = currentStepIndex.value
   const all = steps.value
   if (idx >= all.length) return []
-  const currentDepth = all[idx].scopeDepth
+  const currentBlockDepth = all[idx].blockDescriptions.length
   const result: string[] = []
-  // Look back for one-shot descriptions at the same scope depth (same block)
+  // Look back for one-shot descriptions at the same block description depth
+  // (same level of nested describe blocks, not raw scope depth)
   for (let i = Math.max(0, idx - 4); i < idx; i++) {
-    if (all[i].description && all[i].scopeDepth === currentDepth) {
+    if (all[i].description && all[i].blockDescriptions.length === currentBlockDepth) {
       result.push(all[i].description)
     }
   }

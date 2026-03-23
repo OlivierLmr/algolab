@@ -143,6 +143,33 @@ describe('block descriptions (describe directive)', () => {
       expect(loopStep).toBeDefined()
       expect(loopStep!.scopeDepth).toBeGreaterThan(algoStep!.scopeDepth)
     })
+
+    it('one-shot comments from outer describe level do not leak into inner described blocks', () => {
+      const { steps } = compile(`algo Test(arr[])
+  #: describe "Outer loop pass {i}"
+  for i from 0 to 1
+    #: comment "Outer comment for i={i}"
+    let x = i
+    #: describe "Inner loop"
+    for j from 0 to 1
+      let y = j`)
+
+      // Steps inside the inner for loop have blockDescriptions.length === 2
+      // Steps in the outer for loop (but outside inner) have blockDescriptions.length === 1
+      // The "Outer comment" should NOT appear at inner block depth
+      const innerSteps = steps.filter(s => s.blockDescriptions.length === 2)
+      const outerSteps = steps.filter(s =>
+        s.blockDescriptions.length === 1 && s.description.includes('Outer comment')
+      )
+      expect(innerSteps.length).toBeGreaterThan(0)
+      expect(outerSteps.length).toBeGreaterThan(0)
+
+      // Verify inner steps don't carry outer one-shot comments in their block depth
+      for (const step of innerSteps) {
+        // Inner steps should not have "Outer comment" as their description
+        expect(step.description).not.toContain('Outer comment')
+      }
+    })
   })
 
   describe('loop describe re-evaluation', () => {
