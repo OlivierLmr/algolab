@@ -647,15 +647,20 @@ export function createRunner(algo: AlgoNode, _colorMap: Map<string, string>, typ
 
     function execWhile(node: WhileNode): void {
       let guard = 0
+      // Capture any #: comment preceding the while loop so it can be
+      // re-evaluated on every condition check, not just the first.
+      const loopCommentParts = pendingCommentParts
       pushScope()
       while (evalExpr(node.condition).num !== 0) {
         if (node.describe) applyDescribe(node.describe)
+        if (loopCommentParts) pendingCommentParts = loopCommentParts
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
         if (++guard > MAX_LOOP_ITERATIONS) throw new Error(`Infinite loop detected (${MAX_LOOP_ITERATIONS} iterations). Check your while loop condition.`)
       }
+      if (loopCommentParts) pendingCommentParts = loopCommentParts
       addComparisonHighlights(node.condition)
       snapshot(node.line, 'While condition is false')
       popScope()
