@@ -81,6 +81,7 @@ export function StepVisualizer() {
             onLeaveCell={onLeaveCell}
             showTooltip={showTooltip}
             hideTooltip={hideTooltip}
+            tooltips={step.tooltips}
           />
         ))}
 
@@ -112,28 +113,30 @@ interface SceneElementProps {
   onLeaveCell: () => void
   showTooltip: (name: string, rect: DOMRect, context: { index?: number; value?: number }) => void
   hideTooltip: () => void
+  tooltips: Record<string, string>
 }
 
-function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }: SceneElementProps) {
+function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip, tooltips }: SceneElementProps) {
   switch (el.kind) {
     case 'cell':
-      return <CellElement el={el} onHoverCell={onHoverCell} onLeaveCell={onLeaveCell} showTooltip={showTooltip} hideTooltip={hideTooltip} />
+      return <CellElement el={el} onHoverCell={onHoverCell} onLeaveCell={onLeaveCell} showTooltip={showTooltip} hideTooltip={hideTooltip} tooltips={tooltips} />
     case 'array-label':
       return <ArrayLabelElement el={el} />
     case 'variable':
-      return <VariableElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} />
+      return <VariableElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} tooltips={tooltips} />
     case 'frame':
       return <FrameElement el={el} />
     case 'pointer':
-      return <PointerElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} />
+      return <PointerElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} tooltips={tooltips} />
     default:
       return null
   }
 }
 
-function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }: SceneElementProps) {
+function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip, tooltips }: SceneElementProps) {
   const data = el.data as CellData
   const hasIteratorMeta = data.value.arrays.length > 0
+  const hasTooltip = data.arrayName in tooltips
   const displayVal = data.value.num === Infinity ? '\u221E' : String(data.value.num)
 
   const borderColor = data.highlightType
@@ -183,7 +186,7 @@ function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }:
           height: CELL_SIZE,
           borderColor,
           borderWidth,
-          cursor: hasIteratorMeta ? 'pointer' : undefined,
+          cursor: hasTooltip ? 'help' : hasIteratorMeta ? 'pointer' : undefined,
         }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
@@ -216,8 +219,9 @@ function ArrayLabelElement({ el }: { el: FlatElement }) {
   )
 }
 
-function VariableElement({ el, showTooltip, hideTooltip }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip'] }) {
+function VariableElement({ el, showTooltip, hideTooltip, tooltips }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip']; tooltips: Record<string, string> }) {
   const data = el.data as VariableData
+  const hasTooltip = data.name in tooltips
   const borderColor = data.highlightType ? getHighlightColor(data.highlightType) : '#999'
   const borderWidth = data.highlightType ? 3 : 1.5
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -238,6 +242,7 @@ function VariableElement({ el, showTooltip, hideTooltip }: { el: FlatElement; sh
         transform: `translate(${el.x}px, ${el.y}px)`,
         width: CELL_SIZE,
         opacity: el.opacity,
+        cursor: hasTooltip ? 'help' : undefined,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={hideTooltip}
@@ -286,8 +291,9 @@ function FrameElement({ el }: { el: FlatElement }) {
 
 const ANIMATION_DURATION = 200
 
-function PointerElement({ el, showTooltip, hideTooltip }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip'] }) {
+function PointerElement({ el, showTooltip, hideTooltip, tooltips }: { el: FlatElement; showTooltip: SceneElementProps['showTooltip']; hideTooltip: SceneElementProps['hideTooltip']; tooltips: Record<string, string> }) {
   const data = el.data as PointerData
+  const hasTooltip = data.name in tooltips
   const ref = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLDivElement>(null)
   const prevX = useRef<number | null>(null)
@@ -379,7 +385,7 @@ function PointerElement({ el, showTooltip, hideTooltip }: { el: FlatElement; sho
           color: data.color,
           font: 'bold 12px monospace',
           whiteSpace: 'nowrap',
-          cursor: 'help',
+          cursor: hasTooltip ? 'help' : undefined,
           pointerEvents: 'auto',
         }}
         onMouseEnter={() => {
