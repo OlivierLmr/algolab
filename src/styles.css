@@ -11,16 +11,21 @@ body {
 }
 
 #app {
-  max-width: 1100px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 12px 20px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .header h1 {
@@ -49,12 +54,13 @@ body {
 .main-layout {
   display: grid;
   grid-template-columns: 400px 0px 1fr;
-  grid-template-rows: 1fr auto;
-  gap: 20px;
+  gap: 0 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .resize-handle {
-  grid-row: 1 / -1;
   width: 12px;
   margin: 0 -6px;
   cursor: col-resize;
@@ -85,12 +91,12 @@ body {
 }
 
 .code-panel {
-  grid-row: 1 / -1;
   background: #1e1e1e;
   border-radius: 8px;
   padding: 16px;
-  overflow-x: auto;
+  overflow: auto;
   min-width: 0;
+  min-height: 0;
 }
 
 .code-panel pre {
@@ -202,18 +208,20 @@ body {
 
 .canvas-wrapper {
   min-width: 0;
-  overflow-x: auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .controls {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 20px;
-  padding: 12px 16px;
+  margin-top: 8px;
+  padding: 8px 16px;
   background: #fff;
   border-radius: 8px;
   border: 1px solid #ddd;
+  flex-shrink: 0;
 }
 
 .controls button {
@@ -251,6 +259,8 @@ body {
   border-radius: 8px;
   border: 1px solid #ddd;
   min-height: 36px;
+  margin-top: 8px;
+  flex-shrink: 0;
 }
 
 .description-block {
@@ -271,14 +281,15 @@ body {
 
 /* Editor Panel */
 .editor-panel {
-  grid-row: 1 / -1;
   background: #1e1e1e;
   border-radius: 8px;
   padding: 16px;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: hidden;
 }
 
 .editor-toolbar {
@@ -459,12 +470,13 @@ body {
   align-items: flex-start;
   gap: 12px;
   padding: 10px 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   background: #e8f4fd;
   border: 1px solid #b3d8f0;
   border-radius: 8px;
   font-size: 14px;
   color: #1a4a6e;
+  flex-shrink: 0;
 }
 
 .changelog-content {
@@ -513,10 +525,11 @@ body {
 
 /* DSL Documentation */
 .dsl-docs {
-  margin-top: 16px;
+  margin-top: 8px;
   border: 1px solid #ddd;
   border-radius: 8px;
   background: #2d2d2d;
+  flex-shrink: 0;
 }
 
 .dsl-docs-summary {

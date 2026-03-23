@@ -71,9 +71,9 @@ export function App() {
         <div class={`canvas-wrapper ${editMode ? 'dimmed' : ''}`}>
           <StepVisualizer />
         </div>
-        <div class={`description ${editMode ? 'dimmed' : ''}`}>
-          <DescriptionPanel />
-        </div>
+      </div>
+      <div class={`description ${editMode ? 'dimmed' : ''}`}>
+        <DescriptionPanel />
       </div>
       <Controls />
       {editMode && <DslDocs />}
