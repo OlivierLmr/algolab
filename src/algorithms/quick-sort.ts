@@ -5,7 +5,7 @@ export const quickSort: AlgorithmDefinition = {
   source: `algo QuickSort(arr[])
   #: gauge arr
 
-  #: describe "Partitioning arr[{$lo}..{$hi}] around pivot {$arr[hi]}"
+  #: describe "Partitioning arr[{$lo}..{$hi}] with pivot {$arr[hi]} (in the last position, {$hi})"
   def partition(lo, hi)
     #: dim arr from hi to hi
     #: comment "Scanner {$i} starts to the left of the first element"
@@ -17,22 +17,22 @@ export const quickSort: AlgorithmDefinition = {
     #: comment "{$i} and {$j} have {i < j ? 'not crossed, keep scanning' : 'crossed, stop scanning'}"
     #: describe "Scanning for elements to swap"
     while i < j
-      #: comment "Incrementing {$i}, looking for element larger than pivot"
+      #: comment "Incrementing {$i}; looking for next element to swap"
       i = i + 1
-      #: comment "arr[{$i}] = {$arr[i]} is {arr[i] < arr[hi] ? 'smaller than pivot, keep going' : 'larger than pivot, stop'}"
+      #: comment "arr[{$i}] ({$arr[i]}) is {arr[i] < arr[hi] ? 'smaller' : 'larger'} than the pivot ({$arr[hi]}). {arr[i] < arr[hi] ? 'It is on the correct side; keep going' : 'It is on the wrong side; stop to swap it'}"
       while arr[i] < arr[hi]
         i = i + 1
-      #: comment "Decrementing {$j}, looking for element smaller than pivot"
+      #: comment "Decrementing {$j}; looking for next element to swap"
       j = j - 1
-      #: comment "arr[{$j}] = {$arr[j]} is {arr[hi] < arr[j] ? 'larger than pivot, keep going' : 'smaller than pivot, stop'}"
+      #: comment "arr[{$j}] ({$arr[j]}) is {arr[hi] < arr[j] ? 'larger' : 'smaller'} than the pivot ({$arr[hi]}). {arr[hi] < arr[j] ? 'It is on the correct side; keep going' : 'It is on the wrong side; stop to swap it'}"
       while j > lo and arr[hi] < arr[j]
         j = j - 1
-      #: comment "{$i} and {$j} {i < j ? 'have not crossed, swap them' : 'have crossed, partitioning done'}"
+      #: comment "{$i} and {$j} {i < j ? 'have not yet crossed; they can swap' : 'have crossed; do not swap, loop will end'}"
       if i < j
-        #: comment "Swapping arr[{$i}]={$arr[i]} and arr[{$j}]={$arr[j]}"
+        #: comment "Swapping {$arr[i]} and {$arr[j]} since they are both on the wrong side."
         swap arr[i], arr[j]
     #: undim arr from hi to hi
-    #: comment "Placing pivot {$arr[hi]} at position {$i}"
+    #: comment "Placing pivot {$arr[hi]} at position {$i}. It now has smaller values to the left, and larger values to the right."
     swap arr[i], arr[hi]
     #: comment "Pivot is now at index {$i}"
     return i
@@ -41,22 +41,22 @@ export const quickSort: AlgorithmDefinition = {
   def qsort(lo, hi)
     #: dim arr from 0 to lo - 1
     #: dim arr from hi + 1 to len(arr) - 1
-    #: comment "Subarray has {hi - lo + 1} element(s). {lo < hi + 1 ? 'Handle recursively.' : 'Already sorted.'}"
-    if lo < hi + 1
-      #: comment "Choose pivot at middle index {$p}"
+    #: comment "Subarray has {hi - lo + 1} element(s). {hi - lo + 1 > 1 ? 'Handle recursively.' : 'Already sorted.'}"
+    if hi - lo + 1 > 1
+      #: comment "Choose pivot as element in the middle of the array"
       #: tooltip "Index of the pivot"
       let p = lo + (hi - lo) / 2
-      #: comment "Move pivot {$arr[p]} to last position for partitioning"
+      #: comment "Putting the pivot in the last position, since partition expects it there."
       swap arr[hi], arr[p]
-      #: comment "Partition arr[{$lo}..{$hi}] around pivot {$arr[hi]}"
+      #: comment "Partitioning between {$lo} and {$hi}, with pivot ({$arr[hi]}) in the last position"
       #: tooltip "final position of the pivot"
       let pivotIdx = partition(lo, hi)
-      #: comment "Pivot placed at {$pivotIdx}, recurse on left [{$lo}..{pivotIdx - 1}]"
+      #: comment "Recursively sorting left part (between {$lo} and {pivotIdx - 1})"
       qsort(lo, pivotIdx - 1)
-      #: comment "Recurse on right [{pivotIdx + 1}..{$hi}]"
+      #: comment "Recursively sorting right part (between {pivotIdx + 1} and {$hi})"
       qsort(pivotIdx + 1, hi)
 
-  #: comment "Sort the entire array"
+  #: comment "Calling qsort on the entire array"
   qsort(0, len(arr) - 1)`,
   defaultInput: [5, 3, 4, 1, 2],
 }
