@@ -170,6 +170,67 @@ describe('block descriptions (describe directive)', () => {
         expect(step.description).not.toContain('Outer comment')
       }
     })
+
+    it('one-shot comments from one recursive call do not leak into sibling recursive calls', () => {
+      const { steps } = compile(`algo Test(arr[])
+  #: describe "Working on {lo}..{hi}"
+  def work(lo, hi)
+    if lo < hi
+      #: comment "About to recurse from {lo}..{hi}"
+      let mid = lo + (hi - lo) / 2
+      work(lo, mid)
+      work(mid + 1, hi)
+
+  work(0, 4)`)
+
+      // Find steps that are the first step inside a recursive work() call.
+      // These are steps where blockDescriptions changed from the previous step
+      // (i.e. re-entered a described function). They should NOT carry comments
+      // from the sibling call that just returned.
+      for (let i = 1; i < steps.length; i++) {
+        const prev = steps[i - 1]
+        const curr = steps[i]
+        // Detect entry into a new call: blockDescriptions depth decreased then
+        // increased back (sibling call boundary)
+        if (
+          curr.blockDescriptions.length > 0 &&
+          prev.blockDescriptions.length < curr.blockDescriptions.length &&
+          curr.description && !curr.description.includes('About to recurse')
+        ) {
+          // First step of a new call should not show comments from the previous call
+          // (the "About to recurse" comment belongs to an earlier sibling/parent)
+        }
+      }
+
+      // More direct test: find pairs of sibling recursive calls.
+      // After work(lo, mid) returns, the next work(mid+1, hi) should not see
+      // "About to recurse from lo..hi" as a recent comment (that was before
+      // the first recursive call, separated by a block boundary).
+      const commentSteps = steps.filter(s => s.description.includes('About to recurse'))
+      expect(commentSteps.length).toBeGreaterThan(0)
+
+      // Each "About to recurse" comment should be immediately followed (within
+      // the same block depth) by steps in the same call, not in a different one
+      for (const cs of commentSteps) {
+        const csIdx = steps.indexOf(cs)
+        // The very next step should still be at the same block depth or deeper
+        // (the let mid = ... or the recursive call entry)
+        // But after the first recursive call returns and the second starts,
+        // there must be a block depth change in between
+        const bdLen = cs.blockDescriptions.length
+        let foundBoundary = false
+        for (let j = csIdx + 1; j < steps.length && j < csIdx + 20; j++) {
+          if (steps[j].blockDescriptions.length !== bdLen) {
+            foundBoundary = true
+          }
+          // After a boundary, if we return to same depth, comments should not carry over
+          if (foundBoundary && steps[j].blockDescriptions.length === bdLen) {
+            expect(steps[j].description).not.toContain('About to recurse')
+            break
+          }
+        }
+      }
+    })
   })
 
   describe('loop describe re-evaluation', () => {
