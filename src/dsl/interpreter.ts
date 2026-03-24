@@ -347,13 +347,15 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       }
     }
 
-    function snapshot(line: number, description: string): void {
+    function snapshot(line: number, description: string, commentParts?: CommentPart[]): void {
+      // Use explicit commentParts if provided, otherwise consume pending
+      const parts = commentParts ?? pendingCommentParts
       let isComment = false
       let descriptionParts: DescriptionSegment[] = [{ type: 'text', text: description }]
-      if (pendingCommentParts !== null) {
-        descriptionParts = evaluateCommentSegments(pendingCommentParts)
+      if (parts !== null) {
+        descriptionParts = evaluateCommentSegments(parts)
         description = segmentsToText(descriptionParts)
-        pendingCommentParts = null
+        if (!commentParts) pendingCommentParts = null  // only clear pending if we consumed it
         isComment = true
       }
 
@@ -672,20 +674,19 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       let guard = 0
       // Capture any #: comment preceding the while loop so it can be
       // re-evaluated on every condition check, not just the first.
-      const loopCommentParts = pendingCommentParts
+      const loopComment = pendingCommentParts
+      pendingCommentParts = null  // consumed — will be passed explicitly
       pushScope()
       while (evalExpr(node.condition).num !== 0) {
         if (node.describe) applyDescribe(node.describe, node.line)
-        if (loopCommentParts) pendingCommentParts = loopCommentParts
         addComparisonHighlights(node.condition)
-        snapshot(node.line, 'While condition is true')
+        snapshot(node.line, 'While condition is true', loopComment ?? undefined)
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
         if (++guard > MAX_LOOP_ITERATIONS) throw new Error(`Infinite loop detected (${MAX_LOOP_ITERATIONS} iterations). Check your while loop condition.`)
       }
-      if (loopCommentParts) pendingCommentParts = loopCommentParts
       addComparisonHighlights(node.condition)
-      snapshot(node.line, 'While condition is false')
+      snapshot(node.line, 'While condition is false', loopComment ?? undefined)
       popScope()
     }
 

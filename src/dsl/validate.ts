@@ -1,4 +1,5 @@
 import type { AlgoNode, ASTNode, Expr, DefNode } from './ast.ts'
+import { forEachChildBody } from './ast.ts'
 
 export interface ValidationError {
   line: number
@@ -27,15 +28,10 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
     for (const node of nodes) {
       if (node.type === 'def') {
         functions.set(node.name, { params: node.params })
-        collectDefs(node.body)
       } else if (node.type === 'alloc') {
         globalArrays.add(node.arrayName)
-      } else if (node.type === 'for' || node.type === 'while') {
-        collectDefs(node.body)
-      } else if (node.type === 'if') {
-        collectDefs(node.body)
-        collectDefs(node.elseBody)
       }
+      forEachChildBody(node, collectDefs)
     }
   }
   collectDefs(ast.body)
