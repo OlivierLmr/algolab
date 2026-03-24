@@ -50,6 +50,8 @@ function DescriptionPanel() {
           key={i}
           class="description-block"
           style={{ paddingLeft: bd.depth * 16 }}
+          onMouseEnter={() => { hoveredDescriptionLine.value = bd.line }}
+          onMouseLeave={() => { hoveredDescriptionLine.value = null }}
         >
           {renderSegments(bd.parts, step?.tooltips, step)}
         </div>

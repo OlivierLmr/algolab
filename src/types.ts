@@ -42,6 +42,7 @@ export interface BlockDescription {
   text: string
   parts: DescriptionSegment[]
   depth: number
+  line: number
 }
 
 export interface Step {

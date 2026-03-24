@@ -54,7 +54,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
     // --- Block descriptions (sticky per-block comments) ---
     // Each entry has the evaluated text and the scope depth at which it was registered.
     // On scope pop, entries at deeper scope depths are removed.
-    const blockDescs: { text: string; parts: DescriptionSegment[]; scopeDepth: number }[] = []
+    const blockDescs: { text: string; parts: DescriptionSegment[]; scopeDepth: number; line: number }[] = []
 
     // --- Tooltips (hover descriptions for variables/arrays) ---
     // Each scope level maps variable names to their tooltip template strings.
@@ -396,6 +396,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
           text: bd.text,
           parts: bd.parts,
           depth: i,
+          line: bd.line,
         })),
         tooltips: collectTooltips(),
         scopeDepth: scopeStack.length,
@@ -517,7 +518,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
         }
 
         // Apply describe annotation if present on the def
-        if (proc.describe) applyDescribe(proc.describe)
+        if (proc.describe) applyDescribe(proc.describe, proc.defLine)
 
         // Save caller's dim ranges and gauge arrays
         const savedDimRanges = [...dimRanges]
@@ -672,7 +673,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       for (let i = fromVal; i <= toVal; i++) {
         const val = stampValue(i, loopVarType)
         setVar(node.variable, val)
-        if (node.describe) applyDescribe(node.describe)
+        if (node.describe) applyDescribe(node.describe, node.line)
         highlightComparisonSide({ type: 'identifier', name: node.variable })
         highlightComparisonSide(node.to)
         snapshot(node.line, `Set ${node.variable} = ${i}`)
@@ -689,7 +690,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       const loopCommentParts = pendingCommentParts
       pushScope()
       while (evalExpr(node.condition).num !== 0) {
-        if (node.describe) applyDescribe(node.describe)
+        if (node.describe) applyDescribe(node.describe, node.line)
         if (loopCommentParts) pendingCommentParts = loopCommentParts
         addComparisonHighlights(node.condition)
         snapshot(node.line, 'While condition is true')
@@ -717,7 +718,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
 
       if (cond !== 0) {
         pushScope()
-        if (node.describe) applyDescribe(node.describe)
+        if (node.describe) applyDescribe(node.describe, node.line)
         for (const stmt of node.body) execNode(stmt)
         flushPendingComment(node.line)
         popScope()
@@ -805,7 +806,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
     }
 
     /** Evaluate a describe annotation and push/upsert it in blockDescs. */
-    function applyDescribe(describe: { text: string; parts?: CommentPart[] }): void {
+    function applyDescribe(describe: { text: string; parts?: CommentPart[] }, line: number): void {
       const rawParts = describe.parts ?? [{ type: 'text', text: describe.text }]
       const text = evaluateCommentParts(rawParts)
       const segments = evaluateCommentSegments(rawParts)
@@ -813,9 +814,9 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       // Upsert: replace existing entry at same depth, or push new
       const existing = blockDescs.findIndex(bd => bd.scopeDepth === depth)
       if (existing !== -1) {
-        blockDescs[existing] = { text, parts: segments, scopeDepth: depth }
+        blockDescs[existing] = { text, parts: segments, scopeDepth: depth, line }
       } else {
-        blockDescs.push({ text, parts: segments, scopeDepth: depth })
+        blockDescs.push({ text, parts: segments, scopeDepth: depth, line })
       }
     }
 
