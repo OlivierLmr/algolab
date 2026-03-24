@@ -1,8 +1,7 @@
 import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine } from '../state.ts'
 import { colorizeTokens, isDirectiveLine } from './colorize.ts'
-import { useMemo, useRef, useCallback } from 'preact/hooks'
-import { useSignal } from '@preact/signals'
-import { evaluateTooltip } from '../tooltip.ts'
+import { useMemo, useCallback } from 'preact/hooks'
+import { useTooltip } from '../hooks/useTooltip.ts'
 
 export function CodePanel() {
   const algo = currentAlgo.value
@@ -121,37 +120,22 @@ function VariablesSection({ varEntries, colorMap, step }: {
   colorMap: Map<string, string>
   step: Step
 }) {
-  const tooltipInfo = useSignal<{ text: string; x: number; y: number } | null>(null)
-  const sectionRef = useRef<HTMLDivElement>(null)
+  const { tooltip, containerRef, show, hide } = useTooltip(step)
 
   const onMouseEnter = useCallback((name: string, value: number, e: MouseEvent) => {
-    const template = step.tooltips[name]
-    if (!template) return
     const target = e.currentTarget as HTMLElement
-    const rect = target.getBoundingClientRect()
-    const sectionRect = sectionRef.current?.getBoundingClientRect()
-    if (!sectionRect) return
-    const text = evaluateTooltip(template, step, { value })
-    tooltipInfo.value = {
-      text,
-      x: rect.left + rect.width / 2 - sectionRect.left,
-      y: rect.top - sectionRect.top,
-    }
-  }, [step])
-
-  const onMouseLeave = useCallback(() => {
-    tooltipInfo.value = null
-  }, [])
+    show(name, target.getBoundingClientRect(), { value })
+  }, [show])
 
   return (
-    <div class="variables-section" ref={sectionRef} style={{ position: 'relative' }}>
+    <div class="variables-section" ref={containerRef} style={{ position: 'relative' }}>
       <div class="variables-title">Variables</div>
       {varEntries.map(([name, value]) => (
         <div
           key={name}
           class="variable-entry"
           onMouseEnter={(e: MouseEvent) => onMouseEnter(name, value, e)}
-          onMouseLeave={onMouseLeave}
+          onMouseLeave={hide}
         >
           <span style={colorMap.has(name) ? { color: colorMap.get(name), fontWeight: 'bold' } : undefined}>
             {name}
@@ -160,15 +144,15 @@ function VariablesSection({ varEntries, colorMap, step }: {
           {value}
         </div>
       ))}
-      {tooltipInfo.value && (
+      {tooltip.value && (
         <div
           class="viz-tooltip"
           style={{
-            left: tooltipInfo.value.x,
-            top: tooltipInfo.value.y,
+            left: tooltip.value.x,
+            top: tooltip.value.y,
           }}
         >
-          {tooltipInfo.value.text}
+          {tooltip.value.text}
         </div>
       )}
     </div>

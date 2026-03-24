@@ -1,6 +1,12 @@
 import { useCallback, useRef } from 'preact/hooks'
 import { codePanelWidth } from '../state.ts'
 
+/** Minimum width of the code panel (pixels). */
+const MIN_CODE_PANEL_WIDTH = 250
+
+/** Minimum width reserved for the visualizer panel (pixels). */
+const MIN_VISUALIZER_WIDTH = 200
+
 export function ResizeHandle() {
   const dragging = useRef(false)
 
@@ -15,7 +21,7 @@ export function ResizeHandle() {
       const container = document.querySelector('.main-layout') as HTMLElement
       if (!container) return
       const rect = container.getBoundingClientRect()
-      const newWidth = Math.max(250, Math.min(e.clientX - rect.left, rect.width - 200))
+      const newWidth = Math.max(MIN_CODE_PANEL_WIDTH, Math.min(e.clientX - rect.left, rect.width - MIN_VISUALIZER_WIDTH))
       codePanelWidth.value = newWidth
     }
 

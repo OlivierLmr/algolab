@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useLayoutEffect, useEffect } from 'preact/hooks'
+import { useMemo, useCallback, useRef, useLayoutEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
@@ -6,21 +6,13 @@ import type { FlatElement, CellData, LabelData, VariableData, FrameData, Pointer
 import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP, DIMMED_OPACITY } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
-import { evaluateTooltip } from '../../tooltip.ts'
-
-interface TooltipInfo {
-  text: string
-  x: number
-  y: number
-}
+import { useTooltip } from '../../hooks/useTooltip.ts'
 
 export function StepVisualizer() {
   const step = currentStep.value
   const colorMap = pipelineColorMap.value
   const hoveredCell = useSignal<{ arrayName: string; cellIndex: number } | null>(null)
-  const tooltip = useSignal<TooltipInfo | null>(null)
-  const sceneRef = useRef<HTMLDivElement>(null)
-  const tooltipRef = useRef<HTMLDivElement>(null)
+  const { tooltip, containerRef: sceneRef, tooltipRef, show: showTooltip, hide: hideTooltip } = useTooltip(step, { clamp: true })
 
   const layout = useMemo(() => {
     if (!step) return null
@@ -39,41 +31,6 @@ export function StepVisualizer() {
       hoveredCell.value = null
     }
   }, [])
-
-  const showTooltip = useCallback((name: string, rect: DOMRect, context: { index?: number; value?: number }) => {
-    if (!step) return
-    const template = step.tooltips[name]
-    if (!template) { tooltip.value = null; return }
-    const sceneRect = sceneRef.current?.getBoundingClientRect()
-    if (!sceneRect) return
-    const text = evaluateTooltip(template, step, context)
-    tooltip.value = {
-      text,
-      x: rect.left + rect.width / 2 - sceneRect.left,
-      y: rect.top - sceneRect.top,
-    }
-  }, [step])
-
-  const hideTooltip = useCallback(() => {
-    tooltip.value = null
-  }, [])
-
-  // Clamp tooltip position so it stays within the scene bounds
-  useEffect(() => {
-    const el = tooltipRef.current
-    const scene = sceneRef.current
-    if (!el || !scene || !tooltip.value) return
-    const tooltipWidth = el.offsetWidth
-    const sceneWidth = scene.offsetWidth
-    const halfWidth = tooltipWidth / 2
-    const x = tooltip.value.x
-    // The tooltip is centered (transform: translateX(-50%)), so its left edge is at x - halfWidth
-    if (x - halfWidth < 0) {
-      el.style.left = `${halfWidth}px`
-    } else if (x + halfWidth > sceneWidth) {
-      el.style.left = `${sceneWidth - halfWidth}px`
-    }
-  })
 
   if (!step || !layout) {
     return <div class="viz-container" />

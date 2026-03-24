@@ -103,6 +103,10 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
 
         if (sameArray) {
           const midX = (sourceCenterX + targetCenterX) / 2
+          // Quadratic bezier arc below the array for same-array arrows.
+          // arcDrop scales linearly with horizontal distance (0.3x slope),
+          // with a 15px minimum and 35px cap to keep short arrows visible
+          // without tall arrows dominating the layout.
           const arcDrop = Math.min(35, Math.abs(targetCenterX - sourceCenterX) * 0.3 + 15)
           const controlY = ha.sourceY + CELL_SIZE + arcDrop
           path = `M${sourceCenterX},${sourceCenterY} Q${midX},${controlY} ${targetCenterX},${targetIndexY}`

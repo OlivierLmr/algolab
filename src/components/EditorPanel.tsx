@@ -91,7 +91,7 @@ export function EditorPanel() {
             customInput.value = data.defaultInput
           }
         } catch {
-          // ignore invalid files
+          editorError.value = 'Failed to import: file is not valid .algolab JSON'
         }
       }
       reader.readAsText(file)

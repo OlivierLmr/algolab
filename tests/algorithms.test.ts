@@ -59,6 +59,39 @@ describe('Counting Sort: retroactive cell tagging', () => {
   })
 })
 
+describe('Sorting algorithms: edge-case inputs', () => {
+  const sortAlgos = algorithms.filter(a =>
+    ['Bubble Sort', 'Selection Sort', 'Insertion Sort',
+     'Merge Sort (L+R copies)', 'Merge Sort (two arrays)',
+     'Quick Sort', 'Quick Sort (Semi-Recursive)',
+     'Counting Sort', 'Radix Sort (LSD)'].includes(a.name)
+  )
+
+  const edgeCases: { name: string; input: number[] }[] = [
+    { name: 'single element', input: [42] },
+    { name: 'already sorted', input: [1, 2, 3, 4, 5] },
+    { name: 'reverse sorted', input: [5, 4, 3, 2, 1] },
+    { name: 'all duplicates', input: [3, 3, 3, 3, 3] },
+    { name: 'two elements', input: [2, 1] },
+    { name: 'with duplicates', input: [4, 2, 3, 2, 1, 4] },
+  ]
+
+  for (const algo of sortAlgos) {
+    for (const { name, input } of edgeCases) {
+      it(`${algo.name} handles ${name}`, () => {
+        const steps = runAlgorithm(algo.source, 'arr', input)
+        expect(steps.length).toBeGreaterThan(0)
+        const lastStep = steps[steps.length - 1]
+        const arrData = lastStep.arrays.find(a => a.name === 'arr')
+        expect(arrData).toBeDefined()
+        const sorted = arrData!.values.map(v => v.num)
+        const expected = [...input].sort((a, b) => a - b)
+        expect(sorted).toEqual(expected)
+      })
+    }
+  }
+})
+
 describe('Quick Select: finds k-th element', () => {
   const qs = algorithms.find(a => a.name === 'Quick Select')!
 
