@@ -7,7 +7,7 @@ export const mergeSortBU: AlgorithmDefinition = {
   alloc aux len(arr)
   #: gauge aux
 
-  #: describe "Merging src[{$lo}..{$mid}] and src[{mid + 1}..{$hi}] into dst"
+  #: describe "Merging src[{$=lo}..{$=mid}] and src[{mid + 1}..{$=hi}] into dst"
   def merge(src[], dst[], lo, mid, hi)
     #: tooltip "read position in left half"
     let i = lo
@@ -24,24 +24,24 @@ export const mergeSortBU: AlgorithmDefinition = {
         dst[k] = src[j]
         j = j + 1
 
-  #: describe "Sorting [{$lo}..{$hi}] from src into dst"
+  #: describe "Sorting [{$=lo}..{$=hi}] from src into dst"
   def msort(src[], dst[], lo, hi)
     #: dim src from 0 to lo - 1
     #: dim src from hi + 1 to len(src) - 1
     #: dim dst from 0 to lo - 1
     #: dim dst from hi + 1 to len(dst) - 1
-    #: comment "Subarray [{$lo}..{$hi}] has {hi - lo + 1} element(s). {lo < hi ? 'Handle recursively.' : 'Already sorted.'}"
+    #: comment "Subarray [{$=lo}..{$=hi}] has {hi - lo + 1} element(s). {lo < hi ? 'Handle recursively.' : 'Already sorted.'}"
     if lo < hi
       #: tooltip "midpoint splitting the subarray"
       let mid = lo + (hi - lo) / 2
-      #: comment "Recursively sorting left half [{$lo}..{$mid}]"
+      #: comment "Recursively sorting left half [{$=lo}..{$=mid}]"
       msort(dst, src, lo, mid)
-      #: comment "Recursively sorting right half [{mid + 1}..{$hi}]"
+      #: comment "Recursively sorting right half [{mid + 1}..{$=hi}]"
       msort(dst, src, mid + 1, hi)
-      #: comment "Both halves sorted, merging into dst[{$lo}..{$hi}]"
+      #: comment "Both halves sorted, merging into dst[{$=lo}..{$=hi}]"
       merge(src, dst, lo, mid, hi)
     else
-      #: comment "Single element: copying src[{$lo}] = {$src[lo]} to dst"
+      #: comment "Single element: copying src[{$*lo}] = {$*src[lo]} to dst"
       dst[lo] = src[lo]
 
   #: comment "Copying arr into aux before sorting"

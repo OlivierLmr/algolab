@@ -114,7 +114,7 @@ export type CommentPart =
   | { type: 'text'; text: string }
   | { type: 'expr'; expr: Expr }
   | { type: 'ternary'; condition: Expr; trueText: string; falseText: string }
-  | { type: 'pill'; name: string; expr: Expr }
+  | { type: 'pill'; name: string; expr: Expr; display: 'name' | 'name-value' | 'value' }
 
 export interface CommentNode {
   type: 'comment'

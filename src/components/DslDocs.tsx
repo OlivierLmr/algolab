@@ -25,7 +25,7 @@ export function DslDocs() {
         <div class="dsl-docs-col">
           <h4 class="dsl-docs-heading">Directives <code class="dsl-docs-prefix">#:</code></h4>
           <table class="dsl-docs-table">
-            <tr><td><code>comment "text"</code></td><td>Step description (<code>&#123;expr&#125;</code> value, <code>&#123;$var&#125;</code> pill, <code>&#123;x ? 'a' : 'b'&#125;</code> ternary)</td></tr>
+            <tr><td><code>comment "text"</code></td><td>Step description (<code>&#123;expr&#125;</code> value, <code>&#123;$var&#125;</code> name, <code>&#123;$=var&#125;</code> name+value, <code>&#123;$*var&#125;</code> value, <code>&#123;x ? 'a' : 'b'&#125;</code> ternary)</td></tr>
             <tr><td><code>describe "text"</code></td><td>Block description (before <code>for</code>/<code>while</code>/<code>if</code>/<code>def</code>)</td></tr>
             <tr><td><code>tooltip "text"</code></td><td>Hover tooltip (before <code>let</code>/<code>for</code>/<code>alloc</code>)</td></tr>
             <tr><td><code>pointer lbl on arr at expr</code></td><td>Show pointer arrow on array</td></tr>

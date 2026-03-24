@@ -87,11 +87,19 @@ function parseCommentTemplate(text: string): CommentPart[] {
     }
     const inner = match[1]
     try {
-      // Check for pill syntax: {$varname} or {$expr}
+      // Check for pill syntax: {$var} name-only, {$=var} name+value, {$*var} value-only
       if (inner.startsWith('$')) {
-        const pillInner = inner.slice(1).trim()
+        let pillInner = inner.slice(1).trim()
+        let display: 'name' | 'name-value' | 'value' = 'name'
+        if (pillInner.startsWith('=')) {
+          display = 'name-value'
+          pillInner = pillInner.slice(1).trim()
+        } else if (pillInner.startsWith('*')) {
+          display = 'value'
+          pillInner = pillInner.slice(1).trim()
+        }
         const expr = parseExprFromString(pillInner)
-        parts.push({ type: 'pill', name: pillInner, expr })
+        parts.push({ type: 'pill', name: pillInner, expr, display })
         lastIndex = regex.lastIndex
         continue
       }

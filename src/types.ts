@@ -36,7 +36,7 @@ export interface CallFrame {
 
 export type DescriptionSegment =
   | { type: 'text'; text: string }
-  | { type: 'pill'; name: string; value: number; color: string | undefined }
+  | { type: 'pill'; name: string; value: number; color: string | undefined; display: 'name' | 'name-value' | 'value' }
 
 export interface BlockDescription {
   text: string
@@ -62,7 +62,14 @@ export interface Step {
 }
 
 export function segmentsToString(parts: DescriptionSegment[]): string {
-  return parts.map(p => p.type === 'text' ? p.text : `${p.name}=${p.value}`).join('')
+  return parts.map(p => {
+    if (p.type === 'text') return p.text
+    switch (p.display) {
+      case 'name': return p.name
+      case 'value': return String(p.value)
+      default: return `${p.name}=${p.value}`
+    }
+  }).join('')
 }
 
 export interface AlgorithmDefinition {

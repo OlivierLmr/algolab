@@ -11,7 +11,7 @@ export const bubbleSort: AlgorithmDefinition = {
     #: tooltip "position being compared"
     #: describe "Comparing adjacent elements"
     for j from 0 to len(arr) - 2 - i
-      #: comment "Comparing {$arr[j]} and {$arr[j + 1]}: {arr[j] > arr[j + 1] ? 'out of order, swapping' : 'already in order'}"
+      #: comment "Comparing {$*arr[j]} and {$*arr[j + 1]}: {arr[j] > arr[j + 1] ? 'out of order, swapping' : 'already in order'}"
       if arr[j] > arr[j + 1]
         swap arr[j], arr[j + 1]
     #: dim arr from len(arr) - 1 - i to len(arr) - 1`,

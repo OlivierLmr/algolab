@@ -203,7 +203,14 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
             }
             catch { return '{?}' }
           case 'pill':
-            try { return `${part.name}=${evalExpr(part.expr).num}` }
+            try {
+              const v = evalExpr(part.expr).num
+              switch (part.display) {
+                case 'name': return part.name
+                case 'value': return String(v)
+                default: return `${part.name}=${v}`
+              }
+            }
             catch { return `${part.name}=?` }
         }
       }).join('')
@@ -225,7 +232,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
           case 'pill':
             try {
               const val = evalExpr(part.expr)
-              return { type: 'pill' as const, name: part.name, value: val.num, color: colorMap.get(part.name) }
+              return { type: 'pill' as const, name: part.name, value: val.num, color: colorMap.get(part.name), display: part.display }
             }
             catch { return { type: 'text' as const, text: `${part.name}=?` } }
         }
