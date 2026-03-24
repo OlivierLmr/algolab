@@ -261,6 +261,92 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       return result
     }
 
+    /** Build a CallFrame for a single active frame. */
+    function buildFrame(fi: number): { frame: CallFrame; ownedArrays: Set<string>; ownedVars: Set<string> } {
+      const af = callFrameStack[fi]
+      const label = `${af.name}(${af.argStrings.join(', ')})`
+      const arrayRefs = [...af.arrayAliases.entries()].map(
+        ([paramName, targetName]) => ({ paramName, targetName })
+      )
+
+      // Frame's scope range
+      const scopeFrom = af.scopeBase
+      const scopeTo = fi + 1 < callFrameStack.length
+        ? callFrameStack[fi + 1].scopeBase
+        : scopeStack.length
+
+      // Frame's variables: regular vars + evaluated expression vars
+      const ownedVars = new Set<string>()
+      const frameVars: Record<string, Value> = {}
+      for (let si = scopeFrom; si < scopeTo; si++) {
+        for (const [k, v] of scopeStack[si]) {
+          frameVars[k] = v
+          ownedVars.add(k)
+        }
+      }
+      const exprVars = evaluateExprVars(scopeFrom, scopeTo)
+      for (const [k, v] of Object.entries(exprVars)) {
+        frameVars[k] = v
+        ownedVars.add(k)
+      }
+
+      // Frame's arrays
+      const ownedArrays = new Set<string>()
+      const frameArrays: TrackedArray[] = []
+      for (const arrName of af.allocatedArrays) {
+        const arr = arrays.get(arrName)
+        if (arr) {
+          frameArrays.push({ name: arrName, values: arr.map(v => ({ ...v })) })
+          ownedArrays.add(arrName)
+        }
+      }
+
+      // Filter highlights/dims/gauges for this frame
+      const isInnermost = fi === callFrameStack.length - 1
+      const frame: CallFrame = {
+        label,
+        variables: frameVars,
+        arrayRefs,
+        arrays: frameArrays,
+        highlights: currentHighlights.filter(h => af.allocatedArrays.has(h.arrayName)),
+        varHighlights: isInnermost ? currentVarHighlights.filter(h => h.varName in frameVars) : [],
+        dimRanges: dimRanges.filter(d => af.allocatedArrays.has(d.arrayName)),
+        gaugeArrays: [...gaugeArrays].filter(n => af.allocatedArrays.has(n)),
+      }
+      return { frame, ownedArrays, ownedVars }
+    }
+
+    /** Collect global (non-frame-owned) arrays, variables, highlights, dims, gauges. */
+    function buildGlobalState(frameArrayNames: Set<string>, frameVarNames: Set<string>) {
+      const globalArrays: TrackedArray[] = []
+      for (const [name, values] of arrays) {
+        if (!frameArrayNames.has(name)) {
+          globalArrays.push({ name, values: values.map(v => ({ ...v })) })
+        }
+      }
+
+      const globalVars: Record<string, Value> = {}
+      const globalScopeTo = callFrameStack.length > 0 ? callFrameStack[0].scopeBase : scopeStack.length
+      for (let si = 0; si < globalScopeTo; si++) {
+        for (const [k, v] of scopeStack[si]) {
+          if (!frameVarNames.has(k)) globalVars[k] = v
+        }
+      }
+      const globalExprVars = evaluateExprVars(0, globalScopeTo)
+      for (const [k, v] of Object.entries(globalExprVars)) {
+        if (!frameVarNames.has(k)) globalVars[k] = v
+      }
+
+      return {
+        arrays: globalArrays,
+        variables: globalVars,
+        highlights: currentHighlights.filter(h => !frameArrayNames.has(h.arrayName)),
+        varHighlights: currentVarHighlights.filter(h => !frameVarNames.has(h.varName)),
+        dimRanges: dimRanges.filter(d => !frameArrayNames.has(d.arrayName)),
+        gaugeArrays: [...gaugeArrays].filter(n => !frameArrayNames.has(n)),
+      }
+    }
+
     function snapshot(line: number, description: string): void {
       let isComment = false
       let descriptionParts: DescriptionSegment[] = [{ type: 'text', text: description }]
@@ -271,118 +357,21 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
         isComment = true
       }
 
-      const allDimRanges: DimRange[] = [...dimRanges]
-
-      // Build call stack frames
+      // Build call stack frames, tracking which arrays/vars are frame-owned
       const frameArrayNames = new Set<string>()
       const frameVarNames = new Set<string>()
       const callStackFrames: CallFrame[] = []
-
-      if (callFrameStack.length > 0) {
-        for (let fi = 0; fi < callFrameStack.length; fi++) {
-          const af = callFrameStack[fi]
-          const label = `${af.name}(${af.argStrings.join(', ')})`
-
-          // Build arrayRefs from aliases
-          const arrayRefs = [...af.arrayAliases.entries()].map(
-            ([paramName, targetName]) => ({ paramName, targetName })
-          )
-
-          // Frame's scope range
-          const scopeFrom = af.scopeBase
-          const scopeTo = fi + 1 < callFrameStack.length
-            ? callFrameStack[fi + 1].scopeBase
-            : scopeStack.length
-
-          // Frame's variables: regular vars + evaluated expression vars
-          const frameVars: Record<string, Value> = {}
-          for (let si = scopeFrom; si < scopeTo; si++) {
-            for (const [k, v] of scopeStack[si]) {
-              frameVars[k] = v
-              frameVarNames.add(k)
-            }
-          }
-          // Inject scoped expression variables
-          const exprVars = evaluateExprVars(scopeFrom, scopeTo)
-          for (const [k, v] of Object.entries(exprVars)) {
-            frameVars[k] = v
-            frameVarNames.add(k)
-          }
-
-          // Frame's arrays
-          const frameArrays: TrackedArray[] = []
-          for (const arrName of af.allocatedArrays) {
-            const arr = arrays.get(arrName)
-            if (arr) {
-              frameArrays.push({ name: arrName, values: arr.map(v => ({ ...v })) })
-              frameArrayNames.add(arrName)
-            }
-          }
-
-          // Filter highlights for this frame's arrays
-          const frameHighlights = currentHighlights.filter(h => af.allocatedArrays.has(h.arrayName))
-          // Only highlight variables in the innermost (currently executing) frame
-          const isInnermostFrame = fi === callFrameStack.length - 1
-          const frameVarHighlights = isInnermostFrame
-            ? currentVarHighlights.filter(h => h.varName in frameVars)
-            : []
-          // Filter dim ranges for this frame's arrays
-          const frameDimRanges = allDimRanges.filter(d => af.allocatedArrays.has(d.arrayName))
-          const frameGaugeArrays = [...gaugeArrays].filter(n => af.allocatedArrays.has(n))
-
-          callStackFrames.push({
-            label,
-            variables: frameVars,
-            arrayRefs,
-            arrays: frameArrays,
-            highlights: frameHighlights,
-            varHighlights: frameVarHighlights,
-            dimRanges: frameDimRanges,
-            gaugeArrays: frameGaugeArrays,
-          })
-        }
+      for (let fi = 0; fi < callFrameStack.length; fi++) {
+        const { frame, ownedArrays, ownedVars } = buildFrame(fi)
+        callStackFrames.push(frame)
+        for (const n of ownedArrays) frameArrayNames.add(n)
+        for (const n of ownedVars) frameVarNames.add(n)
       }
 
-      // Global arrays: not owned by any frame
-      const globalArrays: TrackedArray[] = []
-      for (const [name, values] of arrays) {
-        if (!frameArrayNames.has(name)) {
-          globalArrays.push({ name, values: values.map(v => ({ ...v })) })
-        }
-      }
-
-      // Global variables: from algo-level scopes only + their expression vars
-      const globalVars: Record<string, Value> = {}
-      const globalScopeTo = callFrameStack.length > 0
-        ? callFrameStack[0].scopeBase
-        : scopeStack.length
-      for (let si = 0; si < globalScopeTo; si++) {
-        for (const [k, v] of scopeStack[si]) {
-          if (!frameVarNames.has(k)) {
-            globalVars[k] = v
-          }
-        }
-      }
-      // Inject global-scope expression variables
-      const globalExprVars = evaluateExprVars(0, globalScopeTo)
-      for (const [k, v] of Object.entries(globalExprVars)) {
-        if (!frameVarNames.has(k)) {
-          globalVars[k] = v
-        }
-      }
-
-      const globalHighlights = currentHighlights.filter(h => !frameArrayNames.has(h.arrayName))
-      const globalVarHighlights = currentVarHighlights.filter(h => !frameVarNames.has(h.varName))
-      const globalDimRanges = allDimRanges.filter(d => !frameArrayNames.has(d.arrayName))
-      const globalGaugeArrays = [...gaugeArrays].filter(n => !frameArrayNames.has(n))
+      const global = buildGlobalState(frameArrayNames, frameVarNames)
 
       steps.push({
-        arrays: globalArrays,
-        highlights: globalHighlights,
-        varHighlights: globalVarHighlights,
-        dimRanges: globalDimRanges,
-        gaugeArrays: globalGaugeArrays,
-        variables: globalVars,
+        ...global,
         callStack: callStackFrames,
         currentLine: line,
         description,

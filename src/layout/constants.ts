@@ -54,3 +54,9 @@ export const VARIABLE_LABEL_HEIGHT = 20
 
 /** Vertical gap between pointer arrow tiers. */
 export const ARROW_Y_GAP = 18
+
+/** Opacity for dimmed/inactive content. */
+export const DIMMED_OPACITY = 0.3
+
+/** Opacity for non-innermost call frames. */
+export const INACTIVE_FRAME_OPACITY = 0.35

@@ -6,7 +6,7 @@ import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
 import { derivePointers, getPointerVarNames, countNonPointerVars } from '../renderer/pointers.ts'
 import {
   CONTENT_X, CONTENT_Y, POINTER_SPACE, CALLSTACK_GAP, ARRAY_GROUP_GAP,
-  CELL_SIZE, CELL_GAP,
+  CELL_SIZE, CELL_GAP, INACTIVE_FRAME_OPACITY,
 } from './constants.ts'
 
 /**
@@ -109,7 +109,7 @@ function collectElements(
 ): void {
   if (node.kind === 'frame') {
     const frameData = node.data as FrameData
-    const contentOpacity = frameData.isInnermost ? 1.0 : 0.35
+    const contentOpacity = frameData.isInnermost ? 1.0 : INACTIVE_FRAME_OPACITY
 
     // The frame box itself is always full opacity
     out.push({

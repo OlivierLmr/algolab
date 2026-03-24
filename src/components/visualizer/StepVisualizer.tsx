@@ -3,7 +3,7 @@ import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
 import type { FlatElement, CellData, LabelData, VariableData, FrameData, PointerData } from '../../layout/types.ts'
-import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP } from '../../layout/constants.ts'
+import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP, DIMMED_OPACITY } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
 import { evaluateTooltip } from '../../tooltip.ts'
@@ -194,7 +194,7 @@ function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }:
       style={{
         transform: `translate(${el.x}px, ${el.y}px)`,
         width: CELL_SIZE,
-        opacity: data.dimmed ? 0.3 * el.opacity : el.opacity,
+        opacity: data.dimmed ? DIMMED_OPACITY * el.opacity : el.opacity,
       }}
     >
       <div
