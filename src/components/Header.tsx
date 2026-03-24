@@ -2,7 +2,6 @@ import {
   algorithmList,
   currentAlgoIndex,
   selectAlgorithm,
-  inputText,
   isCustomMode,
   selectCustom,
 } from '../state.ts'
@@ -23,13 +22,6 @@ export function Header() {
     <header class="header">
       <h1>AlgoLab</h1>
       <div class="header-controls">
-        {!custom && (
-          <input
-            type="text"
-            value={inputText.value}
-            onInput={(e) => { inputText.value = (e.target as HTMLInputElement).value }}
-          />
-        )}
         <select
           value={custom ? 'custom' : currentAlgoIndex.value}
           onChange={handleSelectChange}

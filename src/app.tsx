@@ -109,12 +109,14 @@ export function App() {
       <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
         {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
         <ResizeHandle />
-        <div class={`canvas-wrapper ${editMode ? 'dimmed' : ''}`}>
-          <StepVisualizer />
+        <div class={`right-column ${editMode ? 'dimmed' : ''}`}>
+          <div class="canvas-wrapper">
+            <StepVisualizer />
+          </div>
+          <div class="description">
+            <DescriptionPanel />
+          </div>
         </div>
-      </div>
-      <div class={`description ${editMode ? 'dimmed' : ''}`}>
-        <DescriptionPanel />
       </div>
       <Controls />
       {editMode && <DslDocs />}

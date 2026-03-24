@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine, inputText } from '../state.ts'
 import { colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo, useCallback } from 'preact/hooks'
 import { useTooltip } from '../hooks/useTooltip.ts'
@@ -86,6 +86,17 @@ export function CodePanel() {
           </>
         ) : null}
       </div>
+      {!custom && (
+        <div class="code-input-row">
+          <span class="code-input-label">Input:</span>
+          <input
+            class="code-input"
+            type="text"
+            value={inputText.value}
+            onInput={(e) => { inputText.value = (e.target as HTMLInputElement).value }}
+          />
+        </div>
+      )}
       <pre>
         {lines.map((line, i) => {
           const directive = custom && isDirectiveLine(line)
