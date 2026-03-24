@@ -203,12 +203,17 @@ export function stepOutBack(): void {
   currentStepIndex.value = i
 }
 
-export const recentDescriptions = computed<DescriptionSegment[][]>(() => {
+export interface RecentDescription {
+  parts: DescriptionSegment[]
+  line: number
+}
+
+export const recentDescriptions = computed<RecentDescription[]>(() => {
   const idx = currentStepIndex.value
   const all = steps.value
   if (idx >= all.length) return []
   const currentBlockDepth = all[idx].blockDescriptions.length
-  const result: DescriptionSegment[][] = []
+  const result: RecentDescription[] = []
   // Look back for one-shot #: comment descriptions at the same block depth.
   // Only collect steps explicitly marked as comments (not auto-generated descriptions).
   // - Lower depth means we left the current block → stop (boundary).
@@ -219,11 +224,14 @@ export const recentDescriptions = computed<DescriptionSegment[][]>(() => {
     if (stepDepth < currentBlockDepth) break
     if (stepDepth > currentBlockDepth) continue
     if (all[i].isComment) {
-      result.unshift(all[i].descriptionParts)
+      result.unshift({ parts: all[i].descriptionParts, line: all[i].currentLine })
     }
   }
   return result
 })
+
+/** Line number to highlight in code panel when hovering a description entry. */
+export const hoveredDescriptionLine = signal<number | null>(null)
 
 // Clamp initial step to valid range and apply default disabled lines
 if (initial) {

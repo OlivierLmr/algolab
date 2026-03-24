@@ -11,7 +11,7 @@ import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
 import type { DescriptionSegment } from './types.ts'
 import { evaluateTooltip } from './tooltip.ts'
-import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
+import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
 function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string, string>, step?: import('./types.ts').Step | null) {
   return segments.map((seg, i) => {
@@ -55,10 +55,25 @@ function DescriptionPanel() {
         </div>
       ))}
       {descriptions.map((d, i) => (
-        <div key={i} class="description-previous" style={{ paddingLeft: oneShotIndent }}>{renderSegments(d, step?.tooltips, step)}</div>
+        <div
+          key={i}
+          class="description-previous"
+          style={{ paddingLeft: oneShotIndent }}
+          onMouseEnter={() => { hoveredDescriptionLine.value = d.line }}
+          onMouseLeave={() => { hoveredDescriptionLine.value = null }}
+        >
+          {renderSegments(d.parts, step?.tooltips, step)}
+        </div>
       ))}
       {step?.description ? (
-        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{renderSegments(step.descriptionParts, step?.tooltips, step)}</div>
+        <div
+          class="description-current"
+          style={{ paddingLeft: oneShotIndent }}
+          onMouseEnter={() => { if (step) hoveredDescriptionLine.value = step.currentLine }}
+          onMouseLeave={() => { hoveredDescriptionLine.value = null }}
+        >
+          {renderSegments(step.descriptionParts, step?.tooltips, step)}
+        </div>
       ) : null}
     </>
   )

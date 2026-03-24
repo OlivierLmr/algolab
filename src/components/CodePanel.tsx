@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine } from '../state.ts'
 import { colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo, useRef, useCallback } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
@@ -20,6 +20,11 @@ export function CodePanel() {
 
   const activeLine = step
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)
+    : undefined
+
+  const hoveredLine = hoveredDescriptionLine.value
+  const hoveredDisplayLine = hoveredLine !== null
+    ? (lineMap ? lineMap.get(hoveredLine) : hoveredLine)
     : undefined
 
   const disabled = disabledLines.value
@@ -88,7 +93,7 @@ export function CodePanel() {
           return (
             <div
               key={i}
-              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${directive ? 'code-line-directive' : ''} ${isDisabled ? 'code-line-skipped' : ''}`}
+              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${i === hoveredDisplayLine && i !== activeLine ? 'code-line-hovered' : ''} ${directive ? 'code-line-directive' : ''} ${isDisabled ? 'code-line-skipped' : ''}`}
             >
               <span class={`breakpoint-gutter ${isEmpty ? 'breakpoint-gutter-empty' : ''}`} onClick={isEmpty ? undefined : () => toggleBreakpoint(sourceLine)}>
                 {!isEmpty && <span class={`breakpoint-dot ${isDisabled ? 'breakpoint-dot-disabled' : ''}`} />}
