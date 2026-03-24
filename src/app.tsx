@@ -10,16 +10,22 @@ import { StepVisualizer } from './components/visualizer/StepVisualizer.tsx'
 import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
 import type { DescriptionSegment } from './types.ts'
+import { evaluateTooltip } from './tooltip.ts'
 import { currentStep, recentDescriptions, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
 
-function renderSegments(segments: DescriptionSegment[]) {
+function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string, string>, step?: import('./types.ts').Step | null) {
   return segments.map((seg, i) => {
     if (seg.type === 'text') return <span key={i}>{seg.text}</span>
+    let title: string | undefined
+    if (tooltips && step && seg.name in tooltips) {
+      title = evaluateTooltip(tooltips[seg.name], step, { value: seg.value })
+    }
     return (
       <span
         key={i}
         class="var-pill"
         style={{ borderColor: seg.color, color: seg.color }}
+        title={title}
       >
         <span class="var-pill-name">{seg.name}</span>
         <span class="var-pill-value">{seg.value}</span>
@@ -45,14 +51,14 @@ function DescriptionPanel() {
           class="description-block"
           style={{ paddingLeft: bd.depth * 16 }}
         >
-          {renderSegments(bd.parts)}
+          {renderSegments(bd.parts, step?.tooltips, step)}
         </div>
       ))}
       {descriptions.map((d, i) => (
-        <div key={i} class="description-previous" style={{ paddingLeft: oneShotIndent }}>{renderSegments(d)}</div>
+        <div key={i} class="description-previous" style={{ paddingLeft: oneShotIndent }}>{renderSegments(d, step?.tooltips, step)}</div>
       ))}
       {step?.description ? (
-        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{renderSegments(step.descriptionParts)}</div>
+        <div class="description-current" style={{ paddingLeft: oneShotIndent }}>{renderSegments(step.descriptionParts, step?.tooltips, step)}</div>
       ) : null}
     </>
   )

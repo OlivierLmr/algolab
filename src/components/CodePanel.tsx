@@ -144,7 +144,6 @@ function VariablesSection({ varEntries, colorMap, step }: {
           class="variable-entry"
           onMouseEnter={(e: MouseEvent) => onMouseEnter(name, value, e)}
           onMouseLeave={onMouseLeave}
-          style={{ cursor: step.tooltips[name] ? 'help' : undefined }}
         >
           <span style={colorMap.has(name) ? { color: colorMap.get(name), fontWeight: 'bold' } : undefined}>
             {name}
