@@ -124,6 +124,11 @@ body {
   padding-left: 5px;
 }
 
+.code-line-active.code-line-hovered {
+  background: rgba(200, 200, 80, 0.25);
+  border-left: 3px solid #d4a820;
+}
+
 .code-line-directive {
   color: #666;
   font-style: italic;

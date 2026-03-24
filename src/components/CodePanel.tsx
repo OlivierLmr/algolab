@@ -22,10 +22,13 @@ export function CodePanel() {
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)
     : undefined
 
-  const hoveredLine = hoveredDescriptionLine.value
-  const hoveredDisplayLine = hoveredLine !== null
-    ? (lineMap ? lineMap.get(hoveredLine) : hoveredLine)
-    : undefined
+  // hoveredDescriptionLine is an external signal set by DescriptionPanel on hover.
+  // We derive the display line from it using the lineMap.
+  const hoveredDisplayLine = (() => {
+    const raw = hoveredDescriptionLine.value
+    if (raw === null) return null
+    return lineMap ? (lineMap.get(raw) ?? null) : raw
+  })()
 
   const disabled = disabledLines.value
 
@@ -93,7 +96,7 @@ export function CodePanel() {
           return (
             <div
               key={i}
-              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${i === hoveredDisplayLine && i !== activeLine ? 'code-line-hovered' : ''} ${directive ? 'code-line-directive' : ''} ${isDisabled ? 'code-line-skipped' : ''}`}
+              class={`code-line ${i === activeLine ? 'code-line-active' : ''} ${hoveredDisplayLine !== null && i === hoveredDisplayLine ? 'code-line-hovered' : ''} ${directive ? 'code-line-directive' : ''} ${isDisabled ? 'code-line-skipped' : ''}`}
             >
               <span class={`breakpoint-gutter ${isEmpty ? 'breakpoint-gutter-empty' : ''}`} onClick={isEmpty ? undefined : () => toggleBreakpoint(sourceLine)}>
                 {!isEmpty && <span class={`breakpoint-dot ${isDisabled ? 'breakpoint-dot-disabled' : ''}`} />}
