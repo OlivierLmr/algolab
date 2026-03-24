@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-03-24T12:00:00Z",
+    "title": "Description Hover Highlights & Pill Display Modes",
+    "items": [
+      "Hovering over description entries (block descriptions, recent history, current) now highlights the corresponding line in the code panel.",
+      "Variable pills in descriptions now support three display modes: {$var} (name only), {$=var} (name + value), {$*var} (value only)."
+    ]
+  },
+  {
     "date": "2026-03-23T12:00:00Z",
     "title": "Variable Pills, Tooltips & Richer Algorithm Descriptions",
     "items": [
