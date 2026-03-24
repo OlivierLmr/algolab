@@ -136,6 +136,8 @@ body {
 
 .code-line-skipped {
   opacity: 0.35;
+  text-decoration: line-through;
+  text-decoration-color: rgba(0, 0, 0, 0.25);
 }
 
 /* Directive lines in the editor overlay */
@@ -325,7 +327,8 @@ body {
   transition: opacity 0.12s 0.1s;
 }
 
-.var-pill-has-tooltip:hover::after {
+.var-pill-has-tooltip:hover::after,
+.var-pill-has-tooltip:focus-visible::after {
   opacity: 1;
 }
 

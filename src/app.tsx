@@ -26,6 +26,7 @@ function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string
         class={`var-pill${title ? ' var-pill-has-tooltip' : ''}`}
         style={{ borderColor: seg.color, color: seg.color }}
         data-tooltip={title}
+        tabIndex={title ? 0 : undefined}
       >
         {seg.display !== 'value' && <span class={seg.display === 'name' ? 'var-pill-name-only' : 'var-pill-name'}>{seg.name}</span>}
         {seg.display !== 'name' && <span class="var-pill-value">{seg.value}</span>}
