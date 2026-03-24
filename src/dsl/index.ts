@@ -140,36 +140,27 @@ function parseExprFromString(exprStr: string): Expr {
 
 // --- Block range extraction from AST ---
 
+function maxLine(nodes: ASTNode[]): number {
+  let m = -1
+  for (const n of nodes) {
+    m = Math.max(m, n.line)
+    forEachChildBody(n, body => { m = Math.max(m, maxLine(body)) })
+  }
+  return m
+}
+
 function getBlockRangesFromAST(ast: AlgoNode): { startLine: number; endLine: number }[] {
   const ranges: { startLine: number; endLine: number }[] = []
 
-  function maxLine(nodes: ASTNode[]): number {
-    let m = -1
-    for (const n of nodes) {
-      m = Math.max(m, n.line)
-      if (n.type === 'for' || n.type === 'while' || n.type === 'def') {
-        m = Math.max(m, maxLine(n.body))
-      } else if (n.type === 'if') {
-        m = Math.max(m, maxLine(n.body))
-        if (n.elseBody.length > 0) m = Math.max(m, maxLine(n.elseBody))
-      }
-    }
-    return m
-  }
-
   function walk(nodes: ASTNode[]): void {
     for (const node of nodes) {
-      if (node.type === 'for' || node.type === 'while' || node.type === 'def') {
-        const endLine = maxLine(node.body)
+      const bodies: ASTNode[][] = []
+      forEachChildBody(node, body => bodies.push(body))
+      if (bodies.length > 0 && node.type !== 'algo') {
+        const endLine = maxLine(bodies.flat())
         if (endLine > node.line) ranges.push({ startLine: node.line, endLine })
-        walk(node.body)
-      } else if (node.type === 'if') {
-        const allBodies = [...node.body, ...node.elseBody]
-        const endLine = maxLine(allBodies)
-        if (endLine > node.line) ranges.push({ startLine: node.line, endLine })
-        walk(node.body)
-        walk(node.elseBody)
       }
+      for (const body of bodies) walk(body)
     }
   }
 
@@ -202,13 +193,7 @@ function getDefaultDisabledLines(
           disabled.add(next.line)
         }
       }
-      // Recurse into child blocks
-      if (node.type === 'for' || node.type === 'while' || node.type === 'def') {
-        processNodes(node.body)
-      } else if (node.type === 'if') {
-        processNodes(node.body)
-        processNodes(node.elseBody)
-      }
+      forEachChildBody(node, processNodes)
     }
   }
 

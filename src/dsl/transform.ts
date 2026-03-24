@@ -202,38 +202,24 @@ function processBody(
   for (const node of body) {
     switch (node.type) {
       case 'for': {
-        // For-loop variable is available as param inside its body
-        const forParams = new Set(availableParams)
-        // Also include all let/alloc names from enclosing scope (they're visible inside the for)
-        for (const [name, _idx] of declIndex) {
-          forParams.add(name)
-        }
+        const forParams = new Set([...availableParams, ...declIndex.keys()])
         forParams.add(node.variable)
         processBody(node.body, forParams, inputArrays, existingPointerKeys)
         break
       }
       case 'while': {
-        const whileParams = new Set(availableParams)
-        for (const [name, _idx] of declIndex) {
-          whileParams.add(name)
-        }
+        const whileParams = new Set([...availableParams, ...declIndex.keys()])
         processBody(node.body, whileParams, inputArrays, existingPointerKeys)
         break
       }
       case 'if': {
-        const ifParams = new Set(availableParams)
-        for (const [name, _idx] of declIndex) {
-          ifParams.add(name)
-        }
+        const ifParams = new Set([...availableParams, ...declIndex.keys()])
         processBody(node.body, ifParams, inputArrays, existingPointerKeys)
         processBody(node.elseBody, ifParams, inputArrays, existingPointerKeys)
         break
       }
       case 'def': {
-        const defParams = new Set<string>()
-        for (const p of (node as DefNode).params) {
-          defParams.add(p.name)
-        }
+        const defParams = new Set((node as DefNode).params.map(p => p.name))
         processBody((node as DefNode).body, defParams, inputArrays, existingPointerKeys)
         break
       }

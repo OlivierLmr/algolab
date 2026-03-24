@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { compilePipeline } from '../src/dsl/index.ts'
-
-function compile(source: string, input: number[] = [5, 3, 4, 1, 2]) {
-  return compilePipeline(source, 'arr', input)
-}
+import { compile } from './test-utils.ts'
 
 describe('block descriptions (describe directive)', () => {
   describe('basic functionality', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { compilePipeline } from '../src/dsl/index.ts'
 import { derivePointers } from '../src/renderer/pointers.ts'
 import type { Step, Value } from '../src/types.ts'
+import { isInFrame } from './test-utils.ts'
 
 /** Simulate the renderer's global pointer derivation logic. */
 function getVisibleGlobalPointerNames(step: Step, colorMap: Map<string, string>): string[] {
@@ -27,10 +28,6 @@ function getVisibleGlobalPointerNames(step: Step, colorMap: Map<string, string>)
     .filter(p => globalArrayNames.has(p.arrayName))
 
   return pointers.map(p => p.name).sort()
-}
-
-function isInFrame(step: Step, funcName: string): boolean {
-  return step.callStack.some(f => f.label.startsWith(funcName + '('))
 }
 
 describe('Quick Select: renderer pointer visibility', () => {

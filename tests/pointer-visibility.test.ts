@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { runAlgorithm } from '../src/dsl/index.ts'
 import type { Step } from '../src/types.ts'
+import { isInFrame } from './test-utils.ts'
 
 /** Get all iterator variable names from global scope. */
 function globalIterVars(step: Step): string[] {
@@ -8,11 +9,6 @@ function globalIterVars(step: Step): string[] {
     .filter(([_, v]) => v.arrays.length > 0)
     .map(([n]) => n)
     .sort()
-}
-
-/** Check if step is inside a function call (by label prefix). */
-function isInFrame(step: Step, funcName: string): boolean {
-  return step.callStack.some(f => f.label.startsWith(funcName + '('))
 }
 
 /** Get innermost frame. */

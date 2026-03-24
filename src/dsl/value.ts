@@ -18,10 +18,9 @@ export function addArray(val: Value, arrayName: string): Value {
 }
 
 export function mergeArrays(a: string[], b: string[]): string[] {
-  if (a.length === 0) return b.length === 0 ? [] : [...b]
+  if (a.length === 0) return [...b]
   if (b.length === 0) return [...a]
-  const set = new Set([...a, ...b])
-  return [...set]
+  return [...new Set([...a, ...b])]
 }
 
 /**

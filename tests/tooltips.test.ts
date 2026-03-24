@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { compilePipeline } from '../src/dsl/index.ts'
 import { evaluateTooltip } from '../src/tooltip.ts'
-
-function compile(source: string, input: number[] = [5, 3, 4, 1, 2]) {
-  return compilePipeline(source, 'arr', input)
-}
+import { compile } from './test-utils.ts'
 
 describe('tooltips (tooltip directive)', () => {
   describe('basic variable tooltips', () => {

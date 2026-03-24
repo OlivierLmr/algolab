@@ -17,6 +17,25 @@ class ReturnSignal {
 }
 import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment } from '../types.ts'
 
+interface StoredProcedure {
+  params: { name: string; isArray: boolean }[]
+  body: ASTNode[]
+  defLine: number
+  describe?: { text: string; parts?: CommentPart[] }
+}
+
+/** Convert evaluated segments back to plain text (for the Step.description string). */
+function segmentsToText(segments: DescriptionSegment[]): string {
+  return segments.map(seg => {
+    if (seg.type === 'text') return seg.text
+    switch (seg.display) {
+      case 'name': return seg.name
+      case 'value': return String(seg.value)
+      default: return `${seg.name}=${seg.value}`
+    }
+  }).join('')
+}
+
 /**
  * Create a runner for the given algorithm AST.
  * colorMap is computed once in the pipeline and shared.
@@ -28,7 +47,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
     const steps: Step[] = []
     const arrays = new Map<string, Value[]>()
     const scopeStack: Map<string, Value>[] = [new Map()]
-    const procedures = new Map<string, { params: { name: string; isArray: boolean }[]; body: ASTNode[]; defLine: number; describe?: { text: string; parts?: CommentPart[] } }>()
+    const procedures = new Map<string, StoredProcedure>()
     let callDepth = 0
 
     interface ActiveFrame {
@@ -189,33 +208,10 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       }
     }
 
-    function evaluateCommentParts(parts: CommentPart[]): string {
-      return parts.map(part => {
-        switch (part.type) {
-          case 'text': return part.text
-          case 'expr':
-            try { return String(evalExpr(part.expr).num) }
-            catch { return '{?}' }
-          case 'ternary':
-            try {
-              const val = evalExpr(part.condition)
-              return val.num !== 0 ? part.trueText : part.falseText
-            }
-            catch { return '{?}' }
-          case 'pill':
-            try {
-              const v = evalExpr(part.expr).num
-              switch (part.display) {
-                case 'name': return part.name
-                case 'value': return String(v)
-                default: return `${part.name}=${v}`
-              }
-            }
-            catch { return `${part.name}=?` }
-        }
-      }).join('')
-    }
-
+    /**
+     * Evaluate comment parts into description segments.
+     * This is the single evaluation function — text is derived via segmentsToText().
+     */
     function evaluateCommentSegments(parts: CommentPart[]): DescriptionSegment[] {
       return parts.map(part => {
         switch (part.type) {
@@ -270,7 +266,7 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
       let descriptionParts: DescriptionSegment[] = [{ type: 'text', text: description }]
       if (pendingCommentParts !== null) {
         descriptionParts = evaluateCommentSegments(pendingCommentParts)
-        description = evaluateCommentParts(pendingCommentParts)
+        description = segmentsToText(descriptionParts)
         pendingCommentParts = null
         isComment = true
       }
@@ -808,8 +804,8 @@ export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, type
     /** Evaluate a describe annotation and push/upsert it in blockDescs. */
     function applyDescribe(describe: { text: string; parts?: CommentPart[] }, line: number): void {
       const rawParts = describe.parts ?? [{ type: 'text', text: describe.text }]
-      const text = evaluateCommentParts(rawParts)
       const segments = evaluateCommentSegments(rawParts)
+      const text = segmentsToText(segments)
       const depth = scopeStack.length
       // Upsert: replace existing entry at same depth, or push new
       const existing = blockDescs.findIndex(bd => bd.scopeDepth === depth)
