@@ -11,13 +11,17 @@ body {
 }
 
 #app {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 12px 20px;
   height: 100vh;
+  overflow: hidden;
+}
+
+.app-main {
+  height: 100vh;
+  padding: 12px 20px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: margin-left 0.2s ease;
 }
 
 .header {
@@ -32,21 +36,125 @@ body {
   font-size: 1.4rem;
 }
 
-.header-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.header select {
-  padding: 6px 12px;
-  font-size: 14px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+/* Algorithm sidebar — fixed to left edge of viewport */
+.algo-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 100vh;
   background: #fff;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  transition: width 0.2s ease;
 }
 
+.algo-sidebar-collapsed {
+  width: 28px;
+}
 
+.algo-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: #888;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+.algo-sidebar-toggle:hover {
+  color: #333;
+  background: #f0f0f0;
+}
+
+.algo-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.algo-sidebar-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.algo-sidebar-group-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  cursor: pointer;
+  text-align: left;
+}
+
+.algo-sidebar-group-header:hover {
+  color: #555;
+}
+
+.algo-sidebar-chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s;
+  width: 12px;
+  text-align: center;
+}
+
+.algo-sidebar-chevron-open {
+  transform: rotate(90deg);
+}
+
+.algo-sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.algo-sidebar-item {
+  display: block;
+  width: 100%;
+  padding: 5px 12px 5px 28px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 0;
+}
+
+.algo-sidebar-item:hover {
+  background: #f0f0f0;
+}
+
+.algo-sidebar-item-active {
+  background: #e8f0ff;
+  color: #1a5cc8;
+  font-weight: 600;
+}
+
+.algo-sidebar-item-active:hover {
+  background: #dce8fa;
+}
+
+.algo-sidebar-custom {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #eee;
+}
 
 .main-layout {
   display: grid;

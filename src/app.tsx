@@ -3,6 +3,7 @@ import './styles/visualizer.css'
 import { useEffect } from 'preact/hooks'
 import { Header } from './components/Header.tsx'
 import { ChangelogBanner } from './components/ChangelogBanner.tsx'
+import { AlgorithmSidebar } from './components/AlgorithmSidebar.tsx'
 import { CodePanel } from './components/CodePanel.tsx'
 import { EditorPanel } from './components/EditorPanel.tsx'
 import { ResizeHandle } from './components/ResizeHandle.tsx'
@@ -11,7 +12,7 @@ import { Controls } from './components/Controls.tsx'
 import { DslDocs } from './components/DslDocs.tsx'
 import type { DescriptionSegment } from './types.ts'
 import { evaluateTooltip } from './tooltip.ts'
-import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth } from './state.ts'
+import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth, sidebarOpen } from './state.ts'
 
 function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string, string>, step?: import('./types.ts').Step | null) {
   return segments.map((seg, i) => {
@@ -102,24 +103,29 @@ export function App() {
 
   const gridColumns = `${codePanelWidth.value}px 0px 1fr`
 
+  const sidebarWidth = sidebarOpen.value ? 200 : 28
+
   return (
     <>
-      <Header />
-      <ChangelogBanner />
-      <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
-        {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
-        <ResizeHandle />
-        <div class={`right-column ${editMode ? 'dimmed' : ''}`}>
-          <div class="canvas-wrapper">
-            <StepVisualizer />
-          </div>
-          <div class="description">
-            <DescriptionPanel />
+      <AlgorithmSidebar />
+      <div class="app-main" style={{ marginLeft: sidebarWidth }}>
+        <Header />
+        <ChangelogBanner />
+        <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
+          {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
+          <ResizeHandle />
+          <div class={`right-column ${editMode ? 'dimmed' : ''}`}>
+            <div class="canvas-wrapper">
+              <StepVisualizer />
+            </div>
+            <div class="description">
+              <DescriptionPanel />
+            </div>
           </div>
         </div>
+        <Controls />
+        {editMode && <DslDocs />}
       </div>
-      <Controls />
-      {editMode && <DslDocs />}
     </>
   )
 }

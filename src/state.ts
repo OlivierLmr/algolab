@@ -51,6 +51,7 @@ export const inputText = signal(
 
 // Layout
 export const codePanelWidth = signal(400)
+export const sidebarOpen = signal(true)
 
 // Custom mode state
 export const isCustomMode = signal(initial?.algo === 'custom')
