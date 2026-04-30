@@ -652,21 +652,35 @@ class ExecutionContext {
   private execFor(node: ForNode): void {
     const fromVal = this.evalExpr(node.from).num
     const toVal = this.evalExpr(node.to).num
-    if (toVal - fromVal > MAX_LOOP_RANGE) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
+    const range = node.direction === 'downto' ? fromVal - toVal : toVal - fromVal
+    if (range > MAX_LOOP_RANGE) throw new Error(`For loop range too large (${fromVal} to ${toVal}). Check your loop bounds.`)
     this.pushScope()
 
     // Static type for the loop variable
     const loopVarType = this.staticVarType(node.variable, node.line)
 
-    for (let i = fromVal; i <= toVal; i++) {
-      const val = this.stampValue(i, loopVarType)
-      this.setVar(node.variable, val)
-      if (node.describe) this.applyDescribe(node.describe, node.line)
-      this.highlightComparisonSide({ type: 'identifier', name: node.variable })
-      this.highlightComparisonSide(node.to)
-      this.snapshot(node.line, `Set ${node.variable} = ${i}`)
-      for (const stmt of node.body) this.execNode(stmt)
-      this.flushPendingComment(node.line)
+    if (node.direction === 'downto') {
+      for (let i = fromVal; i >= toVal; i--) {
+        const val = this.stampValue(i, loopVarType)
+        this.setVar(node.variable, val)
+        if (node.describe) this.applyDescribe(node.describe, node.line)
+        this.highlightComparisonSide({ type: 'identifier', name: node.variable })
+        this.highlightComparisonSide(node.to)
+        this.snapshot(node.line, `Set ${node.variable} = ${i}`)
+        for (const stmt of node.body) this.execNode(stmt)
+        this.flushPendingComment(node.line)
+      }
+    } else {
+      for (let i = fromVal; i <= toVal; i++) {
+        const val = this.stampValue(i, loopVarType)
+        this.setVar(node.variable, val)
+        if (node.describe) this.applyDescribe(node.describe, node.line)
+        this.highlightComparisonSide({ type: 'identifier', name: node.variable })
+        this.highlightComparisonSide(node.to)
+        this.snapshot(node.line, `Set ${node.variable} = ${i}`)
+        for (const stmt of node.body) this.execNode(stmt)
+        this.flushPendingComment(node.line)
+      }
     }
     this.popScope()
   }

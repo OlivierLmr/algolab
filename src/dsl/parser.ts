@@ -106,11 +106,17 @@ export function parse(tokens: Token[]): AlgoNode {
     const variable = expect('ident').value
     expect('keyword', 'from')
     const from = parseExpr()
-    expect('keyword', 'to')
+    let direction: 'to' | 'downto' = 'to'
+    if (match('keyword', 'downto')) {
+      advance()
+      direction = 'downto'
+    } else {
+      expect('keyword', 'to')
+    }
     const to = parseExpr()
     skipNewlines()
     const body = parseBlock()
-    return { type: 'for', variable, from, to, body, line: tok.line }
+    return { type: 'for', variable, from, to, direction, body, line: tok.line }
   }
 
   function parseWhile(): WhileNode {

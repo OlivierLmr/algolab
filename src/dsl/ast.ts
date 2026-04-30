@@ -37,6 +37,7 @@ export interface ForNode {
   variable: string
   from: Expr
   to: Expr
+  direction: 'to' | 'downto'
   body: ASTNode[]
   describe?: DescribeAnnotation
   line: number
