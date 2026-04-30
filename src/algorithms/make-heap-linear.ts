@@ -29,6 +29,7 @@ export const makeHeapLinear: AlgorithmDefinition = {
   def parent(i)
     return (i - 1) / 2
 
+  #: heap max arr
   let p = parent(len(arr) - 1)
   #: describe "Sifting down node at position {$=i}"
   for i from p downto 0

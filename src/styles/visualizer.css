@@ -111,6 +111,18 @@
   margin-top: 4px;
 }
 
+/* === Tree node === */
+.viz-tree-node {
+  position: absolute;
+  border-radius: 50%;
+  border-style: solid;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 200ms ease, opacity 200ms, border-color 150ms;
+}
+
 /* === Pointer arrows (SVG) === */
 .viz-pointer-arrow {
   position: absolute;

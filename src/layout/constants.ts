@@ -60,3 +60,18 @@ export const DIMMED_OPACITY = 0.3
 
 /** Opacity for non-innermost call frames. */
 export const INACTIVE_FRAME_OPACITY = 0.35
+
+/** Radius of a heap tree node circle. */
+export const TREE_NODE_RADIUS = 20
+
+/** Vertical gap between tree levels. */
+export const TREE_LEVEL_GAP = 50
+
+/** Minimum horizontal gap between sibling nodes. */
+export const TREE_MIN_NODE_GAP = 8
+
+/** Gap between the array and the heap tree below it. */
+export const TREE_TOP_GAP = 20
+
+/** Height of the "arr (max-heap)" label above the tree. */
+export const TREE_LABEL_HEIGHT = 20

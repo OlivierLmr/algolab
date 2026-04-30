@@ -15,7 +15,7 @@ class ReturnSignal {
   value: Value
   constructor(value: Value) { this.value = value }
 }
-import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment, HeapInfo } from '../types.ts'
+import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment } from '../types.ts'
 
 interface StoredProcedure {
   params: { name: string; isArray: boolean }[]

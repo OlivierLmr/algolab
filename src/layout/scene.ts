@@ -3,10 +3,11 @@ import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData, Point
 import { layoutArray, arrayGroupHeight } from './array-layout.ts'
 import { layoutVariables, variablesRowHeight } from './variables-layout.ts'
 import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
+import { layoutHeapTree } from './tree-layout.ts'
 import { derivePointers, getPointerVarNames, countNonPointerVars } from '../renderer/pointers.ts'
 import {
   CONTENT_X, CONTENT_Y, POINTER_SPACE, CALLSTACK_GAP, ARRAY_GROUP_GAP,
-  CELL_SIZE, CELL_GAP, INACTIVE_FRAME_OPACITY,
+  CELL_SIZE, CELL_GAP, INACTIVE_FRAME_OPACITY, TREE_TOP_GAP,
 } from './constants.ts'
 
 /**
@@ -68,8 +69,23 @@ export function computeSceneLayout(
     }
   }
 
+  // Heap trees
+  const treeEdges: LayoutEdge[] = []
+  for (const heapInfo of step.heapArrays ?? []) {
+    const array = step.arrays.find(a => a.name === heapInfo.arrayName)
+    if (!array || array.values.length === 0) continue
+    y += TREE_TOP_GAP
+    const tree = layoutHeapTree(
+      array, heapInfo, CONTENT_X, y,
+      step.highlights, step.dimRanges,
+    )
+    nodes.push(tree.node)
+    treeEdges.push(...tree.edges)
+    y += tree.height
+  }
+
   // Derive pointer edges
-  const edges = derivePointerEdges(step, colorMap, pointerNames)
+  const edges = [...derivePointerEdges(step, colorMap, pointerNames), ...treeEdges]
 
   // Flatten tree into a single list of positioned elements
   const flatElements = flattenNodes(nodes)

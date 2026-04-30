@@ -2,8 +2,8 @@ import { useMemo, useCallback, useRef, useLayoutEffect } from 'preact/hooks'
 import { useSignal } from '@preact/signals'
 import { currentStep, pipelineColorMap } from '../../state.ts'
 import { computeSceneLayout } from '../../layout/scene.ts'
-import type { FlatElement, CellData, LabelData, VariableData, FrameData, PointerData } from '../../layout/types.ts'
-import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP, DIMMED_OPACITY } from '../../layout/constants.ts'
+import type { FlatElement, CellData, LabelData, VariableData, FrameData, PointerData, TreeNodeData } from '../../layout/types.ts'
+import { CELL_SIZE, FRAME_BORDER_RADIUS, ARROW_Y_GAP, DIMMED_OPACITY, TREE_NODE_RADIUS } from '../../layout/constants.ts'
 import { getHighlightColor } from '../../renderer/colors.ts'
 import { ArrowOverlay } from './ArrowOverlay.tsx'
 import { useTooltip } from '../../hooks/useTooltip.ts'
@@ -104,6 +104,8 @@ function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip, 
       return <FrameElement el={el} />
     case 'pointer':
       return <PointerElement el={el} showTooltip={showTooltip} hideTooltip={hideTooltip} tooltips={tooltips} />
+    case 'tree-node':
+      return <TreeNodeElement el={el} />
     default:
       return null
   }
@@ -370,6 +372,32 @@ function PointerElement({ el, showTooltip, hideTooltip }: { el: FlatElement; sho
       >
         {labelText}
       </div>
+    </div>
+  )
+}
+
+function TreeNodeElement({ el }: { el: FlatElement }) {
+  const data = el.data as TreeNodeData
+  const diameter = TREE_NODE_RADIUS * 2
+
+  const borderColor = data.highlightType
+    ? getHighlightColor(data.highlightType)
+    : data.violated ? '#e74c3c' : '#999'
+  const borderWidth = data.highlightType ? 3 : data.violated ? 2.5 : 1.5
+
+  return (
+    <div
+      class="viz-tree-node"
+      style={{
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: diameter,
+        height: diameter,
+        borderColor,
+        borderWidth,
+        opacity: data.dimmed ? DIMMED_OPACITY * el.opacity : el.opacity,
+      }}
+    >
+      <span class="viz-cell-value">{String(data.value.num)}</span>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import type { SceneLayout, CellData } from '../../layout/types.ts'
 import type { Step } from '../../types.ts'
 import {
   CELL_SIZE, CELL_GAP, CONTENT_X,
-  INDEX_LABEL_HEIGHT,
+  INDEX_LABEL_HEIGHT, TREE_NODE_RADIUS,
 } from '../../layout/constants.ts'
 
 interface ArrowOverlayProps {
@@ -67,6 +67,30 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     }).filter(Boolean)
   }, [hoveredCell, step, arrayCellYMap])
 
+  // Tree edges: compute center positions from flat elements
+  const treeEdgeLines = useMemo(() => {
+    const treeEdges = layout.edges.filter(e => e.style === 'tree-edge')
+    if (treeEdges.length === 0) return []
+
+    // Build lookup from node id → center position
+    const nodeCenters = new Map<string, { cx: number; cy: number }>()
+    for (const el of layout.flatElements) {
+      if (el.kind === 'tree-node') {
+        nodeCenters.set(el.id, {
+          cx: el.x + TREE_NODE_RADIUS,
+          cy: el.y + TREE_NODE_RADIUS,
+        })
+      }
+    }
+
+    return treeEdges.map(edge => {
+      const from = nodeCenters.get(edge.from)
+      const to = nodeCenters.get(edge.to)
+      if (!from || !to) return null
+      return { from, to, color: edge.color, id: edge.id }
+    }).filter(Boolean) as { from: { cx: number; cy: number }; to: { cx: number; cy: number }; color: string; id: string }[]
+  }, [layout])
+
   return (
     <svg
       class="viz-arrow-overlay"
@@ -91,6 +115,17 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
           <path d="M0,0 L10,4 L0,8 Z" fill="#3498db" />
         </marker>
       </defs>
+
+      {/* Tree edges */}
+      {treeEdgeLines.map(line => (
+        <line
+          key={line.id}
+          x1={line.from.cx} y1={line.from.cy}
+          x2={line.to.cx} y2={line.to.cy}
+          stroke={line.color}
+          stroke-width="2"
+        />
+      ))}
 
       {/* Hover arrows */}
       {hoverArrows?.map((ha, i) => {

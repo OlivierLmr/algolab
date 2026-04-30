@@ -29,6 +29,7 @@ export const heapSort: AlgorithmDefinition = {
   def parent(i)
     return (i - 1) / 2
 
+  #: heap max arr
   let p = parent(len(arr) - 1)
   #: describe "Phase 1: Sifting down node at position {$=i}"
   for i from p downto 0

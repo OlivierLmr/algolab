@@ -15,6 +15,7 @@ export const makeHeapNlogn: AlgorithmDefinition = {
       swap arr[i], arr[p]
       i = p
 
+  #: heap max arr
   #: describe "Inserting element {$*arr[i]} at position {$=i} into the heap"
   for i from 1 to len(arr) - 1
     sift_up(i)`,
