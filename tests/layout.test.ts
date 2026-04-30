@@ -3,10 +3,11 @@ import { computeSceneLayout } from '../src/layout/scene.ts'
 import { layoutArray, arrayGroupHeight, arrayGroupWidth } from '../src/layout/array-layout.ts'
 import { layoutVariables, variablesRowHeight } from '../src/layout/variables-layout.ts'
 import { callStackHeight } from '../src/layout/callstack-layout.ts'
-import { CELL_SIZE, CELL_GAP, CONTENT_X, CONTENT_Y, POINTER_SPACE } from '../src/layout/constants.ts'
+import { layoutHeapTree, heapTreeHeight } from '../src/layout/tree-layout.ts'
+import { CELL_SIZE, CELL_GAP, CONTENT_X, CONTENT_Y, POINTER_SPACE, TREE_NODE_RADIUS } from '../src/layout/constants.ts'
 import { compilePipeline } from '../src/dsl/index.ts'
 import type { Step, TrackedArray, CallFrame } from '../src/types.ts'
-import type { CellData, VariableData, FrameData, FlatElement } from '../src/layout/types.ts'
+import type { CellData, VariableData, FrameData, FlatElement, TreeNodeData } from '../src/layout/types.ts'
 
 function makeArray(name: string, values: number[]): TrackedArray {
   return { name, values: values.map(n => ({ num: n, arrays: [] })) }
@@ -28,6 +29,7 @@ function makeStep(overrides: Partial<Step> = {}): Step {
     blockDescriptions: [],
     tooltips: {},
     scopeDepth: 1,
+    heapArrays: [],
     ...overrides,
   }
 }
@@ -587,5 +589,130 @@ describe('pointer animation stability in QuickSort partition', () => {
     }
 
     expect(layouts.length).toBeGreaterThan(0)
+  })
+})
+
+describe('heap tree layout', () => {
+  it('returns empty for empty array', () => {
+    const array = makeArray('arr', [])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], [])
+    expect(result.height).toBe(0)
+    expect(result.edges).toHaveLength(0)
+  })
+
+  it('returns correct height for given sizes', () => {
+    expect(heapTreeHeight(0)).toBe(0)
+    expect(heapTreeHeight(1)).toBeGreaterThan(0)
+    // 7 nodes = 3 levels
+    const h7 = heapTreeHeight(7)
+    // 15 nodes = 4 levels
+    const h15 = heapTreeHeight(15)
+    expect(h15).toBeGreaterThan(h7)
+  })
+
+  it('creates correct number of tree nodes and edges', () => {
+    const array = makeArray('arr', [10, 8, 6, 4, 2])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], [])
+    // 5 tree-node children + 1 label = 6 children
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    expect(treeNodes).toHaveLength(5)
+    // 4 edges (each non-root node has one parent edge)
+    expect(result.edges).toHaveLength(4)
+  })
+
+  it('detects heap property violations in max-heap', () => {
+    // arr[0]=1 < arr[1]=10 violates max-heap property
+    const array = makeArray('arr', [1, 10, 3])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], [])
+
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    const rootData = treeNodes.find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
+    expect(rootData.violated).toBe(true) // root violates because child > parent
+
+    // Edge from root to left child should be red
+    const violatedEdge = result.edges.find(e => e.id.includes('0-1'))
+    expect(violatedEdge!.color).toBe('#e74c3c')
+  })
+
+  it('detects heap property violations in min-heap', () => {
+    // arr[0]=10 > arr[1]=1 violates min-heap property
+    const array = makeArray('arr', [10, 1, 3])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'min' }, 0, 0, [], [])
+
+    const rootData = result.node.children!
+      .filter(c => c.kind === 'tree-node')
+      .find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
+    expect(rootData.violated).toBe(true)
+  })
+
+  it('valid max-heap has no violations', () => {
+    const array = makeArray('arr', [10, 8, 6, 4, 2])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], [])
+
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    for (const node of treeNodes) {
+      expect((node.data as TreeNodeData).violated).toBe(false)
+    }
+    for (const edge of result.edges) {
+      expect(edge.color).toBe('#666')
+    }
+  })
+
+  it('propagates highlights to tree nodes', () => {
+    const array = makeArray('arr', [10, 8, 6])
+    const highlights = [{ arrayName: 'arr', indices: [0, 1], type: 'compare' as const }]
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, highlights, [])
+
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    const node0 = treeNodes.find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
+    const node1 = treeNodes.find(n => (n.data as TreeNodeData).index === 1)!.data as TreeNodeData
+    const node2 = treeNodes.find(n => (n.data as TreeNodeData).index === 2)!.data as TreeNodeData
+
+    expect(node0.highlightType).toBe('compare')
+    expect(node1.highlightType).toBe('compare')
+    expect(node2.highlightType).toBeUndefined()
+  })
+
+  it('propagates dim ranges to tree nodes', () => {
+    const array = makeArray('arr', [10, 8, 6])
+    const dimRanges = [{ arrayName: 'arr', from: 2, to: 2 }]
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], dimRanges)
+
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    const node2 = treeNodes.find(n => (n.data as TreeNodeData).index === 2)!.data as TreeNodeData
+    expect(node2.dimmed).toBe(true)
+    const node0 = treeNodes.find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
+    expect(node0.dimmed).toBe(false)
+  })
+})
+
+describe('heap tree scene integration', () => {
+  it('includes tree nodes and edges when heapArrays is set', () => {
+    const step = makeStep({
+      arrays: [makeArray('arr', [10, 8, 6, 4, 2])],
+      heapArrays: [{ arrayName: 'arr', kind: 'max' }],
+    })
+    const layout = computeSceneLayout(step, new Map())
+
+    const treeNodes = layout.flatElements.filter(e => e.kind === 'tree-node')
+    expect(treeNodes).toHaveLength(5)
+
+    const treeEdges = layout.edges.filter(e => e.style === 'tree-edge')
+    expect(treeEdges).toHaveLength(4)
+  })
+
+  it('tree increases scene height', () => {
+    const stepNoTree = makeStep({
+      arrays: [makeArray('arr', [10, 8, 6])],
+    })
+    const stepWithTree = makeStep({
+      arrays: [makeArray('arr', [10, 8, 6])],
+      heapArrays: [{ arrayName: 'arr', kind: 'max' }],
+    })
+
+    const layoutNoTree = computeSceneLayout(stepNoTree, new Map())
+    const layoutWithTree = computeSceneLayout(stepWithTree, new Map())
+
+    expect(layoutWithTree.height).toBeGreaterThan(layoutNoTree.height)
   })
 })
