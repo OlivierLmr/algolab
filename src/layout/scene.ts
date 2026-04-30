@@ -29,8 +29,39 @@ export function computeSceneLayout(
     pointerNames = getPointerVarNames(step.variables)
   }
 
+  // Derive pointer edges early (needed for pointer labels on tree nodes)
+  const pointerEdges = derivePointerEdges(step, colorMap, pointerNames)
+
   const nodes: LayoutNode[] = []
   let y = CONTENT_Y + POINTER_SPACE
+
+  // Heap trees (above the array)
+  const treeEdges: LayoutEdge[] = []
+  for (const heapInfo of step.heapArrays ?? []) {
+    const array = step.arrays.find(a => a.name === heapInfo.arrayName)
+    if (!array || array.values.length === 0) continue
+
+    // Build pointer lookup for this array's indices
+    const pointersByIndex = new Map<number, TreePointerInfo[]>()
+    for (const edge of pointerEdges) {
+      if (edge.style !== 'pointer') continue
+      const parts = edge.to.split(':')
+      if (parts[1] !== heapInfo.arrayName) continue
+      const idx = parseInt(parts[2], 10)
+      if (isNaN(idx) || idx >= array.values.length) continue
+      const name = edge.label?.split('=')[0] ?? ''
+      if (!pointersByIndex.has(idx)) pointersByIndex.set(idx, [])
+      pointersByIndex.get(idx)!.push({ name, color: edge.color })
+    }
+
+    const tree = layoutHeapTree(
+      array, heapInfo, CONTENT_X, y,
+      step.highlights, step.dimRanges, pointersByIndex,
+    )
+    nodes.push(tree.node)
+    treeEdges.push(...tree.edges)
+    y += tree.height + TREE_TOP_GAP
+  }
 
   // Global arrays
   for (const array of step.arrays) {
@@ -67,38 +98,6 @@ export function computeSceneLayout(
       nodes.push(varsNode)
       y += variablesRowHeight(nonPointerCount)
     }
-  }
-
-  // Derive pointer edges (needed before tree layout for pointer labels on tree nodes)
-  const pointerEdges = derivePointerEdges(step, colorMap, pointerNames)
-
-  // Heap trees
-  const treeEdges: LayoutEdge[] = []
-  for (const heapInfo of step.heapArrays ?? []) {
-    const array = step.arrays.find(a => a.name === heapInfo.arrayName)
-    if (!array || array.values.length === 0) continue
-
-    // Build pointer lookup for this array's indices
-    const pointersByIndex = new Map<number, TreePointerInfo[]>()
-    for (const edge of pointerEdges) {
-      if (edge.style !== 'pointer') continue
-      const parts = edge.to.split(':')
-      if (parts[1] !== heapInfo.arrayName) continue
-      const idx = parseInt(parts[2], 10)
-      if (isNaN(idx) || idx >= array.values.length) continue
-      const name = edge.label?.split('=')[0] ?? ''
-      if (!pointersByIndex.has(idx)) pointersByIndex.set(idx, [])
-      pointersByIndex.get(idx)!.push({ name, color: edge.color })
-    }
-
-    y += TREE_TOP_GAP
-    const tree = layoutHeapTree(
-      array, heapInfo, CONTENT_X, y,
-      step.highlights, step.dimRanges, pointersByIndex,
-    )
-    nodes.push(tree.node)
-    treeEdges.push(...tree.edges)
-    y += tree.height
   }
 
   const edges = [...pointerEdges, ...treeEdges]
