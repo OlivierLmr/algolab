@@ -1,5 +1,5 @@
 import type { Step, Value } from '../types.ts'
-import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData, PointerData, CellData } from './types.ts'
+import type { SceneLayout, LayoutNode, LayoutEdge, FlatElement, FrameData, PointerData, CellData, TreePointerInfo } from './types.ts'
 import { layoutArray, arrayGroupHeight } from './array-layout.ts'
 import { layoutVariables, variablesRowHeight } from './variables-layout.ts'
 import { layoutCallStack, callStackHeight } from './callstack-layout.ts'
@@ -69,23 +69,39 @@ export function computeSceneLayout(
     }
   }
 
+  // Derive pointer edges (needed before tree layout for pointer labels on tree nodes)
+  const pointerEdges = derivePointerEdges(step, colorMap, pointerNames)
+
   // Heap trees
   const treeEdges: LayoutEdge[] = []
   for (const heapInfo of step.heapArrays ?? []) {
     const array = step.arrays.find(a => a.name === heapInfo.arrayName)
     if (!array || array.values.length === 0) continue
+
+    // Build pointer lookup for this array's indices
+    const pointersByIndex = new Map<number, TreePointerInfo[]>()
+    for (const edge of pointerEdges) {
+      if (edge.style !== 'pointer') continue
+      const parts = edge.to.split(':')
+      if (parts[1] !== heapInfo.arrayName) continue
+      const idx = parseInt(parts[2], 10)
+      if (isNaN(idx) || idx >= array.values.length) continue
+      const name = edge.label?.split('=')[0] ?? ''
+      if (!pointersByIndex.has(idx)) pointersByIndex.set(idx, [])
+      pointersByIndex.get(idx)!.push({ name, color: edge.color })
+    }
+
     y += TREE_TOP_GAP
     const tree = layoutHeapTree(
       array, heapInfo, CONTENT_X, y,
-      step.highlights, step.dimRanges,
+      step.highlights, step.dimRanges, pointersByIndex,
     )
     nodes.push(tree.node)
     treeEdges.push(...tree.edges)
     y += tree.height
   }
 
-  // Derive pointer edges
-  const edges = [...derivePointerEdges(step, colorMap, pointerNames), ...treeEdges]
+  const edges = [...pointerEdges, ...treeEdges]
 
   // Flatten tree into a single list of positioned elements
   const flatElements = flattenNodes(nodes)

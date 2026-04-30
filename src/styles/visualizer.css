@@ -120,7 +120,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1;
   transition: transform 200ms ease, opacity 200ms, border-color 150ms;
+}
+
+.viz-tree-node-pointers {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  white-space: nowrap;
+  font: bold 11px monospace;
 }
 
 /* === Pointer arrows (SVG) === */

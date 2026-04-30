@@ -398,6 +398,13 @@ function TreeNodeElement({ el }: { el: FlatElement }) {
       }}
     >
       <span class="viz-cell-value">{String(data.value.num)}</span>
+      {data.pointers.length > 0 && (
+        <div class="viz-tree-node-pointers">
+          {data.pointers.map(p => (
+            <span key={p.name} style={{ color: p.color }}>{p.name}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

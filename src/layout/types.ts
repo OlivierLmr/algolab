@@ -44,11 +44,28 @@ export interface PointerData {
   stackIndex: number
 }
 
-export interface GroupData {
-  role: 'array-row' | 'variables-row' | 'callstack'
+export interface TreePointerInfo {
+  name: string
+  color: string
 }
 
-export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | GroupData
+export interface TreeNodeData {
+  arrayName: string
+  index: number
+  value: Value
+  highlightType?: 'compare' | 'swap' | 'sorted' | 'active'
+  dimmed: boolean
+  /** Whether the heap property is violated at this node */
+  violated: boolean
+  /** Pointers (iterator variables) targeting this node's index */
+  pointers: TreePointerInfo[]
+}
+
+export interface GroupData {
+  role: 'array-row' | 'variables-row' | 'callstack' | 'heap-tree'
+}
+
+export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | TreeNodeData | GroupData
 
 // --- Layout node ---
 
@@ -58,7 +75,7 @@ export interface LayoutNode {
   y: number
   width: number
   height: number
-  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'group'
+  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'tree-node' | 'group'
   data: NodeData
   children?: LayoutNode[]
 }
@@ -70,7 +87,7 @@ export interface LayoutEdge {
   from: NodeId
   to: NodeId
   label?: string
-  style: 'pointer' | 'hover'
+  style: 'pointer' | 'hover' | 'tree-edge'
   color: string
   highlightType?: 'compare' | 'swap' | 'sorted' | 'active'
 }

@@ -684,6 +684,25 @@ describe('heap tree layout', () => {
     const node0 = treeNodes.find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
     expect(node0.dimmed).toBe(false)
   })
+
+  it('propagates pointer info to tree nodes', () => {
+    const array = makeArray('arr', [10, 8, 6])
+    const pointersByIndex = new Map([
+      [0, [{ name: 'i', color: '#e74c3c' }]],
+      [2, [{ name: 'j', color: '#2ecc71' }, { name: 'k', color: '#3498db' }]],
+    ])
+    const result = layoutHeapTree(array, { arrayName: 'arr', kind: 'max' }, 0, 0, [], [], pointersByIndex)
+
+    const treeNodes = result.node.children!.filter(c => c.kind === 'tree-node')
+    const node0 = treeNodes.find(n => (n.data as TreeNodeData).index === 0)!.data as TreeNodeData
+    expect(node0.pointers).toEqual([{ name: 'i', color: '#e74c3c' }])
+
+    const node1 = treeNodes.find(n => (n.data as TreeNodeData).index === 1)!.data as TreeNodeData
+    expect(node1.pointers).toEqual([])
+
+    const node2 = treeNodes.find(n => (n.data as TreeNodeData).index === 2)!.data as TreeNodeData
+    expect(node2.pointers).toHaveLength(2)
+  })
 })
 
 describe('heap tree scene integration', () => {
@@ -699,6 +718,25 @@ describe('heap tree scene integration', () => {
 
     const treeEdges = layout.edges.filter(e => e.style === 'tree-edge')
     expect(treeEdges).toHaveLength(4)
+  })
+
+  it('pointer variables appear on tree nodes', () => {
+    const step = makeStep({
+      arrays: [makeArray('arr', [10, 8, 6])],
+      heapArrays: [{ arrayName: 'arr', kind: 'max' }],
+      variables: { i: { num: 1, arrays: ['arr'] } },
+    })
+    const colorMap = new Map([['i', '#e74c3c']])
+    const layout = computeSceneLayout(step, colorMap)
+
+    const treeNodes = layout.flatElements.filter(e => e.kind === 'tree-node')
+    const node1 = treeNodes.find(e => (e.data as TreeNodeData).index === 1)
+    expect(node1).toBeDefined()
+    expect((node1!.data as TreeNodeData).pointers).toEqual([{ name: 'i', color: '#e74c3c' }])
+
+    // Other nodes should have empty pointers
+    const node0 = treeNodes.find(e => (e.data as TreeNodeData).index === 0)
+    expect((node0!.data as TreeNodeData).pointers).toEqual([])
   })
 
   it('tree increases scene height', () => {

@@ -1,5 +1,5 @@
 import type { TrackedArray, Highlight, DimRange, HeapInfo } from '../types.ts'
-import type { LayoutNode, LayoutEdge, TreeNodeData } from './types.ts'
+import type { LayoutNode, LayoutEdge, TreeNodeData, TreePointerInfo } from './types.ts'
 import {
   TREE_NODE_RADIUS, TREE_LEVEL_GAP, TREE_MIN_NODE_GAP,
   TREE_LABEL_HEIGHT,
@@ -21,6 +21,7 @@ export function layoutHeapTree(
   y: number,
   highlights: Highlight[],
   dimRanges: DimRange[],
+  pointersByIndex?: Map<number, TreePointerInfo[]>,
 ): { node: LayoutNode; edges: LayoutEdge[]; height: number } {
   const n = array.values.length
   if (n === 0) {
@@ -113,6 +114,7 @@ export function layoutHeapTree(
         highlightType: highlightMap.get(idx),
         dimmed: isDimmed(idx),
         violated,
+        pointers: pointersByIndex?.get(idx) ?? [],
       }
 
       children.push({
