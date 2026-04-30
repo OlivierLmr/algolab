@@ -18,6 +18,8 @@ export type ASTNode =
   | UngaugeNode
   | StepoverNode
   | TooltipNode
+  | HeapNode
+  | UnheapNode
 
 export interface AlgoNode {
   type: 'algo'
@@ -167,6 +169,19 @@ export interface TooltipNode {
   type: 'tooltip'
   target: string
   text: string
+  line: number
+}
+
+export interface HeapNode {
+  type: 'heap'
+  arrayName: string
+  kind: 'max' | 'min'
+  line: number
+}
+
+export interface UnheapNode {
+  type: 'unheap'
+  arrayName: string
   line: number
 }
 

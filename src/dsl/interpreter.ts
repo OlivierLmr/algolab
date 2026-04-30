@@ -15,7 +15,7 @@ class ReturnSignal {
   value: Value
   constructor(value: Value) { this.value = value }
 }
-import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment } from '../types.ts'
+import type { Step, TrackedArray, Highlight, VarHighlight, DimRange, CallFrame, DescriptionSegment, HeapInfo } from '../types.ts'
 
 interface StoredProcedure {
   params: { name: string; isArray: boolean }[]
@@ -67,6 +67,7 @@ class ExecutionContext {
   private currentVarHighlights: VarHighlight[] = []
   private dimRanges: DimRange[] = []
   private gaugeArrays = new Set<string>()
+  private heapArrays = new Map<string, 'max' | 'min'>()
   private pendingCommentParts: CommentPart[] | null = null
   private readonly algo: AlgoNode
   private readonly colorMap: Map<string, string>
@@ -313,6 +314,7 @@ class ExecutionContext {
       varHighlights: isInnermost ? this.currentVarHighlights.filter(h => h.varName in frameVars) : [],
       dimRanges: this.dimRanges.filter(d => af.allocatedArrays.has(d.arrayName)),
       gaugeArrays: [...this.gaugeArrays].filter(n => af.allocatedArrays.has(n)),
+      heapArrays: [...this.heapArrays].filter(([n]) => af.allocatedArrays.has(n)).map(([n, k]) => ({ arrayName: n, kind: k })),
     }
     return { frame, ownedArrays, ownedVars }
   }
@@ -345,6 +347,7 @@ class ExecutionContext {
       varHighlights: this.currentVarHighlights.filter(h => !frameVarNames.has(h.varName)),
       dimRanges: this.dimRanges.filter(d => !frameArrayNames.has(d.arrayName)),
       gaugeArrays: [...this.gaugeArrays].filter(n => !frameArrayNames.has(n)),
+      heapArrays: [...this.heapArrays].filter(([n]) => !frameArrayNames.has(n)).map(([n, k]) => ({ arrayName: n, kind: k })),
     }
   }
 
@@ -508,9 +511,10 @@ class ExecutionContext {
       // Apply describe annotation if present on the def
       if (proc.describe) this.applyDescribe(proc.describe, proc.defLine)
 
-      // Save caller's dim ranges and gauge arrays
+      // Save caller's dim ranges, gauge arrays, and heap arrays
       const savedDimRanges = [...this.dimRanges]
       const savedGaugeArrays = new Set(this.gaugeArrays)
+      const savedHeapArrays = new Map(this.heapArrays)
 
       // Execute body
       let returnValue: Value = plainVal(0)
@@ -528,6 +532,7 @@ class ExecutionContext {
       // Restore caller's state
       this.dimRanges = savedDimRanges
       this.gaugeArrays = savedGaugeArrays
+      this.heapArrays = savedHeapArrays
 
       // Cleanup: pop all scopes back to (and including) the function's base scope
       while (this.scopeStack.length > frame.scopeBase) this.popScope()
@@ -620,6 +625,8 @@ class ExecutionContext {
       case 'undim': this.execUndim(node); break
       case 'gauge': this.execGauge(node); break
       case 'ungauge': this.execUngauge(node); break
+      case 'heap': this.execHeap(node); break
+      case 'unheap': this.execUnheap(node); break
       case 'pointer': this.execPointer(node); break
       case 'stepover': break
       case 'comment': this.execComment(node); break
@@ -799,6 +806,14 @@ class ExecutionContext {
 
   private execUngauge(node: { arrayName: string }): void {
     this.gaugeArrays.delete(this.resolveArrayName(node.arrayName))
+  }
+
+  private execHeap(node: { arrayName: string; kind: 'max' | 'min' }): void {
+    this.heapArrays.set(this.resolveArrayName(node.arrayName), node.kind)
+  }
+
+  private execUnheap(node: { arrayName: string }): void {
+    this.heapArrays.delete(this.resolveArrayName(node.arrayName))
   }
 
   private execComment(node: CommentNode): void {

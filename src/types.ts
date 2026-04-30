@@ -23,6 +23,11 @@ export interface DimRange {
   to: number
 }
 
+export interface HeapInfo {
+  arrayName: string
+  kind: 'max' | 'min'
+}
+
 export interface CallFrame {
   label: string
   variables: Record<string, Value>
@@ -32,6 +37,7 @@ export interface CallFrame {
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
   gaugeArrays: string[]
+  heapArrays: HeapInfo[]
 }
 
 export type DescriptionSegment =
@@ -51,6 +57,7 @@ export interface Step {
   varHighlights: VarHighlight[]
   dimRanges: DimRange[]
   gaugeArrays: string[]
+  heapArrays: HeapInfo[]
   variables: Record<string, Value>
   callStack: CallFrame[]
   currentLine: number

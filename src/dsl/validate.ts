@@ -281,7 +281,9 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
       case 'stepover':
         break
       case 'gauge':
-      case 'ungauge': {
+      case 'ungauge':
+      case 'heap':
+      case 'unheap': {
         const sym = lookupSymbol(node.arrayName)
         if (sym === undefined) {
           errors.push({ line: node.line, message: `Undefined array '${node.arrayName}'` })

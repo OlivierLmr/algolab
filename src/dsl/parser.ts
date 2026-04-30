@@ -1,6 +1,6 @@
 import type { Token } from './lexer.ts'
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, TooltipNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, SwapNode, DimNode, UndimNode, PointerNode, CommentNode, TooltipNode, AllocNode, DefNode, ReturnNode, GaugeNode, UngaugeNode, StepoverNode, HeapNode, UnheapNode,
   Expr,
 } from './ast.ts'
 
@@ -91,6 +91,8 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'return': return parseReturn()
         case 'gauge': return parseGauge()
         case 'ungauge': return parseUngauge()
+        case 'heap': return parseHeap()
+        case 'unheap': return parseUnheap()
         case 'stepover': return parseStepover()
         case 'tooltip': return parseTooltip()
       }
@@ -306,6 +308,25 @@ export function parse(tokens: Token[]): AlgoNode {
     const arrayName = expect('ident').value
     expectNewline()
     return { type: 'ungauge', arrayName, line: tok.line }
+  }
+
+  function parseHeap(): HeapNode {
+    const tok = expect('keyword', 'heap')
+    // Syntax: heap max arr  or  heap min arr  (default: max)
+    let kind: 'max' | 'min' = 'max'
+    if (match('ident', 'max') || match('ident', 'min')) {
+      kind = advance().value as 'max' | 'min'
+    }
+    const arrayName = expect('ident').value
+    expectNewline()
+    return { type: 'heap', arrayName, kind, line: tok.line }
+  }
+
+  function parseUnheap(): UnheapNode {
+    const tok = expect('keyword', 'unheap')
+    const arrayName = expect('ident').value
+    expectNewline()
+    return { type: 'unheap', arrayName, line: tok.line }
   }
 
   function parseStepover(): StepoverNode {
