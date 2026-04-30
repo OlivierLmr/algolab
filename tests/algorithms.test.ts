@@ -23,7 +23,7 @@ describe('Algorithms produce sorted output', () => {
     ['Bubble Sort', 'Selection Sort', 'Insertion Sort',
      'Merge Sort (L+R copies)', 'Merge Sort (two arrays)',
      'Quick Sort', 'Quick Sort (Semi-Recursive)',
-     'Counting Sort', 'Radix Sort (LSD)'].includes(a.name)
+     'Counting Sort', 'Radix Sort (LSD)', 'Heap Sort'].includes(a.name)
   )
 
   for (const algo of sortAlgos) {
@@ -59,12 +59,72 @@ describe('Counting Sort: retroactive cell tagging', () => {
   })
 })
 
+describe('Make Heap algorithms produce valid max-heaps', () => {
+  function isMaxHeap(arr: number[]): boolean {
+    for (let i = 0; i < arr.length; i++) {
+      const left = 2 * i + 1
+      const right = 2 * i + 2
+      if (left < arr.length && arr[left] > arr[i]) return false
+      if (right < arr.length && arr[right] > arr[i]) return false
+    }
+    return true
+  }
+
+  const heapAlgos = algorithms.filter(a =>
+    ['Make Heap O(n log n)', 'Make Heap O(n)'].includes(a.name)
+  )
+
+  for (const algo of heapAlgos) {
+    it(`${algo.name} produces a valid max-heap`, () => {
+      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput)
+      const lastStep = steps[steps.length - 1]
+      const arrData = lastStep.arrays.find(a => a.name === 'arr')!
+      const values = arrData.values.map(v => v.num)
+      expect(isMaxHeap(values)).toBe(true)
+    })
+
+    it(`${algo.name} preserves all elements (multiset)`, () => {
+      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput)
+      const lastStep = steps[steps.length - 1]
+      const arrData = lastStep.arrays.find(a => a.name === 'arr')!
+      const values = arrData.values.map(v => v.num).sort((a, b) => a - b)
+      const expected = [...algo.defaultInput].sort((a, b) => a - b)
+      expect(values).toEqual(expected)
+    })
+  }
+
+  // Edge cases for heap algorithms
+  const edgeCases: { name: string; input: number[] }[] = [
+    { name: 'single element', input: [42] },
+    { name: 'already a heap', input: [9, 7, 8, 3, 5, 6, 4, 1, 2] },
+    { name: 'reverse sorted', input: [1, 2, 3, 4, 5] },
+    { name: 'all duplicates', input: [3, 3, 3, 3, 3] },
+    { name: 'two elements', input: [1, 5] },
+  ]
+
+  for (const algo of heapAlgos) {
+    for (const { name, input } of edgeCases) {
+      it(`${algo.name} handles ${name}`, () => {
+        const steps = runAlgorithm(algo.source, 'arr', input)
+        const lastStep = steps[steps.length - 1]
+        const arrData = lastStep.arrays.find(a => a.name === 'arr')!
+        const values = arrData.values.map(v => v.num)
+        expect(isMaxHeap(values)).toBe(true)
+        // Verify all elements preserved
+        const sorted = values.sort((a, b) => a - b)
+        const expected = [...input].sort((a, b) => a - b)
+        expect(sorted).toEqual(expected)
+      })
+    }
+  }
+})
+
 describe('Sorting algorithms: edge-case inputs', () => {
   const sortAlgos = algorithms.filter(a =>
     ['Bubble Sort', 'Selection Sort', 'Insertion Sort',
      'Merge Sort (L+R copies)', 'Merge Sort (two arrays)',
      'Quick Sort', 'Quick Sort (Semi-Recursive)',
-     'Counting Sort', 'Radix Sort (LSD)'].includes(a.name)
+     'Counting Sort', 'Radix Sort (LSD)', 'Heap Sort'].includes(a.name)
   )
 
   const edgeCases: { name: string; input: number[] }[] = [

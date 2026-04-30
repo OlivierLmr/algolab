@@ -9,6 +9,9 @@ import { quickSortSemi } from './quick-sort-semi.ts'
 import { quickSelect } from './quick-select.ts'
 import { countingSort } from './counting-sort.ts'
 import { radixSort } from './radix-sort.ts'
+import { makeHeapNlogn } from './make-heap-nlogn.ts'
+import { makeHeapLinear } from './make-heap-linear.ts'
+import { heapSort } from './heap-sort.ts'
 
 export const algorithms: AlgorithmDefinition[] = [
   bubbleSort,
@@ -21,4 +24,7 @@ export const algorithms: AlgorithmDefinition[] = [
   quickSelect,
   countingSort,
   radixSort,
+  makeHeapNlogn,
+  makeHeapLinear,
+  heapSort,
 ]

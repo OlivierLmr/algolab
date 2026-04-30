@@ -28,6 +28,25 @@ function collectVarNames(expr: Expr): Set<string> {
   return names
 }
 
+/** Check whether an expression contains a function call (user-defined, not len). */
+function containsCall(expr: Expr): boolean {
+  switch (expr.type) {
+    case 'number':
+    case 'identifier':
+      return false
+    case 'binary':
+      return containsCall(expr.left) || containsCall(expr.right)
+    case 'unary':
+      return containsCall(expr.operand)
+    case 'index':
+      return containsCall(expr.array) || containsCall(expr.index)
+    case 'call':
+      // len() is a built-in, safe to evaluate during snapshot
+      if (expr.callee === 'len') return expr.args.some(containsCall)
+      return true
+  }
+}
+
 interface PendingPointer {
   label: string
   arrayName: string
@@ -71,7 +90,10 @@ function collectImplicitPointers(nodes: ASTNode[]): PendingPointer[] {
     // arr[complexExpr] where index is not a bare identifier and contains variables
     if (expr.type === 'index' && expr.array.type === 'identifier' && expr.index.type !== 'identifier') {
       const varNames = collectVarNames(expr.index)
-      if (varNames.size > 0) {  // skip constant expressions like arr[0]
+      // Skip constant expressions (arr[0]) and expressions containing user-defined
+      // function calls (arr[parent(i)]) — calls push/pop scopes during evaluation,
+      // which corrupts state when expression pointers are re-evaluated during snapshot.
+      if (varNames.size > 0 && !containsCall(expr.index)) {
         const label = exprToString(expr.index)
         const arrayName = expr.array.name
         const key = `${arrayName}:${label}`

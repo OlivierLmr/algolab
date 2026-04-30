@@ -1,0 +1,37 @@
+import type { AlgorithmDefinition } from '../types.ts'
+
+export const makeHeapLinear: AlgorithmDefinition = {
+  name: 'Make Heap O(n)',
+  source: `algo MakeHeapLinear(arr[])
+  #: stepover
+  def left(i)
+    return 2 * i + 1
+
+  #: stepover
+  def right(i)
+    return 2 * i + 2
+
+  #: describe "Sifting down element {$*arr[i]} at position {$=i}"
+  def sift_down(i, size)
+    let largest = i
+    let l = left(i)
+    let r = right(i)
+    if l < size and arr[l] > arr[largest]
+      largest = l
+    if r < size and arr[r] > arr[largest]
+      largest = r
+    if largest != i
+      #: comment "Swapping arr[{$*i}] = {$*arr[i]} with arr[{$*largest}] = {$*arr[largest]}"
+      swap arr[i], arr[largest]
+      sift_down(largest, size)
+
+  #: stepover
+  def parent(i)
+    return (i - 1) / 2
+
+  let p = parent(len(arr) - 1)
+  #: describe "Sifting down node at position {$=i}"
+  for i from p downto 0
+    sift_down(i, len(arr))`,
+  defaultInput: [4, 10, 3, 5, 1, 8, 7, 2, 9, 6],
+}
