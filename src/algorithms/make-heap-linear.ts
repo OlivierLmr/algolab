@@ -31,6 +31,7 @@ export const makeHeapLinear: AlgorithmDefinition = {
 
   #: heap max arr
   let p = parent(len(arr) - 1)
+  #: pointer p on arr at p
   #: describe "Sifting down node at position {$=i}"
   for i from p downto 0
     sift_down(i, len(arr))`,

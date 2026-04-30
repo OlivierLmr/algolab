@@ -11,7 +11,7 @@ export const heapSort: AlgorithmDefinition = {
   def right(i)
     return 2 * i + 2
 
-  #: describe "Sifting down element {$*arr[i]} at position {$=i}"
+  #: stepover
   def sift_down(i, size)
     let largest = i
     let l = left(i)
@@ -21,7 +21,6 @@ export const heapSort: AlgorithmDefinition = {
     if r < size and arr[r] > arr[largest]
       largest = r
     if largest != i
-      #: comment "Swapping arr[{$*i}] = {$*arr[i]} with arr[{$*largest}] = {$*arr[largest]}"
       swap arr[i], arr[largest]
       sift_down(largest, size)
 
@@ -29,13 +28,16 @@ export const heapSort: AlgorithmDefinition = {
   def parent(i)
     return (i - 1) / 2
 
-  #: heap max arr
-  let p = parent(len(arr) - 1)
-  #: describe "Phase 1: Sifting down node at position {$=i}"
-  for i from p downto 0
-    sift_down(i, len(arr))
+  #: stepover
+  def make_heap()
+    let p = parent(len(arr) - 1)
+    for i from p downto 0
+      sift_down(i, len(arr))
 
-  #: describe "Phase 2: Extracting max element to position {$=i}"
+  #: heap max arr
+  make_heap()
+
+  #: describe "Extracting max element to position {$=i}"
   for i from len(arr) - 1 downto 1
     #: comment "Swapping max {$*arr[0]} with arr[{$*i}] = {$*arr[i]}"
     swap arr[0], arr[i]
