@@ -31,7 +31,9 @@ export const heapSort: AlgorithmDefinition = {
   #: describe "Phase 1: Building max-heap by sifting down node at position {$=i}"
   def make_heap()
     let p = parent(len(arr) - 1)
+    #: pointer p on arr at p
     for i from p downto 0
+      #: pointer i on arr at i
       #: comment "Sifting down arr[{$*i}] = {$*arr[i]} to fix subtree"
       sift_down(i, len(arr))
 
