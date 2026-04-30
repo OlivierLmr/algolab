@@ -10,7 +10,8 @@ export function DslDocs() {
             <tr><td><code>let x = expr</code></td><td>Declare a variable</td></tr>
             <tr><td><code>x = expr</code></td><td>Assign to variable</td></tr>
             <tr><td><code>arr[i] = expr</code></td><td>Assign to array element</td></tr>
-            <tr><td><code>for i from a to b</code></td><td>For loop (inclusive bounds)</td></tr>
+            <tr><td><code>for i from a to b</code></td><td>For loop (ascending, inclusive)</td></tr>
+            <tr><td><code>for i from a downto b</code></td><td>For loop (descending, inclusive)</td></tr>
             <tr><td><code>while condition</code></td><td>While loop</td></tr>
             <tr><td><code>if cond</code> / <code>else</code></td><td>Conditional branch</td></tr>
             <tr><td><code>swap arr[i], arr[j]</code></td><td>Swap two array elements</td></tr>
@@ -30,6 +31,8 @@ export function DslDocs() {
             <tr><td><code>tooltip "text"</code></td><td>Hover tooltip (before <code>let</code>/<code>for</code>/<code>alloc</code>)</td></tr>
             <tr><td><code>pointer lbl on arr at expr</code></td><td>Show pointer arrow on array</td></tr>
             <tr><td><code>gauge arr</code> / <code>ungauge arr</code></td><td>Show/hide value gauge on cells</td></tr>
+            <tr><td><code>heap [max|min] arr</code></td><td>Show binary heap tree view</td></tr>
+            <tr><td><code>unheap arr</code></td><td>Hide heap tree view</td></tr>
             <tr><td><code>dim arr from i to j</code></td><td>Gray out array range</td></tr>
             <tr><td><code>undim arr from i to j</code></td><td>Restore grayed-out range</td></tr>
             <tr><td><code>stepover</code></td><td>Hide next function from step-by-step view</td></tr>
