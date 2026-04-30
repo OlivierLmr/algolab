@@ -28,20 +28,23 @@ export const heapSort: AlgorithmDefinition = {
   def parent(i)
     return (i - 1) / 2
 
-  #: stepover
+  #: describe "Phase 1: Building max-heap by sifting down node at position {$=i}"
   def make_heap()
     let p = parent(len(arr) - 1)
     for i from p downto 0
+      #: comment "Sifting down arr[{$*i}] = {$*arr[i]} to fix subtree"
       sift_down(i, len(arr))
 
   #: heap max arr
+  #: comment "Building the max-heap from the unsorted array"
   make_heap()
 
-  #: describe "Extracting max element to position {$=i}"
+  #: describe "Phase 2: Extracting max element to position {$=i}"
   for i from len(arr) - 1 downto 1
-    #: comment "Swapping max {$*arr[0]} with arr[{$*i}] = {$*arr[i]}"
+    #: comment "Max element is arr[0] = {$*arr[0]}. Swapping with arr[{$*i}] = {$*arr[i]} to place it in its final sorted position"
     swap arr[0], arr[i]
     #: dim arr from i to len(arr) - 1
+    #: comment "Restoring heap property on the reduced heap of size {$=i}"
     sift_down(0, i)`,
   defaultInput: [4, 10, 3, 5, 1, 8, 7, 2, 9, 6],
 }
