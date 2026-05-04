@@ -33,7 +33,8 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     const sourceArr = step.arrays.find(a => a.name === hoveredCell.arrayName)
     if (!sourceArr || hoveredCell.cellIndex >= sourceArr.values.length) return null
     const cellValue = sourceArr.values[hoveredCell.cellIndex]
-    if (cellValue.arrays.length === 0) return null
+    const hasRef = cellValue.ref !== undefined
+    if (cellValue.arrays.length === 0 && !hasRef) return null
 
     const sourceY = arrayCellYMap.get(hoveredCell.arrayName)
     if (sourceY === undefined) return null
@@ -41,6 +42,33 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     const sourceCenterX = CONTENT_X + hoveredCell.cellIndex * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
     const sourceCenterY = sourceY + CELL_SIZE / 2
 
+    // ref arrows: point to the referenced array's label area
+    if (hasRef) {
+      const targetArrayName = cellValue.ref!
+      const targetArr = step.arrays.find(a => a.name === targetArrayName)
+      if (!targetArr) return []
+      const targetY = arrayCellYMap.get(targetArrayName)
+      if (targetY === undefined) return []
+
+      // Point to the middle of the array (label area)
+      const targetCenterX = CONTENT_X + (targetArr.values.length * (CELL_SIZE + CELL_GAP) - CELL_GAP) / 2
+      const targetTopY = targetY - INDEX_LABEL_HEIGHT / 2
+      const label = `\u2192 ${targetArrayName}`
+
+      return [{
+        sourceCenterX, sourceCenterY,
+        targetCenterX, targetIndexY: targetTopY,
+        sourceX: CONTENT_X + hoveredCell.cellIndex * (CELL_SIZE + CELL_GAP),
+        sourceY,
+        targetX: CONTENT_X,
+        targetY,
+        sameArray: false,
+        label,
+        isRef: true,
+      }]
+    }
+
+    // Iterator arrows: point to specific cell index
     return cellValue.arrays.map(targetArrayName => {
       const targetArr = step.arrays.find(a => a.name === targetArrayName)
       if (!targetArr) return null
@@ -63,6 +91,7 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
         targetY,
         sameArray,
         label,
+        isRef: false,
       }
     }).filter(Boolean)
   }, [hoveredCell, step, arrayCellYMap])
@@ -130,7 +159,7 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
       {/* Hover arrows */}
       {hoverArrows?.map((ha, i) => {
         if (!ha) return null
-        const { sourceCenterX, sourceCenterY, targetCenterX, targetIndexY, sameArray, label } = ha
+        const { sourceCenterX, sourceCenterY, targetCenterX, targetIndexY, sameArray, label, isRef } = ha
 
         let path: string
         let labelX: number
@@ -161,12 +190,14 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
               width={CELL_SIZE + 2} height={CELL_SIZE + 2}
               fill="none" stroke="#3498db" stroke-width="3"
             />
-            {/* Highlight target cell */}
-            <rect
-              x={ha.targetX - 1} y={ha.targetY - 1}
-              width={CELL_SIZE + 2} height={CELL_SIZE + 2}
-              fill="none" stroke="#3498db" stroke-width="3"
-            />
+            {/* Highlight target cell (not for ref arrows — they target the whole array) */}
+            {!isRef && (
+              <rect
+                x={ha.targetX - 1} y={ha.targetY - 1}
+                width={CELL_SIZE + 2} height={CELL_SIZE + 2}
+                fill="none" stroke="#3498db" stroke-width="3"
+              />
+            )}
             {/* Arrow path */}
             <path
               d={path}

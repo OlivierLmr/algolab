@@ -113,8 +113,8 @@ function SceneElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip, 
 
 function CellElement({ el, onHoverCell, onLeaveCell, showTooltip, hideTooltip }: SceneElementProps) {
   const data = el.data as CellData
-  const hasIteratorMeta = data.value.arrays.length > 0
-  const displayVal = data.value.num === Infinity ? '\u221E' : String(data.value.num)
+  const hasIteratorMeta = data.value.arrays.length > 0 || data.value.ref !== undefined
+  const displayVal = data.value.ref ?? (data.value.num === Infinity ? '\u221E' : String(data.value.num))
 
   const borderColor = data.highlightType
     ? getHighlightColor(data.highlightType)

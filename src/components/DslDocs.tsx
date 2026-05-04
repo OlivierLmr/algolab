@@ -17,9 +17,11 @@ export function DslDocs() {
             <tr><td><code>swap arr[i], arr[j]</code></td><td>Swap two array elements</td></tr>
             <tr><td><code>alloc name size</code></td><td>Allocate a persistent array</td></tr>
             <tr><td><code>local name size</code></td><td>Allocate a temporary array (cleaned up on function return)</td></tr>
+            <tr><td><code>free name</code></td><td>Deallocate a heap-allocated array</td></tr>
             <tr><td><code>def fn(x, arr[])</code></td><td>Define a function (<code>[]</code> = array param)</td></tr>
             <tr><td><code>return expr</code></td><td>Return from function</td></tr>
             <tr><td><code>len(arr)</code></td><td>Get array length</td></tr>
+            <tr><td><code>ref(arr)</code></td><td>Reference to array (shows name, hover arrow)</td></tr>
             <tr><td><code>inf</code></td><td>Infinity value</td></tr>
             <tr><td colspan={2} class="dsl-docs-operators">Operators: <code>+ - * / % &lt; &gt; &lt;= &gt;= == != and or not</code></td></tr>
           </table>
