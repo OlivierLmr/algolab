@@ -15,9 +15,10 @@ export function DslDocs() {
             <tr><td><code>while condition</code></td><td>While loop</td></tr>
             <tr><td><code>if cond</code> / <code>else</code></td><td>Conditional branch</td></tr>
             <tr><td><code>swap arr[i], arr[j]</code></td><td>Swap two array elements</td></tr>
-            <tr><td><code>alloc name size</code></td><td>Allocate a persistent array</td></tr>
+            <tr><td><code>alloc name size</code></td><td>Allocate a named persistent array</td></tr>
+            <tr><td><code>let p = alloc size</code></td><td>Allocate and return ref (dynamic)</td></tr>
             <tr><td><code>local name size</code></td><td>Allocate a temporary array (cleaned up on function return)</td></tr>
-            <tr><td><code>free name</code></td><td>Deallocate a heap-allocated array</td></tr>
+            <tr><td><code>free name</code></td><td>Deallocate a heap-allocated array (or ref)</td></tr>
             <tr><td><code>def fn(x, arr[])</code></td><td>Define a function (<code>[]</code> = array param)</td></tr>
             <tr><td><code>return expr</code></td><td>Return from function</td></tr>
             <tr><td><code>len(arr)</code></td><td>Get array length</td></tr>

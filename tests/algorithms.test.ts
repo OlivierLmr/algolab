@@ -174,27 +174,26 @@ describe('Deque demo: data structure operations', () => {
 
     // After all 16 push/pop operations, the deque contains:
     // {1, 2, 4, 6, 9, 12, 15, 20, 30, 40, 50, 55, 60, 65}
-    // Spread across: c4[3]=1, c2=[2,4,6,9], c0=[12,15,20,30], c1=[40,50,55,60], c3[0]=65
-    const c0 = lastStep.arrays.find(a => a.name === 'c0')!
-    const c1 = lastStep.arrays.find(a => a.name === 'c1')!
-    const c2 = lastStep.arrays.find(a => a.name === 'c2')!
-    const c3 = lastStep.arrays.find(a => a.name === 'c3')!
-    const c4 = lastStep.arrays.find(a => a.name === 'c4')!
+    // Chunks are dynamically allocated with auto-generated names
     const map2 = lastStep.arrays.find(a => a.name === 'map2')!
+    expect(map2).toBeDefined()
 
-    expect(c4.values.map(v => v.num)).toEqual([0, 0, 0, 1])
-    expect(c2.values.map(v => v.num)).toEqual([2, 4, 6, 9])
-    expect(c0.values.map(v => v.num)).toEqual([12, 15, 20, 30])
-    expect(c1.values.map(v => v.num)).toEqual([40, 50, 55, 60])
-    expect(c3.values.map(v => v.num)).toEqual([65, 0, 0, 0])
+    // map should have been freed after reallocation
+    const map = lastStep.arrays.find(a => a.name === 'map')
+    expect(map).toBeUndefined()
 
-    // map2 should have the chunk layout after reallocation:
-    // map2[1]=4(c4), map2[2]=2(c2), map2[3]=0(c0), map2[4]=1(c1), map2[5]=3(c3)
-    expect(map2.values[1].num).toBe(4)
-    expect(map2.values[2].num).toBe(2)
-    expect(map2.values[3].num).toBe(0)
-    expect(map2.values[4].num).toBe(1)
-    expect(map2.values[5].num).toBe(3)
+    // Collect all deque values by following map2 refs in order (slots 1-5)
+    const allValues: number[] = []
+    for (let slot = 1; slot <= 5; slot++) {
+      const ref = map2.values[slot].ref
+      expect(ref).toBeDefined()
+      const chunk = lastStep.arrays.find(a => a.name === ref)!
+      expect(chunk).toBeDefined()
+      for (const v of chunk.values) {
+        if (v.num !== 0) allValues.push(v.num)
+      }
+    }
+    expect(allValues).toEqual([1, 2, 4, 6, 9, 12, 15, 20, 30, 40, 50, 55, 60, 65])
   })
 
   it('has reasonable step count for a demo with stepover operations', () => {
