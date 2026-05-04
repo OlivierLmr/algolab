@@ -172,9 +172,9 @@ describe('Deque demo: data structure operations', () => {
     const steps = runAlgorithm(deque.source, 'arr', deque.defaultInput)
     const lastStep = steps[steps.length - 1]
 
-    // After all 17 operations, the deque contains:
-    // {1, 2, 4, 6, 9, 12, 15, 20, 25, 30, 40, 55, 60, 65}
-    // Spread across: c4[3]=1, c2=[2,4,6,9], c0=[12,15,20,25], c1=[30,40,55,60], c3[0]=65
+    // After all 16 push/pop operations, the deque contains:
+    // {1, 2, 4, 6, 9, 12, 15, 20, 30, 40, 50, 55, 60, 65}
+    // Spread across: c4[3]=1, c2=[2,4,6,9], c0=[12,15,20,30], c1=[40,50,55,60], c3[0]=65
     const c0 = lastStep.arrays.find(a => a.name === 'c0')!
     const c1 = lastStep.arrays.find(a => a.name === 'c1')!
     const c2 = lastStep.arrays.find(a => a.name === 'c2')!
@@ -184,8 +184,8 @@ describe('Deque demo: data structure operations', () => {
 
     expect(c4.values.map(v => v.num)).toEqual([0, 0, 0, 1])
     expect(c2.values.map(v => v.num)).toEqual([2, 4, 6, 9])
-    expect(c0.values.map(v => v.num)).toEqual([12, 15, 20, 25])
-    expect(c1.values.map(v => v.num)).toEqual([30, 40, 55, 60])
+    expect(c0.values.map(v => v.num)).toEqual([12, 15, 20, 30])
+    expect(c1.values.map(v => v.num)).toEqual([40, 50, 55, 60])
     expect(c3.values.map(v => v.num)).toEqual([65, 0, 0, 0])
 
     // map2 should have the chunk layout after reallocation:
