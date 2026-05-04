@@ -41,8 +41,8 @@ function containsCall(expr: Expr): boolean {
     case 'index':
       return containsCall(expr.array) || containsCall(expr.index)
     case 'call':
-      // len() is a built-in, safe to evaluate during snapshot
-      if (expr.callee === 'len') return expr.args.some(containsCall)
+      // len() and ref() are built-ins, safe to evaluate during snapshot
+      if (expr.callee === 'len' || expr.callee === 'ref') return expr.args.some(containsCall)
       return true
   }
 }

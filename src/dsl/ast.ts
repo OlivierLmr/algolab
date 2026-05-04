@@ -18,6 +18,7 @@ export type ASTNode =
   | UngaugeNode
   | StepoverNode
   | TooltipNode
+  | FreeNode
   | HeapNode
   | UnheapNode
 
@@ -131,6 +132,12 @@ export interface AllocNode {
   arrayName: string
   size: Expr
   persistent: boolean  // true = heap (alloc), false = stack (local)
+  line: number
+}
+
+export interface FreeNode {
+  type: 'free'
+  arrayName: string
   line: number
 }
 

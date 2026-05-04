@@ -2,6 +2,7 @@
 export interface Value {
   num: number
   arrays: string[] // empty = plain number, non-empty = iterator on these arrays
+  ref?: string     // if set, this value is a reference to the named array
 }
 
 export function plainVal(n: number): Value {
@@ -10,6 +11,10 @@ export function plainVal(n: number): Value {
 
 export function iterVal(n: number, arrays: string[]): Value {
   return { num: n, arrays: [...arrays] }
+}
+
+export function refVal(arrayName: string): Value {
+  return { num: 0, arrays: [], ref: arrayName }
 }
 
 export function addArray(val: Value, arrayName: string): Value {

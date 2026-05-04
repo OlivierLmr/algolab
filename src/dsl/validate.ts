@@ -14,6 +14,7 @@ interface FunctionInfo {
 
 const BUILTIN_FUNCTIONS: Record<string, { paramCount: number; arrayArgs: number[] }> = {
   len: { paramCount: 1, arrayArgs: [0] },
+  ref: { paramCount: 1, arrayArgs: [0] },
 }
 
 export function validateAST(ast: AlgoNode): ValidationError[] {
@@ -276,6 +277,15 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         }
         validateExpr(node.from, node.line)
         validateExpr(node.to, node.line)
+        break
+      }
+      case 'free': {
+        const sym = lookupSymbol(node.arrayName)
+        if (sym === undefined) {
+          errors.push({ line: node.line, message: `Undefined array '${node.arrayName}'` })
+        } else if (sym === 'scalar') {
+          errors.push({ line: node.line, message: `'${node.arrayName}' is not an array` })
+        }
         break
       }
       case 'stepover':

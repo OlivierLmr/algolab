@@ -1,9 +1,9 @@
 import type {
-  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, TooltipNode, AllocNode, DefNode, ReturnNode, PointerNode,
+  ASTNode, AlgoNode, ForNode, WhileNode, IfNode, LetNode, AssignNode, SwapNode, DimNode, UndimNode, CommentNode, TooltipNode, AllocNode, FreeNode, DefNode, ReturnNode, PointerNode,
   Expr, CommentPart,
 } from './ast.ts'
 import type { Value } from './value.ts'
-import { plainVal, mergeArrays, propagateArithmetic } from './value.ts'
+import { plainVal, refVal, mergeArrays, propagateArithmetic } from './value.ts'
 import type { TypeContext } from './typeinfer.ts'
 
 const MAX_CALL_DEPTH = 1000
@@ -459,6 +459,13 @@ class ExecutionContext {
   }
 
   private evalCall(name: string, args: Expr[]): Value {
+    if (name === 'ref') {
+      const arg = args[0]
+      if (arg.type === 'identifier') {
+        return refVal(this.resolveArrayName(arg.name))
+      }
+      throw new Error(`ref() expects an array identifier`)
+    }
     if (name === 'len') {
       const arg = args[0]
       if (arg.type === 'identifier') {
@@ -632,6 +639,7 @@ class ExecutionContext {
       case 'comment': this.execComment(node); break
       case 'tooltip': this.execTooltip(node); break
       case 'alloc': this.execAlloc(node); break
+      case 'free': this.execFree(node); break
       case 'def': this.execDef(node); break
       case 'return': this.execReturn(node); break
       case 'exprStmt':
@@ -772,9 +780,11 @@ class ExecutionContext {
       const arr = this.getArray(node.target.array)
       const idx = this.evalExpr(node.target.index).num
 
-      // Stamp stored cell value with static element type
+      // Stamp stored cell value with static element type, preserving ref
       const arrayName = this.getArrayName(node.target.array)
-      arr[idx] = this.stampCell(val.num, arrayName)
+      const stamped = this.stampCell(val.num, arrayName)
+      if (val.ref) stamped.ref = val.ref
+      arr[idx] = stamped
 
       this.setArrayHighlight(arrayName, [idx], 'active')
       if (node.value.type === 'identifier') {
@@ -868,6 +878,14 @@ class ExecutionContext {
     if (!node.persistent && this.callFrameStack.length > 0) {
       this.callFrameStack[this.callFrameStack.length - 1].allocatedArrays.add(node.arrayName)
     }
+  }
+
+  private execFree(node: FreeNode): void {
+    this.arrays.delete(node.arrayName)
+    this.dimRanges = this.dimRanges.filter(d => d.arrayName !== node.arrayName)
+    this.gaugeArrays.delete(node.arrayName)
+    this.heapArrays.delete(node.arrayName)
+    this.snapshot(node.line, `Free ${node.arrayName}`)
   }
 
   private execDef(node: DefNode): void {

@@ -378,6 +378,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       case 'ungauge':
       case 'heap':
       case 'unheap':
+      case 'free':
       case 'stepover':
         break
     }
@@ -418,7 +419,7 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
       }
 
       case 'call': {
-        if (expr.callee === 'len') return []  // Num
+        if (expr.callee === 'len' || expr.callee === 'ref') return []  // Num
         const info = functions.get(expr.callee)
         if (info) return [...info.returnType]
         return []
