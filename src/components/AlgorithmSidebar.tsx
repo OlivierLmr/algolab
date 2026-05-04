@@ -38,6 +38,10 @@ function buildGroups(): AlgorithmGroup[] {
       label: 'Heaps',
       names: ['Make Heap O(n log n)', 'Make Heap O(n)', 'Heap Sort'],
     },
+    {
+      label: 'Data Structures',
+      names: ['Deque (demo)'],
+    },
   ]
 
   const groups: AlgorithmGroup[] = []

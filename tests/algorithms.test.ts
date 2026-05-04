@@ -164,3 +164,44 @@ describe('Quick Select: finds k-th element', () => {
     expect(arrData.values[k].num).toBe(3)
   })
 })
+
+describe('Deque demo: data structure operations', () => {
+  const deque = algorithms.find(a => a.name === 'Deque (demo)')!
+
+  it('produces correct final chunk contents after all operations', () => {
+    const steps = runAlgorithm(deque.source, 'arr', deque.defaultInput)
+    const lastStep = steps[steps.length - 1]
+
+    // After all 17 operations, the deque contains:
+    // {1, 2, 4, 6, 9, 12, 15, 20, 25, 30, 40, 55, 60, 65}
+    // Spread across: c4[3]=1, c2=[2,4,6,9], c0=[12,15,20,25], c1=[30,40,55,60], c3[0]=65
+    const c0 = lastStep.arrays.find(a => a.name === 'c0')!
+    const c1 = lastStep.arrays.find(a => a.name === 'c1')!
+    const c2 = lastStep.arrays.find(a => a.name === 'c2')!
+    const c3 = lastStep.arrays.find(a => a.name === 'c3')!
+    const c4 = lastStep.arrays.find(a => a.name === 'c4')!
+    const map2 = lastStep.arrays.find(a => a.name === 'map2')!
+
+    expect(c4.values.map(v => v.num)).toEqual([0, 0, 0, 1])
+    expect(c2.values.map(v => v.num)).toEqual([2, 4, 6, 9])
+    expect(c0.values.map(v => v.num)).toEqual([12, 15, 20, 25])
+    expect(c1.values.map(v => v.num)).toEqual([30, 40, 55, 60])
+    expect(c3.values.map(v => v.num)).toEqual([65, 0, 0, 0])
+
+    // map2 should have the chunk layout after reallocation:
+    // map2[1]=4(c4), map2[2]=2(c2), map2[3]=0(c0), map2[4]=1(c1), map2[5]=3(c3)
+    expect(map2.values[1].num).toBe(4)
+    expect(map2.values[2].num).toBe(2)
+    expect(map2.values[3].num).toBe(0)
+    expect(map2.values[4].num).toBe(1)
+    expect(map2.values[5].num).toBe(3)
+  })
+
+  it('has reasonable step count for a demo with stepover operations', () => {
+    const steps = runAlgorithm(deque.source, 'arr', deque.defaultInput)
+    // Should have at least alloc steps + 17 operation comments/calls
+    expect(steps.length).toBeGreaterThan(20)
+    // But shouldn't be excessively long (operations are stepover'd)
+    expect(steps.length).toBeLessThan(500)
+  })
+})

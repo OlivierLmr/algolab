@@ -15,7 +15,8 @@ export function DslDocs() {
             <tr><td><code>while condition</code></td><td>While loop</td></tr>
             <tr><td><code>if cond</code> / <code>else</code></td><td>Conditional branch</td></tr>
             <tr><td><code>swap arr[i], arr[j]</code></td><td>Swap two array elements</td></tr>
-            <tr><td><code>alloc name size</code></td><td>Allocate a new array</td></tr>
+            <tr><td><code>alloc name size</code></td><td>Allocate a persistent array</td></tr>
+            <tr><td><code>local name size</code></td><td>Allocate a temporary array (cleaned up on function return)</td></tr>
             <tr><td><code>def fn(x, arr[])</code></td><td>Define a function (<code>[]</code> = array param)</td></tr>
             <tr><td><code>return expr</code></td><td>Return from function</td></tr>
             <tr><td><code>len(arr)</code></td><td>Get array length</td></tr>
@@ -28,7 +29,7 @@ export function DslDocs() {
           <table class="dsl-docs-table">
             <tr><td><code>comment "text"</code></td><td>Step description (<code>&#123;expr&#125;</code> value, <code>&#123;$var&#125;</code> name, <code>&#123;$=var&#125;</code> name+value, <code>&#123;$*var&#125;</code> value, <code>&#123;x ? 'a' : 'b'&#125;</code> ternary)</td></tr>
             <tr><td><code>describe "text"</code></td><td>Block description (before <code>for</code>/<code>while</code>/<code>if</code>/<code>def</code>)</td></tr>
-            <tr><td><code>tooltip "text"</code></td><td>Hover tooltip (before <code>let</code>/<code>for</code>/<code>alloc</code>)</td></tr>
+            <tr><td><code>tooltip "text"</code></td><td>Hover tooltip (before <code>let</code>/<code>for</code>/<code>alloc</code>/<code>local</code>)</td></tr>
             <tr><td><code>pointer lbl on arr at expr</code></td><td>Show pointer arrow on array</td></tr>
             <tr><td><code>gauge arr</code> / <code>ungauge arr</code></td><td>Show/hide value gauge on cells</td></tr>
             <tr><td><code>heap [max|min] arr</code></td><td>Show binary heap tree view</td></tr>

@@ -21,7 +21,7 @@ export type TokenType =
 
 const KEYWORDS = new Set([
   'algo', 'let', 'for', 'from', 'to', 'downto', 'while', 'if', 'else', 'swap', 'and', 'or', 'not',
-  'dim', 'undim', 'pointer', 'on', 'at', 'comment', 'describe', 'alloc', 'def', 'inf', 'return',
+  'dim', 'undim', 'pointer', 'on', 'at', 'comment', 'describe', 'alloc', 'local', 'def', 'inf', 'return',
   'gauge', 'ungauge', 'stepover', 'tooltip', 'heap', 'unheap',
 ])
 

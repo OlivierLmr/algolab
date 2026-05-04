@@ -12,6 +12,7 @@ import { radixSort } from './radix-sort.ts'
 import { makeHeapNlogn } from './make-heap-nlogn.ts'
 import { makeHeapLinear } from './make-heap-linear.ts'
 import { heapSort } from './heap-sort.ts'
+import { dequeDemo } from './deque-demo.ts'
 
 export const algorithms: AlgorithmDefinition[] = [
   bubbleSort,
@@ -27,4 +28,5 @@ export const algorithms: AlgorithmDefinition[] = [
   makeHeapNlogn,
   makeHeapLinear,
   heapSort,
+  dequeDemo,
 ]

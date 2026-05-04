@@ -4,3 +4,4 @@
 - use pnpm, not npm
 - while this started as a poc/prototype, this is now intended to be clean and production quality.
 - focus on the conceptual, theoretical cleanness and quality of any non-trivial choice you make. No quick hacks, easy wins. Have something that is architecturally clean, and that is intelligent in terms of theory of software, theory of programming languages.
+- Any time you introduce a change to the DSL, make sure to update the "DSL Reference" of the editor page.

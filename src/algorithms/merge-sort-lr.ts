@@ -5,7 +5,7 @@ export const mergeSortLR: AlgorithmDefinition = {
   source: `algo MergeSortLR(arr[])
   #: gauge arr
   #: stepover
-  def copy(lo, mid, hi)
+  def copy(lo, mid, hi, L[], R[])
     let leftLen = mid - lo + 1
     let rightLen = hi - mid
     for i from 0 to leftLen - 1
@@ -17,12 +17,12 @@ export const mergeSortLR: AlgorithmDefinition = {
 
   #: describe "Merging arr[{$=lo}..{$=mid}] and arr[{mid + 1}..{$=hi}]"
   def merge(lo, mid, hi)
-    alloc L mid - lo + 2
-    alloc R hi - mid + 1
+    local L mid - lo + 2
+    local R hi - mid + 1
     #: gauge L
     #: gauge R
     #: comment "Copying arr[{$=lo}..{$=mid}] to L and arr[{mid + 1}..{$=hi}] to R"
-    copy(lo, mid, hi)
+    copy(lo, mid, hi, L, R)
     #: tooltip "read position in L"
     let i = 0
     #: tooltip "read position in R"

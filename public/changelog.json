@@ -6,7 +6,8 @@
       "New algorithms: Make Heap O(n log n), Make Heap O(n), and Heap Sort.",
       "New heap directive renders arrays as interactive binary trees showing the heap structure, with violated edges highlighted in red.",
       "New downto keyword for descending for loops (e.g. for i from n downto 0).",
-      "Algorithm selector moved to a collapsible sidebar with algorithms grouped by category."
+      "Algorithm selector moved to a collapsible sidebar with algorithms grouped by category.",
+      "New Deque data structure demo illustrating push, pop, insert, chunk allocation, and map reallocation."
     ]
   },
   {

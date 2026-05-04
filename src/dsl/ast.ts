@@ -130,6 +130,7 @@ export interface AllocNode {
   type: 'alloc'
   arrayName: string
   size: Expr
+  persistent: boolean  // true = heap (alloc), false = stack (local)
   line: number
 }
 

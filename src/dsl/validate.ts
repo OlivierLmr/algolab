@@ -28,7 +28,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
     for (const node of nodes) {
       if (node.type === 'def') {
         functions.set(node.name, { params: node.params })
-      } else if (node.type === 'alloc') {
+      } else if (node.type === 'alloc' && node.persistent) {
         globalArrays.add(node.arrayName)
       }
       forEachChildBody(node, collectDefs)

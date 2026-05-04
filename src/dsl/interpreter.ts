@@ -864,7 +864,8 @@ class ExecutionContext {
     this.arrays.set(node.arrayName, new Array(size).fill(null).map(() =>
       elemType.length > 0 ? { num: 0, arrays: [...elemType] } : plainVal(0)
     ))
-    if (this.callFrameStack.length > 0) {
+    // Only track for cleanup if stack-scoped (local) and inside a function
+    if (!node.persistent && this.callFrameStack.length > 0) {
       this.callFrameStack[this.callFrameStack.length - 1].allocatedArrays.add(node.arrayName)
     }
   }

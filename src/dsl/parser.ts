@@ -86,7 +86,8 @@ export function parse(tokens: Token[]): AlgoNode {
         case 'pointer': return parsePointer()
         case 'comment': return parseComment()
         case 'describe': return parseDescribe()
-        case 'alloc': return parseAlloc()
+        case 'alloc': return parseAlloc(true)
+        case 'local': return parseAlloc(false)
         case 'def': return parseDef()
         case 'return': return parseReturn()
         case 'gauge': return parseGauge()
@@ -249,11 +250,11 @@ export function parse(tokens: Token[]): AlgoNode {
       target = tokens[peekPos + 1].value
     } else if (next?.type === 'keyword' && next.value === 'for') {
       target = tokens[peekPos + 1].value
-    } else if (next?.type === 'keyword' && next.value === 'alloc') {
+    } else if (next?.type === 'keyword' && (next.value === 'alloc' || next.value === 'local')) {
       target = tokens[peekPos + 1].value
     } else {
       throw new Error(
-        `tooltip directive must be followed by let, for, or alloc statement at line ${tok.line + 1}`
+        `tooltip directive must be followed by let, for, alloc, or local statement at line ${tok.line + 1}`
       )
     }
     return { type: 'tooltip', target, text, line: tok.line }
@@ -281,12 +282,12 @@ export function parse(tokens: Token[]): AlgoNode {
     return { type: 'def', name, params, body, line: tok.line }
   }
 
-  function parseAlloc(): AllocNode {
-    const tok = expect('keyword', 'alloc')
+  function parseAlloc(persistent: boolean): AllocNode {
+    const tok = expect('keyword', persistent ? 'alloc' : 'local')
     const arrayName = expect('ident').value
     const size = parseExpr()
     expectNewline()
-    return { type: 'alloc', arrayName, size, line: tok.line }
+    return { type: 'alloc', arrayName, size, persistent, line: tok.line }
   }
 
   function parseReturn(): ReturnNode {
