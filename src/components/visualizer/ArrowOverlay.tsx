@@ -96,6 +96,40 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
     }).filter(Boolean)
   }, [hoveredCell, step, arrayCellYMap])
 
+  // Persistent ref arrows: always visible for cells containing ref values
+  const refArrows = useMemo(() => {
+    const arrows: {
+      sourceCenterX: number; sourceCenterY: number
+      targetCenterX: number; targetTopY: number
+      sourceX: number; sourceY: number
+    }[] = []
+    for (const arr of step.arrays) {
+      const sourceY = arrayCellYMap.get(arr.name)
+      if (sourceY === undefined) continue
+      for (let ci = 0; ci < arr.values.length; ci++) {
+        const val = arr.values[ci]
+        if (!val.ref) continue
+        const targetArr = step.arrays.find(a => a.name === val.ref)
+        if (!targetArr) continue
+        const targetY = arrayCellYMap.get(val.ref)
+        if (targetY === undefined) continue
+
+        const sourceCenterX = CONTENT_X + ci * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+        const sourceCenterY = sourceY + CELL_SIZE / 2
+        const targetCenterX = CONTENT_X + (targetArr.values.length * (CELL_SIZE + CELL_GAP) - CELL_GAP) / 2
+        const targetTopY = targetY - INDEX_LABEL_HEIGHT / 2
+
+        arrows.push({
+          sourceCenterX, sourceCenterY,
+          targetCenterX, targetTopY,
+          sourceX: CONTENT_X + ci * (CELL_SIZE + CELL_GAP),
+          sourceY,
+        })
+      }
+    }
+    return arrows
+  }, [step, arrayCellYMap])
+
   // Tree edges: compute center positions from flat elements
   const treeEdgeLines = useMemo(() => {
     const treeEdges = layout.edges.filter(e => e.style === 'tree-edge')
@@ -143,6 +177,16 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
         >
           <path d="M0,0 L10,4 L0,8 Z" fill="#3498db" />
         </marker>
+        <marker
+          id="arrowhead-ref"
+          markerWidth="8"
+          markerHeight="6"
+          refX="8"
+          refY="3"
+          orient="auto"
+        >
+          <path d="M0,0 L8,3 L0,6 Z" fill="#8e44ad" />
+        </marker>
       </defs>
 
       {/* Tree edges */}
@@ -155,6 +199,23 @@ export function ArrowOverlay({ layout, step, hoveredCell }: ArrowOverlayProps) {
           stroke-width="2"
         />
       ))}
+
+      {/* Persistent ref arrows */}
+      {refArrows.map((ra, i) => {
+        const path = `M${ra.sourceCenterX},${ra.sourceCenterY} L${ra.targetCenterX},${ra.targetTopY}`
+        return (
+          <path
+            key={`ref-${i}`}
+            d={path}
+            fill="none"
+            stroke="#8e44ad"
+            stroke-width="1.5"
+            stroke-dasharray="4,3"
+            marker-end="url(#arrowhead-ref)"
+            opacity="0.6"
+          />
+        )
+      })}
 
       {/* Hover arrows */}
       {hoverArrows?.map((ha, i) => {
