@@ -465,6 +465,13 @@ export function parse(tokens: Token[]): AlgoNode {
       return { type: 'number', value: Infinity }
     }
 
+    // Dynamic alloc expression: alloc size
+    if (tok.type === 'keyword' && tok.value === 'alloc') {
+      advance()
+      const size = parseExpr()
+      return { type: 'allocExpr', size } as import('./ast.ts').AllocExpr
+    }
+
     // Parenthesized expression
     if (tok.type === 'paren' && tok.value === '(') {
       advance()

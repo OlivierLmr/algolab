@@ -97,6 +97,9 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
       case 'call':
         validateCall(expr.callee, expr.args, line)
         break
+      case 'allocExpr':
+        validateExpr(expr.size, line)
+        break
     }
   }
 
@@ -172,7 +175,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
     switch (node.type) {
       case 'let': {
         validateExpr(node.value, node.line)
-        const isRef = node.value.type === 'call' && node.value.callee === 'ref'
+        const isRef = (node.value.type === 'call' && node.value.callee === 'ref') || node.value.type === 'allocExpr'
         defineSymbol(node.name, isRef ? 'ref' : 'scalar')
         break
       }
@@ -286,7 +289,7 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         const sym = lookupSymbol(node.arrayName)
         if (sym === undefined) {
           errors.push({ line: node.line, message: `Undefined array '${node.arrayName}'` })
-        } else if (sym === 'scalar') {
+        } else if (sym !== 'array' && sym !== 'ref') {
           errors.push({ line: node.line, message: `'${node.arrayName}' is not an array` })
         }
         break

@@ -22,6 +22,7 @@ function collectVarNames(expr: Expr): Set<string> {
       case 'unary': walk(e.operand); break
       case 'index': walk(e.array); walk(e.index); break
       case 'call': e.args.forEach(walk); break
+      case 'allocExpr': walk(e.size); break
     }
   }
   walk(expr)
@@ -44,6 +45,8 @@ function containsCall(expr: Expr): boolean {
       // len() and ref() are built-ins, safe to evaluate during snapshot
       if (expr.callee === 'len' || expr.callee === 'ref') return expr.args.some(containsCall)
       return true
+    case 'allocExpr':
+      return true  // alloc has side effects, not safe in expression pointers
   }
 }
 
@@ -111,6 +114,7 @@ function collectImplicitPointers(nodes: ASTNode[]): PendingPointer[] {
       case 'unary': scanExpr(expr.operand, line); break
       case 'index': scanExpr(expr.array, line); scanExpr(expr.index, line); break
       case 'call': expr.args.forEach(a => scanExpr(a, line)); break
+      case 'allocExpr': scanExpr(expr.size, line); break
     }
   }
 

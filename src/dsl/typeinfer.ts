@@ -424,6 +424,9 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         if (info) return [...info.returnType]
         return []
       }
+
+      case 'allocExpr':
+        return []  // Returns a ref, no iterator type
     }
   }
 
@@ -469,6 +472,9 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         for (const arg of expr.args) {
           if (processExprConstraints(arg, scope)) changed = true
         }
+        break
+      case 'allocExpr':
+        if (processExprConstraints(expr.size, scope)) changed = true
         break
       case 'index':
         if (processExprConstraints(expr.array, scope)) changed = true
@@ -521,6 +527,9 @@ export function inferTypes(ast: AlgoNode, inputArrayNames: string[]): TypeContex
         for (const arg of expr.args) {
           if (walkExprShallow(arg, visit)) changed = true
         }
+        break
+      case 'allocExpr':
+        if (walkExprShallow(expr.size, visit)) changed = true
         break
       // index: don't recurse — visitor already saw this node
     }

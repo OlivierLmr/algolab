@@ -227,6 +227,79 @@ describe('ref indirection: edge cases', () => {
   })
 })
 
+describe('dynamic alloc (alloc as expression)', () => {
+  it('alloc in expression context returns a ref', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  let ptr = alloc 3
+  ptr[0] = 42`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    // ptr should hold a ref to an auto-named array
+    expect(lastStep.variables['ptr'].ref).toBeDefined()
+    // The referenced array should exist and have the written value
+    const arrName = lastStep.variables['ptr'].ref!
+    const arr = lastStep.arrays.find(a => a.name === arrName)!
+    expect(arr.values[0].num).toBe(42)
+    expect(arr.values.length).toBe(3)
+  })
+
+  it('multiple dynamic allocs get distinct names', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  let a = alloc 2
+  let b = alloc 3
+  a[0] = 10
+  b[0] = 20`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    expect(lastStep.variables['a'].ref).toBeDefined()
+    expect(lastStep.variables['b'].ref).toBeDefined()
+    expect(lastStep.variables['a'].ref).not.toBe(lastStep.variables['b'].ref)
+  })
+
+  it('dynamic alloc in function returns ref that persists', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  alloc map 2
+  def make(m[], slot)
+    let ptr = alloc 4
+    m[slot] = ptr
+  make(map, 0)
+  make(map, 1)
+  map[0][0] = 99
+  map[1][0] = 77`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    const map = lastStep.arrays.find(a => a.name === 'map')!
+    const arr0name = map.values[0].ref!
+    const arr1name = map.values[1].ref!
+    const arr0 = lastStep.arrays.find(a => a.name === arr0name)!
+    const arr1 = lastStep.arrays.find(a => a.name === arr1name)!
+    expect(arr0.values[0].num).toBe(99)
+    expect(arr1.values[0].num).toBe(77)
+  })
+
+  it('dynamic alloc with variable size', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  let n = 5
+  let ptr = alloc n
+  ptr[4] = 88`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    const arrName = lastStep.variables['ptr'].ref!
+    const arr = lastStep.arrays.find(a => a.name === arrName)!
+    expect(arr.values.length).toBe(5)
+    expect(arr.values[4].num).toBe(88)
+  })
+
+  it('free works on ref variables (resolves through ref)', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  let ptr = alloc 3
+  ptr[0] = 1
+  free ptr
+  let x = 1`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    // ptr's ref target should have been freed
+    const ref = steps[steps.length - 2].variables['ptr']?.ref
+    expect(ref).toBeDefined()
+    expect(lastStep.arrays.find(a => a.name === ref)).toBeUndefined()
+  })
+})
+
 describe('free keyword', () => {
   it('removes array from subsequent snapshots', () => {
     const steps = runAlgorithm(`algo Test(arr[])

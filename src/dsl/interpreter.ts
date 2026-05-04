@@ -66,6 +66,7 @@ class ExecutionContext {
   private currentHighlights: Highlight[] = []
   private currentVarHighlights: VarHighlight[] = []
   private dimRanges: DimRange[] = []
+  private nextAllocId = 0
   private gaugeArrays = new Set<string>()
   private heapArrays = new Map<string, 'max' | 'min'>()
   private pendingCommentParts: CommentPart[] | null = null
@@ -450,7 +451,16 @@ class ExecutionContext {
         return arr[idx]
       }
       case 'call': return this.evalCall(expr.callee, expr.args)
+      case 'allocExpr': return this.evalAllocExpr(expr)
     }
+  }
+
+  private evalAllocExpr(expr: import('./ast.ts').AllocExpr): Value {
+    const size = this.evalExpr(expr.size).num
+    const name = `#${this.nextAllocId++}`
+    this.arrays.set(name, new Array(size).fill(null).map(() => plainVal(0)))
+    // Dynamic allocs are always persistent (heap-allocated)
+    return refVal(name)
   }
 
   private evalBinary(op: string, left: number, right: number): number {
@@ -907,11 +917,12 @@ class ExecutionContext {
   }
 
   private execFree(node: FreeNode): void {
-    this.arrays.delete(node.arrayName)
-    this.dimRanges = this.dimRanges.filter(d => d.arrayName !== node.arrayName)
-    this.gaugeArrays.delete(node.arrayName)
-    this.heapArrays.delete(node.arrayName)
-    this.snapshot(node.line, `Free ${node.arrayName}`)
+    const resolved = this.resolveArrayName(node.arrayName)
+    this.arrays.delete(resolved)
+    this.dimRanges = this.dimRanges.filter(d => d.arrayName !== resolved)
+    this.gaugeArrays.delete(resolved)
+    this.heapArrays.delete(resolved)
+    this.snapshot(node.line, `Free ${resolved}`)
   }
 
   private execDef(node: DefNode): void {

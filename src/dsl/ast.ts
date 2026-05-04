@@ -201,6 +201,7 @@ export type Expr =
   | UnaryExpr
   | IndexExpr
   | CallExpr
+  | AllocExpr
 
 export interface NumberLiteral {
   type: 'number'
@@ -237,6 +238,11 @@ export interface CallExpr {
   args: Expr[]
 }
 
+export interface AllocExpr {
+  type: 'allocExpr'
+  size: Expr
+}
+
 export function exprToString(expr: Expr): string {
   switch (expr.type) {
     case 'number': return String(expr.value)
@@ -255,6 +261,7 @@ export function exprToString(expr: Expr): string {
       return `${expr.op} ${exprToString(expr.operand)}`
     case 'index': return `${exprToString(expr.array)}[${exprToString(expr.index)}]`
     case 'call': return `${expr.callee}(${expr.args.map(exprToString).join(', ')})`
+    case 'allocExpr': return `alloc ${exprToString(expr.size)}`
   }
 }
 
