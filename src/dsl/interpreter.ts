@@ -103,6 +103,7 @@ class ExecutionContext {
     const seen = new Set<string>()
     let current = name
     for (;;) {
+      // Check array parameter aliases (function call bindings)
       let found = false
       for (let i = this.arrayAliasStack.length - 1; i >= 0; i--) {
         if (this.arrayAliasStack[i].has(current)) {
@@ -113,7 +114,20 @@ class ExecutionContext {
           break
         }
       }
-      if (!found) return current
+      if (found) continue
+
+      // Check if it's a variable holding a ref value (pointer indirection)
+      if (!this.arrays.has(current)) {
+        const val = this.getVar(current)
+        if (val?.ref) {
+          current = val.ref
+          if (seen.has(current)) return current
+          seen.add(current)
+          continue
+        }
+      }
+
+      return current
     }
   }
 
@@ -495,10 +509,11 @@ class ExecutionContext {
           aliasMap.set(param.name, resolved)
           argStrings.push(resolved)
         } else {
-          // Scalar param — stamp with static type
+          // Scalar param — stamp with static type, preserving ref
           const rawVal = this.evalExpr(args[i])
           const paramType = this.staticVarType(param.name, proc.defLine)
           const val = this.stampValue(rawVal.num, paramType)
+          if (rawVal.ref) val.ref = rawVal.ref
           scalarBindings.push({ name: param.name, value: val, defLine: proc.defLine })
           argStrings.push(String(rawVal.num))
         }
@@ -561,12 +576,22 @@ class ExecutionContext {
       if (!arr) throw new Error(`Undefined array: ${expr.name}`)
       return arr
     }
-    throw new Error('Expected array identifier')
+    // Support chained indexing through refs: map[i][j] where map[i] is a ref
+    const val = this.evalExpr(expr)
+    if (val.ref) {
+      const arr = this.arrays.get(val.ref)
+      if (!arr) throw new Error(`Undefined array: ${val.ref}`)
+      return arr
+    }
+    throw new Error('Expected array identifier or ref value')
   }
 
   private getArrayName(expr: Expr): string {
     if (expr.type === 'identifier') return this.resolveArrayName(expr.name)
-    throw new Error('Expected array identifier')
+    // Support chained indexing through refs
+    const val = this.evalExpr(expr)
+    if (val.ref) return val.ref
+    throw new Error('Expected array identifier or ref value')
   }
 
   private formatValue(expr: Expr): string {
@@ -749,9 +774,10 @@ class ExecutionContext {
   private execLet(node: LetNode): void {
     this.snapshotCallIfProcedure(node.value, node.line)
     const rawVal = this.evalExpr(node.value)
-    // Stamp with static type
+    // Stamp with static type, preserving ref
     const letType = this.staticVarType(node.name, node.line)
     const val = this.stampValue(rawVal.num, letType)
+    if (rawVal.ref) val.ref = rawVal.ref
     this.setVar(node.name, val)
     if (val.arrays.length === 0) {
       this.currentVarHighlights.push({ varName: node.name, type: 'active' })

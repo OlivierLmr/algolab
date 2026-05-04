@@ -6,7 +6,7 @@ export interface ValidationError {
   message: string
 }
 
-type SymbolType = 'scalar' | 'array'
+type SymbolType = 'scalar' | 'array' | 'ref'
 
 interface FunctionInfo {
   params: { name: string; isArray: boolean }[]
@@ -80,12 +80,12 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
         validateExpr(expr.operand, line)
         break
       case 'index': {
-        // The array part must be an array
+        // The array part must be an array or ref
         if (expr.array.type === 'identifier') {
           const sym = lookupSymbol(expr.array.name)
           if (sym === undefined) {
             errors.push({ line, message: `Undefined array '${expr.array.name}'` })
-          } else if (sym === 'scalar') {
+          } else if (sym !== 'array' && sym !== 'ref') {
             errors.push({ line, message: `'${expr.array.name}' is not an array` })
           }
         } else {
@@ -172,7 +172,8 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
     switch (node.type) {
       case 'let': {
         validateExpr(node.value, node.line)
-        defineSymbol(node.name, 'scalar')
+        const isRef = node.value.type === 'call' && node.value.callee === 'ref'
+        defineSymbol(node.name, isRef ? 'ref' : 'scalar')
         break
       }
       case 'assign': {
@@ -182,14 +183,16 @@ export function validateAST(ast: AlgoNode): ValidationError[] {
           }
           validateExpr(node.value, node.line)
         } else if (node.target.type === 'index') {
-          // Array index assignment
+          // Array index assignment (including chained: map[i][j] = v)
           if (node.target.array.type === 'identifier') {
             const sym = lookupSymbol(node.target.array.name)
             if (sym === undefined) {
               errors.push({ line: node.line, message: `Undefined array '${node.target.array.name}'` })
-            } else if (sym === 'scalar') {
+            } else if (sym !== 'array' && sym !== 'ref') {
               errors.push({ line: node.line, message: `'${node.target.array.name}' is not an array` })
             }
+          } else {
+            validateExpr(node.target.array, node.line)
           }
           validateExpr(node.target.index, node.line)
           validateExpr(node.value, node.line)
