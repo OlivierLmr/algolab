@@ -187,6 +187,32 @@ describe('ref indirection: edge cases', () => {
     expect(lastStep.variables['v2'].num).toBe(20)
   })
 
+  it('ref indirection inside for loop', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  alloc target 3
+  let ptr = ref(target)
+  for i from 0 to 2
+    ptr[i] = i * 10`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    const target = lastStep.arrays.find(a => a.name === 'target')!
+    expect(target.values.map(v => v.num)).toEqual([0, 10, 20])
+  })
+
+  it('free then ref to reallocated array', () => {
+    const steps = runAlgorithm(`algo Test(arr[])
+  alloc buf 2
+  buf[0] = 1
+  let ptr = ref(buf)
+  free buf
+  alloc buf 4
+  ptr = ref(buf)
+  ptr[3] = 99`, 'arr', [1])
+    const lastStep = steps[steps.length - 1]
+    const buf = lastStep.arrays.find(a => a.name === 'buf')!
+    expect(buf.values.length).toBe(4)
+    expect(buf.values[3].num).toBe(99)
+  })
+
   it('swap through ref indirection', () => {
     const steps = runAlgorithm(`algo Test(arr[])
   alloc data 3
