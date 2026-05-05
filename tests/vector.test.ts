@@ -347,16 +347,44 @@ describe('vector: substeps', () => {
     expect(steps[0].description).toContain('Write')
   })
 
-  it('insert with realloc produces 6 substeps', () => {
+  it('insert with realloc produces 5 substeps (copy with gap, no shift)', () => {
     const state = vectorDS.createInitialState([1, 2, 3, 4])
-    const steps = applySteps(state, 'insert', { pos: 0, val: 0 })
-    expect(steps.length).toBe(6)
+    const steps = applySteps(state, 'insert', { pos: 2, val: 99 })
+    expect(steps.length).toBe(5)
     expect(steps[0].description).toContain('Allocate')
     expect(steps[1].description).toContain('Copy')
+    expect(steps[1].description).toContain('gap')
     expect(steps[2].description).toContain('pointer')
     expect(steps[3].description).toContain('Delete')
-    expect(steps[4].description).toContain('Shift')
-    expect(steps[5].description).toContain('Write')
+    expect(steps[4].description).toContain('Write')
+    expect(steps[4].state.data.slice(0, 5)).toEqual([1, 2, 99, 3, 4])
+  })
+
+  it('insert with realloc: copy step leaves gap at insertion position', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 2, val: 99 })
+    // After copy step, new array has: [1, 2, 0, 3, 4, 0, 0, 0]
+    const copyState = steps[1].state
+    expect(copyState.data[0]).toBe(1)
+    expect(copyState.data[1]).toBe(2)
+    expect(copyState.data[2]).toBe(0) // gap
+    expect(copyState.data[3]).toBe(3)
+    expect(copyState.data[4]).toBe(4)
+    // newUsed should mark the gap range as initialized for display
+    expect(copyState.newUsed).toBe(5) // size + 1
+  })
+
+  it('insert at pos=0 with realloc: gap at beginning', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 0, val: 0 })
+    expect(steps.length).toBe(5)
+    const copyState = steps[1].state
+    expect(copyState.data[0]).toBe(0) // gap
+    expect(copyState.data[1]).toBe(1)
+    expect(copyState.data[2]).toBe(2)
+    expect(copyState.data[3]).toBe(3)
+    expect(copyState.data[4]).toBe(4)
+    expect(steps[4].state.data.slice(0, 5)).toEqual([0, 1, 2, 3, 4])
   })
 
   it('erase from middle produces 2 substeps', () => {

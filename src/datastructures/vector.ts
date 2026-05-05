@@ -48,8 +48,20 @@ type Step = DSSubstep<VectorState>
  * Substeps: allocate → copy → switch pointer (old still visible) → delete old.
  */
 function growSteps(state: VectorState, newCap: number): Step[] {
+  return growStepsWithGap(state, newCap, -1)
+}
+
+/**
+ * Produce reallocation substeps, optionally leaving a gap at gapPos.
+ * When gapPos >= 0, elements [0..gapPos-1] copy to the same positions and
+ * elements [gapPos..size-1] copy to positions [gapPos+1..size], leaving
+ * position gapPos empty for a subsequent insert.
+ * When gapPos < 0, copies all elements contiguously (standard realloc).
+ */
+function growStepsWithGap(state: VectorState, newCap: number, gapPos: number): Step[] {
   const oldData = [...state.data]
   const oldCap = state.capacity
+  const hasGap = gapPos >= 0
 
   // Step 1: allocate new empty array — nothing written yet
   const allocData = new Array(newCap).fill(0)
@@ -58,26 +70,36 @@ function growSteps(state: VectorState, newCap: number): Step[] {
     oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed: 0,
   }
 
-  // Step 2: copy elements to new array
+  // Step 2: copy elements to new array (with or without gap)
   const copyData = [...allocData]
-  for (let i = 0; i < state.size; i++) copyData[i] = oldData[i]
+  if (hasGap) {
+    for (let i = 0; i < gapPos; i++) copyData[i] = oldData[i]
+    for (let i = gapPos; i < state.size; i++) copyData[i + 1] = oldData[i]
+  } else {
+    for (let i = 0; i < state.size; i++) copyData[i] = oldData[i]
+  }
+  const newUsed = hasGap ? state.size + 1 : state.size
   const copied: VectorState = {
     data: copyData, size: state.size, capacity: newCap,
-    oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed: state.size,
+    oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed,
   }
 
   // Step 3: switch pointer to new, old array still visible (dimmed)
   const switched: VectorState = {
     data: [...copyData], size: state.size, capacity: newCap,
-    oldData, oldCapacity: oldCap, pointerTarget: 'new', newUsed: state.size,
+    oldData, oldCapacity: oldCap, pointerTarget: 'new', newUsed,
   }
 
   // Step 4: delete old array
   const deleted: VectorState = { data: [...copyData], size: state.size, capacity: newCap }
 
+  const copyDesc = hasGap
+    ? `Copy ${state.size} element${state.size !== 1 ? 's' : ''}, leaving gap at position ${gapPos}`
+    : `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array`
+
   return [
     { state: allocated, description: `Allocate new array (capacity ${newCap})` },
-    { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
+    { state: copied, description: copyDesc },
     { state: switched, description: `Update data pointer to new array` },
     { state: deleted, description: `Delete old array` },
   ]
@@ -109,23 +131,30 @@ function applyOperation(state: VectorState, op: string, args: Record<string, num
       const val = args.val ?? 0
       if (pos < 0 || pos > state.size) throw new Error(`insert position ${pos} out of range [0, ${state.size}]`)
       const needsGrow = state.size >= state.capacity
-      const reallocSteps = needsGrow
-        ? growSteps(state, state.capacity === 0 ? 1 : state.capacity * 2)
-        : []
-      const base = needsGrow ? reallocSteps[reallocSteps.length - 1].state : state
-      const steps: Step[] = [...reallocSteps]
-      // Shift right (if not inserting at end)
-      if (base.size > pos) {
-        const shifted = [...base.data]
-        for (let i = base.size; i > pos; i--) shifted[i] = shifted[i - 1]
-        shifted[pos] = base.data[pos]  // still shows old value before overwrite
-        const shiftState: VectorState = { data: shifted, size: base.size + 1, capacity: base.capacity }
-        steps.push({ state: shiftState, description: `Shift elements [${pos}..${base.size - 1}] right` })
+
+      if (needsGrow) {
+        // Realloc with gap: copy leaves a hole at pos, no shift needed
+        const newCap = state.capacity === 0 ? 1 : state.capacity * 2
+        const reallocSteps = growStepsWithGap(state, newCap, pos)
+        const base = reallocSteps[reallocSteps.length - 1].state
+        const data = [...base.data]
+        data[pos] = val
+        const finalState: VectorState = { data, size: base.size + 1, capacity: base.capacity }
+        return [...reallocSteps, { state: finalState, description: `Write ${val} at position ${pos}, increment size` }]
       }
-      // Write value at position
-      const prevData = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...base.data]
+
+      // No realloc: shift right then write
+      const steps: Step[] = []
+      if (state.size > pos) {
+        const shifted = [...state.data]
+        for (let i = state.size; i > pos; i--) shifted[i] = shifted[i - 1]
+        shifted[pos] = state.data[pos]  // still shows old value before overwrite
+        const shiftState: VectorState = { data: shifted, size: state.size + 1, capacity: state.capacity }
+        steps.push({ state: shiftState, description: `Shift elements [${pos}..${state.size - 1}] right` })
+      }
+      const prevData = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...state.data]
       prevData[pos] = val
-      const finalState: VectorState = { data: prevData, size: base.size + 1, capacity: base.capacity }
+      const finalState: VectorState = { data: prevData, size: state.size + 1, capacity: state.capacity }
       steps.push({ state: finalState, description: `Write ${val} at position ${pos}, increment size` })
       return steps
     }
