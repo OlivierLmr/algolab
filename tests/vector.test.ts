@@ -264,29 +264,64 @@ describe('vector: layout', () => {
 describe('vector: substeps', () => {
   it('push_back without realloc produces 1 substep', () => {
     const state = vectorDS.createInitialState([1, 2])
-    // capacity is 2, push triggers realloc, so first reserve
     const reserved = apply(state, 'reserve', { cap: 8 })
     const steps = applySteps(reserved, 'push_back', { val: 3 })
     expect(steps.length).toBe(1)
     expect(steps[0].description).toContain('Write')
   })
 
-  it('push_back with realloc produces 3 substeps', () => {
+  it('push_back with realloc produces 4 substeps', () => {
     const state = vectorDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_back', { val: 3 })
-    expect(steps.length).toBe(3)
+    expect(steps.length).toBe(4)
     expect(steps[0].description).toContain('Allocate')
     expect(steps[1].description).toContain('Copy')
-    expect(steps[2].description).toContain('Write')
-    // Each substep has valid state
+    expect(steps[2].description).toContain('pointer')
+    expect(steps[3].description).toContain('Write')
     expect(steps[0].state.capacity).toBe(4)
     expect(steps[0].state.size).toBe(2)
-    expect(steps[2].state.data.slice(0, 3)).toEqual([1, 2, 3])
+    expect(steps[3].state.data.slice(0, 3)).toEqual([1, 2, 3])
+  })
+
+  it('realloc substeps: pointer targets old during allocate/copy, then switches', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_back', { val: 3 })
+    // Allocate: old array present, pointer → old, new array empty
+    expect(steps[0].state.oldData).toEqual([1, 2])
+    expect(steps[0].state.oldCapacity).toBe(2)
+    expect(steps[0].state.pointerTarget).toBe('old')
+    expect(steps[0].state.data).toEqual([0, 0, 0, 0])
+    // Copy: old array present, pointer → old, new array has data
+    expect(steps[1].state.oldData).toEqual([1, 2])
+    expect(steps[1].state.pointerTarget).toBe('old')
+    expect(steps[1].state.data.slice(0, 2)).toEqual([1, 2])
+    // Switch pointer: old array gone, pointer → new
+    expect(steps[2].state.oldData).toBeUndefined()
+    expect(steps[2].state.pointerTarget).toBeUndefined()
+    // Write: final state
+    expect(steps[3].state.oldData).toBeUndefined()
+  })
+
+  it('realloc layout: arrow points to old array during allocate/copy', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_back', { val: 3 })
+    // Allocate step: layout has both arrays, arrow targets old
+    const allocLayout = vectorDS.computeLayout(steps[0].state)
+    const oldCells = allocLayout.elements.filter(e => e.id.startsWith('cell:old:'))
+    expect(oldCells.length).toBe(2)
+    const newCells = allocLayout.elements.filter(e => e.id.startsWith('cell:data:'))
+    expect(newCells.length).toBe(4)
+    // Arrow should point to old array (higher Y = old, lower Y = new)
+    expect(allocLayout.arrows.length).toBe(1)
+    const oldCellY = oldCells[0].y
+    expect(allocLayout.arrows[0].toY).toBe(oldCellY)
+    // Switch step: only new array
+    const switchLayout = vectorDS.computeLayout(steps[2].state)
+    expect(switchLayout.elements.filter(e => e.id.startsWith('cell:old:')).length).toBe(0)
   })
 
   it('insert with shift produces 2 substeps', () => {
     const state = vectorDS.createInitialState([1, 2, 3])
-    // capacity is 4, room for one more
     const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
     expect(steps.length).toBe(2)
     expect(steps[0].description).toContain('Shift')
@@ -301,14 +336,15 @@ describe('vector: substeps', () => {
     expect(steps[0].description).toContain('Write')
   })
 
-  it('insert with realloc produces 4 substeps', () => {
+  it('insert with realloc produces 5 substeps', () => {
     const state = vectorDS.createInitialState([1, 2, 3, 4])
     const steps = applySteps(state, 'insert', { pos: 0, val: 0 })
-    expect(steps.length).toBe(4)
+    expect(steps.length).toBe(5)
     expect(steps[0].description).toContain('Allocate')
     expect(steps[1].description).toContain('Copy')
-    expect(steps[2].description).toContain('Shift')
-    expect(steps[3].description).toContain('Write')
+    expect(steps[2].description).toContain('pointer')
+    expect(steps[3].description).toContain('Shift')
+    expect(steps[4].description).toContain('Write')
   })
 
   it('erase from middle produces 2 substeps', () => {
@@ -326,12 +362,42 @@ describe('vector: substeps', () => {
     expect(steps[0].description).toContain('Remove')
   })
 
-  it('reserve produces 2 substeps', () => {
+  it('reserve produces 3 substeps', () => {
     const state = vectorDS.createInitialState([1, 2])
     const steps = applySteps(state, 'reserve', { cap: 16 })
-    expect(steps.length).toBe(2)
+    expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('Allocate')
     expect(steps[1].description).toContain('Copy')
+    expect(steps[2].description).toContain('pointer')
+  })
+
+  it('reserve shows old array in allocate and copy steps', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'reserve', { cap: 16 })
+    // Allocate: old array present, pointer → old
+    expect(steps[0].state.oldData).toEqual([1, 2])
+    expect(steps[0].state.oldCapacity).toBe(2)
+    expect(steps[0].state.pointerTarget).toBe('old')
+    // Copy: old array present, pointer → old
+    expect(steps[1].state.oldData).toEqual([1, 2])
+    expect(steps[1].state.pointerTarget).toBe('old')
+    // Switch: old array gone
+    expect(steps[2].state.oldData).toBeUndefined()
+  })
+
+  it('shrink_to_fit produces 3 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2, 3])
+    const reserved = apply(state, 'reserve', { cap: 64 })
+    const steps = applySteps(reserved, 'shrink_to_fit')
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('Allocate')
+    expect(steps[1].description).toContain('Copy')
+    expect(steps[2].description).toContain('pointer')
+    // Pointer targets old during first two steps
+    expect(steps[0].state.pointerTarget).toBe('old')
+    expect(steps[1].state.pointerTarget).toBe('old')
+    expect(steps[2].state.oldData).toBeUndefined()
+    expect(steps[2].state.capacity).toBe(3)
   })
 
   it('all intermediate substeps have valid renderable state', () => {

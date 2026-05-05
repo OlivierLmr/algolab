@@ -1062,62 +1062,92 @@ body {
   cursor: default;
 }
 
-.ds-history-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  overflow: hidden;
-}
-
 .ds-history-ops {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  font-size: 12px;
-  font-family: monospace;
-  color: #aaa;
+  gap: 6px;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.ds-history-op-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .ds-history-entry {
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: #f5f5f5;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  font-size: 14px;
+  font-family: monospace;
+  color: #999;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .ds-history-entry:hover {
-  background: #e8e8e8;
+  background: #e4e4e4;
+}
+
+.ds-history-current {
+  background: #dce8f3;
+  color: #333;
+  font-weight: 600;
+}
+
+.ds-history-future {
+  opacity: 0.4;
 }
 
 .ds-history-substeps {
   display: flex;
-  gap: 6px;
-  padding-left: 2px;
+  gap: 2px;
 }
 
-.ds-substep-dot {
-  width: 8px;
+.ds-substep-rect {
+  flex: 1;
   height: 8px;
-  border-radius: 50%;
-  background: #ddd;
-  border: 1.5px solid #bbb;
+  border-radius: 3px;
+  background: #e8e8e8;
   cursor: pointer;
-  transition: background 150ms, border-color 150ms;
+  transition: background 150ms;
 }
 
-.ds-substep-dot:hover {
-  background: #ccc;
+.ds-substep-rect:hover {
+  background: #d0d0d0;
 }
 
 .ds-substep-visited {
-  background: #a0c4e8;
-  border-color: #6a9fca;
+  background: #c8d8e8;
 }
 
-.ds-substep-current {
-  background: #4a90d9;
-  border-color: #2b6cb0;
+.ds-substep-active {
+  background: #b0c8e0;
+}
+
+.ds-substep-future {
+  background: #f0f0f0;
+}
+
+/* In DS mode, align viz to the left with padding instead of centering */
+.ds-body .viz-container {
+  justify-content: flex-start;
+  padding: 24px 40px;
+}
+
+/* Disable position transitions in DS mode — elements should appear instantly */
+.ds-body .viz-cell-wrapper,
+.ds-body .viz-array-label,
+.ds-body .ds-field-wrapper {
+  transition: none;
+}
+
+.ds-viz-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 /* DS Executing banner */
@@ -1130,7 +1160,8 @@ body {
   border: 1px solid #f0d060;
   border-radius: 6px;
   font-size: 13px;
-  margin-bottom: 8px;
+  margin-top: 12px;
+  flex-shrink: 0;
 }
 
 .ds-executing-label {

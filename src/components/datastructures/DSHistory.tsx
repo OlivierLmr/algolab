@@ -11,8 +11,6 @@ export function DSHistory() {
 
   if (history.length === 0) return null
 
-  const currentOp = history[opIdx]
-
   return (
     <div class="ds-history">
       <button
@@ -23,30 +21,41 @@ export function DSHistory() {
       >
         &#8592;
       </button>
-      <div class="ds-history-content">
-        <div class="ds-history-ops">
-          {history.map((op, i) => (
-            <span
-              key={i}
-              class={`ds-history-entry${i === opIdx ? ' ds-history-current' : ''}${i > opIdx ? ' ds-history-future' : ''}`}
-              onClick={() => dsGoToOp(i)}
-            >
-              {op.label}
-            </span>
-          ))}
-        </div>
-        {currentOp && currentOp.substeps.length > 1 && (
-          <div class="ds-history-substeps">
-            {currentOp.substeps.map((_, i) => (
+      <div class="ds-history-ops">
+        {history.map((op, i) => {
+          const isCurrent = i === opIdx
+          const isFuture = i > opIdx
+          return (
+            <div key={i} class="ds-history-op-col">
               <span
-                key={i}
-                class={`ds-substep-dot${i === substepIdx ? ' ds-substep-current' : ''}${i < substepIdx ? ' ds-substep-visited' : ''}`}
-                onClick={() => dsGoToSubstep(i)}
-                title={currentOp.substeps[i].description}
-              />
-            ))}
-          </div>
-        )}
+                class={`ds-history-entry${isCurrent ? ' ds-history-current' : ''}${isFuture ? ' ds-history-future' : ''}`}
+                onClick={() => dsGoToOp(i)}
+              >
+                {op.label}
+              </span>
+              {op.substeps.length > 1 && (
+                <div class="ds-history-substeps">
+                  {op.substeps.map((_, si) => {
+                    const isActive = isCurrent && si === substepIdx
+                    const isVisited = isCurrent ? si < substepIdx : !isFuture
+                    return (
+                      <span
+                        key={si}
+                        class={`ds-substep-rect${isActive ? ' ds-substep-active' : ''}${isVisited ? ' ds-substep-visited' : ''}${isFuture ? ' ds-substep-future' : ''}`}
+                        onClick={() => {
+                          if (i !== opIdx) dsGoToOp(i)
+                          // After navigating to the op, go to this substep
+                          dsGoToSubstep(si)
+                        }}
+                        title={op.substeps[si].description}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
       <button
         class="ds-history-btn"

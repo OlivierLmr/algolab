@@ -16,31 +16,33 @@ export function DSVisualizer() {
 
   return (
     <div class="viz-container">
-      {isIntermediate && op && (
-        <div class="ds-executing-banner">
-          <span class="ds-executing-label">Executing {op.label}...</span>
-          <span class="ds-executing-step">
-            step {substepIdx + 1}/{op.substeps.length}: {description}
-          </span>
-        </div>
-      )}
-      <div
-        class="viz-scene"
-        style={{
-          position: 'relative',
-          width: layout.width,
-          height: layout.height,
-        }}
-      >
-        {layout.elements.map(el => (
-          <DSElement key={el.id} el={el} />
-        ))}
+      <div class="ds-viz-column">
+        <div
+          class="viz-scene"
+          style={{
+            position: 'relative',
+            width: layout.width,
+            height: layout.height,
+          }}
+        >
+          {layout.elements.map(el => (
+            <DSElement key={el.id} el={el} />
+          ))}
 
-        <DSArrowOverlay
-          arrows={layout.arrows}
-          width={layout.width}
-          height={layout.height}
-        />
+          <DSArrowOverlay
+            arrows={layout.arrows}
+            width={layout.width}
+            height={layout.height}
+          />
+        </div>
+        {isIntermediate && op && (
+          <div class="ds-executing-banner">
+            <span class="ds-executing-label">Executing {op.label}...</span>
+            <span class="ds-executing-step">
+              step {substepIdx + 1}/{op.substeps.length}: {description}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

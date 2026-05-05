@@ -1,11 +1,16 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
-import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
+import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT, DIMMED_OPACITY } from '../layout/constants.ts'
 
 export interface VectorState {
   data: number[]    // Backing array (length === capacity)
   size: number
   capacity: number
+  /** During reallocation: the old backing array being replaced. */
+  oldData?: number[]
+  oldCapacity?: number
+  /** During reallocation: which array the data pointer targets ('old' or 'new'). */
+  pointerTarget?: 'old' | 'new'
 }
 
 // --- Layout constants ---
@@ -36,100 +41,135 @@ function createInitialState(values: number[]): VectorState {
 
 type Step = DSSubstep<VectorState>
 
-/** Produce reallocation substeps if at capacity, returning the grown state. */
-function growSteps(state: VectorState): { steps: Step[]; grown: VectorState } {
-  if (state.size < state.capacity) return { steps: [], grown: state }
-  const newCap = state.capacity === 0 ? 1 : state.capacity * 2
-  // Step 1: allocate
+/**
+ * Produce reallocation substeps when growing capacity.
+ * Substeps: allocate new (data→old) → copy (data→old) → switch pointer + delete old (data→new).
+ */
+function growSteps(state: VectorState, newCap: number): Step[] {
+  const oldData = [...state.data]
+  const oldCap = state.capacity
+
+  // Step 1: allocate new empty array, data still points to old
   const allocData = new Array(newCap).fill(0)
-  const allocated: VectorState = { data: allocData, size: state.size, capacity: newCap }
-  // Step 2: copy
-  const copyData = [...allocData]
-  for (let i = 0; i < state.size; i++) copyData[i] = state.data[i]
-  const copied: VectorState = { data: copyData, size: state.size, capacity: newCap }
-  return {
-    steps: [
-      { state: allocated, description: `Allocate new array (capacity ${newCap})` },
-      { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
-    ],
-    grown: copied,
+  const allocated: VectorState = {
+    data: allocData, size: state.size, capacity: newCap,
+    oldData, oldCapacity: oldCap, pointerTarget: 'old',
   }
+
+  // Step 2: copy elements to new array, data still points to old
+  const copyData = [...allocData]
+  for (let i = 0; i < state.size; i++) copyData[i] = oldData[i]
+  const copied: VectorState = {
+    data: copyData, size: state.size, capacity: newCap,
+    oldData, oldCapacity: oldCap, pointerTarget: 'old',
+  }
+
+  // Step 3: switch pointer to new, delete old
+  const switched: VectorState = { data: [...copyData], size: state.size, capacity: newCap }
+
+  return [
+    { state: allocated, description: `Allocate new array (capacity ${newCap})` },
+    { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
+    { state: switched, description: `Update data pointer, delete old array` },
+  ]
 }
 
 function applyOperation(state: VectorState, op: string, args: Record<string, number>): Step[] {
   switch (op) {
     case 'push_back': {
       const val = args.val ?? 0
-      const { steps, grown } = growSteps(state)
-      const data = [...grown.data]
-      data[grown.size] = val
-      const final: VectorState = { data, size: grown.size + 1, capacity: grown.capacity }
-      return [...steps, { state: final, description: `Write ${val} at position ${grown.size}` }]
+      const needsGrow = state.size >= state.capacity
+      const reallocSteps = needsGrow
+        ? growSteps(state, state.capacity === 0 ? 1 : state.capacity * 2)
+        : []
+      const base = needsGrow ? reallocSteps[reallocSteps.length - 1].state : state
+      // Write value and increment size
+      const data = [...base.data]
+      data[base.size] = val
+      const final: VectorState = { data, size: base.size + 1, capacity: base.capacity }
+      return [...reallocSteps, { state: final, description: `Write ${val} at position ${base.size}, increment size` }]
     }
     case 'pop_back': {
       if (state.size === 0) throw new Error('pop_back on empty vector')
       const data = [...state.data]
       data[state.size - 1] = 0
-      return [{ state: { data, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}` }]
+      return [{ state: { data, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}, decrement size` }]
     }
     case 'insert': {
       const pos = args.pos ?? 0
       const val = args.val ?? 0
       if (pos < 0 || pos > state.size) throw new Error(`insert position ${pos} out of range [0, ${state.size}]`)
-      const { steps, grown } = growSteps(state)
-      // Shift right
-      const shifted = [...grown.data]
-      for (let i = grown.size; i > pos; i--) shifted[i] = shifted[i - 1]
-      shifted[pos] = 0  // placeholder before write
-      const shiftState: VectorState = { data: shifted, size: grown.size + 1, capacity: grown.capacity }
-      const shiftSteps: Step[] = grown.size > pos
-        ? [{ state: shiftState, description: `Shift elements [${pos}..${grown.size - 1}] right` }]
+      const needsGrow = state.size >= state.capacity
+      const reallocSteps = needsGrow
+        ? growSteps(state, state.capacity === 0 ? 1 : state.capacity * 2)
         : []
-      // Write
-      const final = [...shifted]
-      final[pos] = val
-      const finalState: VectorState = { data: final, size: grown.size + 1, capacity: grown.capacity }
-      return [...steps, ...shiftSteps, { state: finalState, description: `Write ${val} at position ${pos}` }]
+      const base = needsGrow ? reallocSteps[reallocSteps.length - 1].state : state
+      const steps: Step[] = [...reallocSteps]
+      // Shift right (if not inserting at end)
+      if (base.size > pos) {
+        const shifted = [...base.data]
+        for (let i = base.size; i > pos; i--) shifted[i] = shifted[i - 1]
+        shifted[pos] = base.data[pos]  // still shows old value before overwrite
+        const shiftState: VectorState = { data: shifted, size: base.size + 1, capacity: base.capacity }
+        steps.push({ state: shiftState, description: `Shift elements [${pos}..${base.size - 1}] right` })
+      }
+      // Write value at position
+      const prevData = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...base.data]
+      prevData[pos] = val
+      const finalState: VectorState = { data: prevData, size: base.size + 1, capacity: base.capacity }
+      steps.push({ state: finalState, description: `Write ${val} at position ${pos}, increment size` })
+      return steps
     }
     case 'erase': {
       const pos = args.pos ?? 0
       if (state.size === 0) throw new Error('erase on empty vector')
       if (pos < 0 || pos >= state.size) throw new Error(`erase position ${pos} out of range [0, ${state.size - 1}]`)
       const steps: Step[] = []
-      // Shift left
+      // Shift left (rightmost still has its old value)
       if (pos < state.size - 1) {
         const shifted = [...state.data]
         for (let i = pos; i < state.size - 1; i++) shifted[i] = shifted[i + 1]
-        shifted[state.size - 1] = state.data[state.size - 1]  // not yet cleared
+        // rightmost still contains its value (not yet cleared)
         steps.push({ state: { data: shifted, size: state.size, capacity: state.capacity }, description: `Shift elements [${pos + 1}..${state.size - 1}] left` })
       }
-      // Remove last
-      const final = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...state.data]
-      final[state.size - 1] = 0
-      steps.push({ state: { data: final, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}` })
+      // Delete rightmost value
+      const prevData = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...state.data]
+      prevData[state.size - 1] = 0
+      steps.push({ state: { data: prevData, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}, decrement size` })
       return steps
     }
     case 'reserve': {
       const cap = args.cap ?? 0
       if (cap <= state.capacity) return [{ state, description: 'No reallocation needed' }]
-      const allocData = new Array(cap).fill(0)
-      const allocated: VectorState = { data: allocData, size: state.size, capacity: cap }
-      const copyData = [...allocData]
-      for (let i = 0; i < state.size; i++) copyData[i] = state.data[i]
-      const copied: VectorState = { data: copyData, size: state.size, capacity: cap }
-      return [
-        { state: allocated, description: `Allocate new array (capacity ${cap})` },
-        { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''}` },
-      ]
+      return growSteps(state, cap)
     }
     case 'clear': {
       const data = new Array(state.capacity).fill(0)
-      return [{ state: { data, size: 0, capacity: state.capacity }, description: 'Clear all elements' }]
+      return [{ state: { data, size: 0, capacity: state.capacity }, description: 'Clear all elements (size = 0)' }]
     }
     case 'shrink_to_fit': {
       if (state.capacity === state.size) return [{ state, description: 'Already at minimum capacity' }]
-      const data = state.data.slice(0, state.size)
-      return [{ state: { data, size: state.size, capacity: state.size }, description: `Reallocate to exact size (${state.size})` }]
+      const newCap = state.size
+      const oldData = [...state.data]
+      const oldCap = state.capacity
+      // Step 1: allocate new array with capacity = size
+      const allocData = state.data.slice(0, newCap)
+      const allocated: VectorState = {
+        data: allocData, size: state.size, capacity: newCap,
+        oldData, oldCapacity: oldCap, pointerTarget: 'old',
+      }
+      // Step 2: copy values (already in allocData since we sliced)
+      const copied: VectorState = {
+        data: [...allocData], size: state.size, capacity: newCap,
+        oldData, oldCapacity: oldCap, pointerTarget: 'old',
+      }
+      // Step 3: switch pointer to new, delete old
+      const switched: VectorState = { data: [...allocData], size: state.size, capacity: newCap }
+      return [
+        { state: allocated, description: `Allocate new array (capacity ${newCap})` },
+        { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
+        { state: switched, description: `Update data pointer, delete old array` },
+      ]
     }
     default:
       throw new Error(`Unknown operation: ${op}`)
@@ -180,23 +220,71 @@ function computeLayout(state: VectorState): DSLayout {
     fieldX += CELL_SIZE + FIELD_GAP
   }
 
-  // Backing array
+  // Backing array (new/current)
   const arrayY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_ARRAY_GAP
   const arrayX = STRUCT_X + CELL_SIZE + FIELD_GAP // Indent array under capacity/data fields
 
-  // Array label
+  const hasOldArray = state.oldData != null && state.oldCapacity != null
+  const pointsToOld = hasOldArray && state.pointerTarget === 'old'
+
+  // Old array (shown during reallocation, above the new one)
+  let oldCellsY = arrayY + ARRAY_LABEL_HEIGHT
+  let oldArrayBottomY = arrayY
+  if (hasOldArray) {
+    const oldOpacity = pointsToOld ? 1.0 : DIMMED_OPACITY
+
+    elements.push({
+      id: 'array-label:old',
+      x: arrayX,
+      y: arrayY,
+      width: 100,
+      height: ARRAY_LABEL_HEIGHT,
+      kind: 'array-label',
+      data: { text: pointsToOld ? '' : 'old' } as LabelData,
+      opacity: oldOpacity,
+    })
+
+    for (let i = 0; i < state.oldCapacity!; i++) {
+      const cellX = arrayX + i * (CELL_SIZE + CELL_GAP)
+      const isDimmed = i >= state.size
+
+      elements.push({
+        id: `cell:old:${i}`,
+        x: cellX,
+        y: oldCellsY,
+        width: CELL_SIZE,
+        height: CELL_SIZE,
+        kind: 'cell',
+        data: {
+          arrayName: 'old',
+          index: i,
+          value: { num: state.oldData![i], arrays: [] },
+          dimmed: isDimmed,
+        } as CellData,
+        opacity: oldOpacity,
+      })
+    }
+
+    oldArrayBottomY = oldCellsY + CELL_SIZE + INDEX_LABEL_HEIGHT + CELL_GAP
+  }
+
+  // New/current array
+  const newArrayY = hasOldArray ? oldArrayBottomY + 12 : arrayY
+  const newLabel = hasOldArray ? 'new' : ''
+  const newOpacity = pointsToOld ? DIMMED_OPACITY : 1.0
+
   elements.push({
     id: 'array-label:data',
     x: arrayX,
-    y: arrayY,
+    y: newArrayY,
     width: 100,
     height: ARRAY_LABEL_HEIGHT,
     kind: 'array-label',
-    data: { text: '' } as LabelData,
-    opacity: 1.0,
+    data: { text: newLabel } as LabelData,
+    opacity: newOpacity,
   })
 
-  const cellsY = arrayY + ARRAY_LABEL_HEIGHT
+  const cellsY = newArrayY + ARRAY_LABEL_HEIGHT
 
   for (let i = 0; i < state.capacity; i++) {
     const cellX = arrayX + i * (CELL_SIZE + CELL_GAP)
@@ -217,14 +305,16 @@ function computeLayout(state: VectorState): DSLayout {
       height: CELL_SIZE,
       kind: 'cell',
       data: cellData,
-      opacity: 1.0,
+      opacity: newOpacity,
     })
   }
 
-  // Arrow from data field to first cell of backing array
-  if (state.capacity > 0) {
+  // Arrow from data field to the array it currently points to
+  const arrowTargetCellsY = pointsToOld ? oldCellsY : cellsY
+  const arrowTargetCap = pointsToOld ? state.oldCapacity! : state.capacity
+  if (arrowTargetCap > 0) {
     const targetX = arrayX + CELL_SIZE / 2
-    const targetY = cellsY
+    const targetY = arrowTargetCellsY
     arrows.push({
       fromX: dataFieldCenterX,
       fromY: dataFieldCenterY,
@@ -234,8 +324,9 @@ function computeLayout(state: VectorState): DSLayout {
   }
 
   // Compute total dimensions
-  const lastCellRight = state.capacity > 0
-    ? arrayX + state.capacity * (CELL_SIZE + CELL_GAP) - CELL_GAP
+  const maxCap = Math.max(state.capacity, state.oldCapacity ?? 0)
+  const lastCellRight = maxCap > 0
+    ? arrayX + maxCap * (CELL_SIZE + CELL_GAP) - CELL_GAP
     : fieldX
   const bottomY = state.capacity > 0
     ? cellsY + CELL_SIZE + INDEX_LABEL_HEIGHT
