@@ -11,6 +11,8 @@ export interface VectorState {
   oldCapacity?: number
   /** During reallocation: which array the data pointer targets ('old' or 'new'). */
   pointerTarget?: 'old' | 'new'
+  /** During reallocation: how many cells in the new array have been written to. */
+  newUsed?: number
 }
 
 // --- Layout constants ---
@@ -43,34 +45,41 @@ type Step = DSSubstep<VectorState>
 
 /**
  * Produce reallocation substeps when growing capacity.
- * Substeps: allocate new (data→old) → copy (data→old) → switch pointer + delete old (data→new).
+ * Substeps: allocate → copy → switch pointer (old still visible) → delete old.
  */
 function growSteps(state: VectorState, newCap: number): Step[] {
   const oldData = [...state.data]
   const oldCap = state.capacity
 
-  // Step 1: allocate new empty array, data still points to old
+  // Step 1: allocate new empty array — nothing written yet
   const allocData = new Array(newCap).fill(0)
   const allocated: VectorState = {
     data: allocData, size: state.size, capacity: newCap,
-    oldData, oldCapacity: oldCap, pointerTarget: 'old',
+    oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed: 0,
   }
 
-  // Step 2: copy elements to new array, data still points to old
+  // Step 2: copy elements to new array
   const copyData = [...allocData]
   for (let i = 0; i < state.size; i++) copyData[i] = oldData[i]
   const copied: VectorState = {
     data: copyData, size: state.size, capacity: newCap,
-    oldData, oldCapacity: oldCap, pointerTarget: 'old',
+    oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed: state.size,
   }
 
-  // Step 3: switch pointer to new, delete old
-  const switched: VectorState = { data: [...copyData], size: state.size, capacity: newCap }
+  // Step 3: switch pointer to new, old array still visible (dimmed)
+  const switched: VectorState = {
+    data: [...copyData], size: state.size, capacity: newCap,
+    oldData, oldCapacity: oldCap, pointerTarget: 'new', newUsed: state.size,
+  }
+
+  // Step 4: delete old array
+  const deleted: VectorState = { data: [...copyData], size: state.size, capacity: newCap }
 
   return [
     { state: allocated, description: `Allocate new array (capacity ${newCap})` },
     { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
-    { state: switched, description: `Update data pointer, delete old array` },
+    { state: switched, description: `Update data pointer to new array` },
+    { state: deleted, description: `Delete old array` },
   ]
 }
 
@@ -149,27 +158,8 @@ function applyOperation(state: VectorState, op: string, args: Record<string, num
     }
     case 'shrink_to_fit': {
       if (state.capacity === state.size) return [{ state, description: 'Already at minimum capacity' }]
-      const newCap = state.size
-      const oldData = [...state.data]
-      const oldCap = state.capacity
-      // Step 1: allocate new array with capacity = size
-      const allocData = state.data.slice(0, newCap)
-      const allocated: VectorState = {
-        data: allocData, size: state.size, capacity: newCap,
-        oldData, oldCapacity: oldCap, pointerTarget: 'old',
-      }
-      // Step 2: copy values (already in allocData since we sliced)
-      const copied: VectorState = {
-        data: [...allocData], size: state.size, capacity: newCap,
-        oldData, oldCapacity: oldCap, pointerTarget: 'old',
-      }
-      // Step 3: switch pointer to new, delete old
-      const switched: VectorState = { data: [...allocData], size: state.size, capacity: newCap }
-      return [
-        { state: allocated, description: `Allocate new array (capacity ${newCap})` },
-        { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
-        { state: switched, description: `Update data pointer, delete old array` },
-      ]
+      // Use the standard realloc sequence: allocate → copy → switch → delete
+      return growSteps(state, state.size)
     }
     default:
       throw new Error(`Unknown operation: ${op}`)
@@ -231,8 +221,6 @@ function computeLayout(state: VectorState): DSLayout {
   let oldCellsY = arrayY + ARRAY_LABEL_HEIGHT
   let oldArrayBottomY = arrayY
   if (hasOldArray) {
-    const oldOpacity = pointsToOld ? 1.0 : DIMMED_OPACITY
-
     elements.push({
       id: 'array-label:old',
       x: arrayX,
@@ -240,8 +228,8 @@ function computeLayout(state: VectorState): DSLayout {
       width: 100,
       height: ARRAY_LABEL_HEIGHT,
       kind: 'array-label',
-      data: { text: pointsToOld ? '' : 'old' } as LabelData,
-      opacity: oldOpacity,
+      data: { text: 'old' } as LabelData,
+      opacity: 1.0,
     })
 
     for (let i = 0; i < state.oldCapacity!; i++) {
@@ -261,17 +249,16 @@ function computeLayout(state: VectorState): DSLayout {
           value: { num: state.oldData![i], arrays: [] },
           dimmed: isDimmed,
         } as CellData,
-        opacity: oldOpacity,
+        opacity: 1.0,
       })
     }
 
     oldArrayBottomY = oldCellsY + CELL_SIZE + INDEX_LABEL_HEIGHT + CELL_GAP
   }
 
-  // New/current array
+  // New/current array (always full opacity, individual cells dimmed if empty)
   const newArrayY = hasOldArray ? oldArrayBottomY + 12 : arrayY
   const newLabel = hasOldArray ? 'new' : ''
-  const newOpacity = pointsToOld ? DIMMED_OPACITY : 1.0
 
   elements.push({
     id: 'array-label:data',
@@ -281,14 +268,17 @@ function computeLayout(state: VectorState): DSLayout {
     height: ARRAY_LABEL_HEIGHT,
     kind: 'array-label',
     data: { text: newLabel } as LabelData,
-    opacity: newOpacity,
+    opacity: 1.0,
   })
 
   const cellsY = newArrayY + ARRAY_LABEL_HEIGHT
 
+  // When newUsed is set, use it to determine which cells in the new array are initialized
+  const newArrayUsed = state.newUsed ?? state.size
+
   for (let i = 0; i < state.capacity; i++) {
     const cellX = arrayX + i * (CELL_SIZE + CELL_GAP)
-    const isDimmed = i >= state.size
+    const isDimmed = i >= newArrayUsed
 
     const cellData: CellData = {
       arrayName: 'data',
@@ -305,7 +295,7 @@ function computeLayout(state: VectorState): DSLayout {
       height: CELL_SIZE,
       kind: 'cell',
       data: cellData,
-      opacity: newOpacity,
+      opacity: 1.0,
     })
   }
 
