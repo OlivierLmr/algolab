@@ -61,11 +61,17 @@ export interface TreeNodeData {
   pointers: TreePointerInfo[]
 }
 
+export interface StructFieldData {
+  name: string
+  displayValue: string
+  isPointer: boolean
+}
+
 export interface GroupData {
   role: 'array-row' | 'variables-row' | 'callstack' | 'heap-tree'
 }
 
-export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | TreeNodeData | GroupData
+export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | TreeNodeData | StructFieldData | GroupData
 
 // --- Layout node ---
 
@@ -75,7 +81,7 @@ export interface LayoutNode {
   y: number
   width: number
   height: number
-  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'tree-node' | 'group'
+  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'tree-node' | 'struct-field' | 'group'
   data: NodeData
   children?: LayoutNode[]
 }
