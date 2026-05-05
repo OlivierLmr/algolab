@@ -432,4 +432,23 @@ describe('forward_list: layout', () => {
     expect(layout.width).toBeGreaterThanOrEqual(300)
     expect(layout.height).toBeGreaterThan(100)
   })
+
+  it('multiple floating nodes in splice are spread horizontally, not overlapping', () => {
+    const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
+    // Splice nodes at positions 2, 3 (range (1, 4)) — two floating nodes after unlink
+    const steps = applySteps(state, 'splice_after', { pos: 0, first: 1, last: 4 })
+    // After step 0 (unlink): nodes at positions 2 and 3 become floating
+    const layout = forwardListDS.computeLayout(steps[0].state)
+    // Find floating node cells — they should be at floatingY (below linked row)
+    const linkedCells = layout.elements.filter(e =>
+      e.kind === 'cell' && e.id.startsWith('cell:node:') && e.id.endsWith(':value')
+    )
+    const linkedY = linkedCells.find(e => e.id.includes(':0:'))?.y // node 0 is still linked
+    const floatingCells = linkedCells.filter(e => e.y !== linkedY)
+    // There should be 2 floating nodes (ids 2 and 3)
+    expect(floatingCells.length).toBe(2)
+    // Their X positions should differ (spread horizontally)
+    const xs = floatingCells.map(e => e.x)
+    expect(xs[0]).not.toBe(xs[1])
+  })
 })

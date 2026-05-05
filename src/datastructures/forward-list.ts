@@ -423,16 +423,18 @@ function computeLayout(state: ForwardListState): DSLayout {
     emitNodeCells(elements, node, nodeX, nodesY)
   }
 
-  // Lay out floating nodes BELOW the anchor position
+  // Lay out floating nodes BELOW the anchor position, spread horizontally
   const FLOATING_Y_GAP = 20
   const floatingY = nodesY + CELL_SIZE + FLOATING_Y_GAP
+  const anchorIdx = state.floatingAnchorIdx ?? 0
+  const clampedAnchor = Math.min(anchorIdx, Math.max(0, orderedNodes.length - 1))
+  const floatingStartX = orderedNodes.length > 0
+    ? STRUCT_X + clampedAnchor * (NODE_WIDTH + NODE_GAP)
+    : STRUCT_X
 
-  for (const node of floatingNodes) {
-    const anchorIdx = state.floatingAnchorIdx ?? 0
-    const clampedAnchor = Math.min(anchorIdx, Math.max(0, orderedNodes.length - 1))
-    const nodeX = orderedNodes.length > 0
-      ? STRUCT_X + clampedAnchor * (NODE_WIDTH + NODE_GAP)
-      : STRUCT_X
+  for (let fi = 0; fi < floatingNodes.length; fi++) {
+    const node = floatingNodes[fi]
+    const nodeX = floatingStartX + fi * (NODE_WIDTH + NODE_GAP)
     nodePositions.set(node.id, { x: nodeX, y: floatingY })
     emitNodeCells(elements, node, nodeX, floatingY)
   }
