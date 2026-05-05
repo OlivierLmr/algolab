@@ -3,6 +3,7 @@ import type { Step, AlgorithmDefinition, DescriptionSegment } from './types.ts'
 import { algorithms } from './algorithms/index.ts'
 import { compilePipeline, runAlgorithm } from './dsl/index.ts'
 import type { PipelineResult } from './dsl/index.ts'
+import { isDSMode } from './datastructures/state.ts'
 
 export const algorithmList = algorithms
 
@@ -18,6 +19,8 @@ function readHash(): { algo: number | 'custom'; step: number; input: string } | 
   const hash = window.location.hash.slice(1)
   if (!hash) return null
   const params = new URLSearchParams(hash)
+  // DS mode has its own initialization — don't restore algo state
+  if (params.has('ds')) return null
   const algoRaw = params.get('algo')
   const step = params.has('step') ? Number(params.get('step')) : NaN
   const input = params.get('input')
@@ -241,8 +244,9 @@ if (initial) {
 }
 disabledLines.value = new Set(pipelineDefaultDisabledLines.value)
 
-// Sync state to URL hash
+// Sync state to URL hash (only when not in DS mode — DS mode has its own sync)
 effect(() => {
+  if (isDSMode.value) return
   const params = new URLSearchParams()
   if (isCustomMode.value) {
     params.set('algo', 'custom')

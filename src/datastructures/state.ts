@@ -1,4 +1,4 @@
-import { signal, computed } from '@preact/signals'
+import { signal, computed, effect } from '@preact/signals'
 import type { DataStructure, DSOperation, DSLayout } from './types.ts'
 import { vectorDS } from './vector.ts'
 import { forwardListDS } from './forward-list.ts'
@@ -8,9 +8,32 @@ import { dequeDS } from './deque.ts'
 // Registry of available data structures
 export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS, listDS, dequeDS]
 
+/** Derive a URL slug from a DS name (e.g. "vector<T>" → "vector"). */
+function dsSlug(ds: DataStructure<any>): string {
+  return ds.name.replace(/<.*>/, '')
+}
+
+/** Find DS index by slug, or -1 if not found. */
+function dsIndexBySlug(slug: string): number {
+  return dataStructures.findIndex(ds => dsSlug(ds) === slug)
+}
+
+// Read initial DS mode from URL hash
+function readDSFromHash(): number | null {
+  const hash = window.location.hash.slice(1)
+  if (!hash) return null
+  const params = new URLSearchParams(hash)
+  const slug = params.get('ds')
+  if (!slug) return null
+  const idx = dsIndexBySlug(slug)
+  return idx >= 0 ? idx : null
+}
+
+const initialDS = readDSFromHash()
+
 // Mode and selection
-export const isDSMode = signal(false)
-export const currentDSIndex = signal(0)
+export const isDSMode = signal(initialDS !== null)
+export const currentDSIndex = signal(initialDS ?? 0)
 
 export const currentDS = computed<DataStructure<any>>(
   () => dataStructures[currentDSIndex.value]
@@ -221,3 +244,15 @@ export function exitDSMode(): void {
   cancelAnimation()
   isDSMode.value = false
 }
+
+// Initialize DS state from hash on load
+if (initialDS !== null) {
+  initDS([1, 2, 3, 4, 5])
+}
+
+// Sync DS state to URL hash
+effect(() => {
+  if (!isDSMode.value) return
+  const slug = dsSlug(dataStructures[currentDSIndex.value])
+  window.history.replaceState(null, '', '#ds=' + slug)
+})

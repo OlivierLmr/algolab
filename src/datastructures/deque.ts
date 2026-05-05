@@ -36,7 +36,7 @@ function chunkPhysical(state: DequeState, chunkOffset: number): number {
 }
 
 /** Get the value at logical index i. */
-function getAt(state: DequeState, i: number): number {
+export function getAt(state: DequeState, i: number): number {
   const chunkOffset = Math.floor((state.chunkBeg + i) / state.chunkCap)
   const chunkIdx = chunkPhysical(state, chunkOffset)
   const withinChunk = (state.chunkBeg + i) % state.chunkCap

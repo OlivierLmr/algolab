@@ -1,6 +1,6 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
-import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
+import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT } from '../layout/constants.ts'
 
 // --- State ---
 

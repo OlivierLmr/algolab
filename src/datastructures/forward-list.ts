@@ -1,6 +1,6 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
-import { CELL_SIZE, CELL_GAP, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
+import { CELL_SIZE, CELL_GAP } from '../layout/constants.ts'
 
 // --- State ---
 
@@ -482,7 +482,6 @@ function computeLayout(state: ForwardListState): DSLayout {
   }
 
   // Compute dimensions
-  const allNodeCount = orderedNodes.length + floatingNodes.length
   let rightEdge = fieldX
   let bottomY = nodesY + CELL_SIZE
   for (const pos of nodePositions.values()) {
