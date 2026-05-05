@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-05-05T12:00:00Z",
+    "title": "Data Structure Visualizer",
+    "items": [
+      "New mode: interactive visualizer for C++ standard data structures (vector, forward_list, list, deque), accessible from the sidebar.",
+      "Each operation (push, pop, insert, erase, splice, reserve, ...) is animated step-by-step showing internal state changes (reallocation, pointer rewiring, element shifting).",
+      "vector: insert at capacity uses a smart copy-with-gap strategy, showing the gap cell dimmed until the value is written.",
+      "deque: map-of-chunks layout with circular buffer addressing; insert shifts the smaller side; map growth shows old and new maps simultaneously.",
+      "list/forward_list: splice operations show the subchain floating below the main row during relinking steps; sentinel arrows visualize head.prev and tail.next.",
+      "Navigation: arrow keys move between operations, Shift+arrows step through substeps within an operation."
+    ]
+  },
+  {
     "date": "2026-04-30T12:00:00Z",
     "title": "Heap Algorithms & Tree Visualization",
     "items": [
