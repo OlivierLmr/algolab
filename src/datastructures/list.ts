@@ -150,15 +150,15 @@ function pushFront(state: ListState, val: number): Step[] {
   }
 
   // Step 4: Set begin = new, size++
-  const sPrev = steps[steps.length - 1].state
-  const s4 = cloneState(sPrev)
+  const sPrev4 = steps[steps.length - 1].state
+  const s4 = cloneState(sPrev4)
   s4.headId = newNode.id
   if (s4.tailId === null) {
     s4.tailId = newNode.id
   }
   s4.size++
   delete s4.floatingAnchorIdx
-  steps.push({ state: s4, description: `Set begin → new, size = ${s4.size}` })
+  steps.push({ state: s4, description: `Set begin → new` })
 
   return steps
 }
@@ -194,15 +194,15 @@ function pushBack(state: ListState, val: number): Step[] {
   }
 
   // Step 4: Set end = new, size++
-  const sPrev = steps[steps.length - 1].state
-  const s4 = cloneState(sPrev)
+  const sPrev4 = steps[steps.length - 1].state
+  const s4 = cloneState(sPrev4)
   s4.tailId = newNode.id
   if (s4.headId === null) {
     s4.headId = newNode.id
   }
   s4.size++
   delete s4.floatingAnchorIdx
-  steps.push({ state: s4, description: `Set end → new, size = ${s4.size}` })
+  steps.push({ state: s4, description: `Set end → new` })
 
   return steps
 }
@@ -214,14 +214,13 @@ function popFront(state: ListState): Step[] {
   const oldHeadId = state.headId!
   const oldHead = getNode(state, oldHeadId)
 
-  // Step 1: Set begin = head.next, size--
+  // Step 1: Set begin = head.next
   const s1 = cloneState(state)
   s1.headId = oldHead.nextId
   if (s1.headId === null) {
     s1.tailId = null
   }
-  s1.size--
-  steps.push({ state: s1, description: `Set begin → head.next, size = ${s1.size}` })
+  steps.push({ state: s1, description: `Set begin → head.next` })
 
   // Step 2: Set new_head.prev = null (skip if list now empty)
   if (s1.headId !== null) {
@@ -230,11 +229,12 @@ function popFront(state: ListState): Step[] {
     steps.push({ state: s2, description: `Set new_head.prev → null` })
   }
 
-  // Step 3: Delete old head node
+  // Step N: Delete old head node, size--
   const sPrev = steps[steps.length - 1].state
-  const s3 = cloneState(sPrev)
-  s3.nodes = s3.nodes.filter(n => n.id !== oldHeadId)
-  steps.push({ state: s3, description: `Delete old head node` })
+  const sDel = cloneState(sPrev)
+  sDel.nodes = sDel.nodes.filter(n => n.id !== oldHeadId)
+  sDel.size--
+  steps.push({ state: sDel, description: `Delete old head node` })
 
   return steps
 }
@@ -246,14 +246,13 @@ function popBack(state: ListState): Step[] {
   const oldTailId = state.tailId!
   const oldTail = getNode(state, oldTailId)
 
-  // Step 1: Set end = tail.prev, size--
+  // Step 1: Set end = tail.prev
   const s1 = cloneState(state)
   s1.tailId = oldTail.prevId
   if (s1.tailId === null) {
     s1.headId = null
   }
-  s1.size--
-  steps.push({ state: s1, description: `Set end → tail.prev, size = ${s1.size}` })
+  steps.push({ state: s1, description: `Set end → tail.prev` })
 
   // Step 2: Set new_tail.next = null (skip if list now empty)
   if (s1.tailId !== null) {
@@ -262,11 +261,12 @@ function popBack(state: ListState): Step[] {
     steps.push({ state: s2, description: `Set new_tail.next → null` })
   }
 
-  // Step 3: Delete old tail node
+  // Step N: Delete old tail node, size--
   const sPrev = steps[steps.length - 1].state
-  const s3 = cloneState(sPrev)
-  s3.nodes = s3.nodes.filter(n => n.id !== oldTailId)
-  steps.push({ state: s3, description: `Delete old tail node` })
+  const sDel = cloneState(sPrev)
+  sDel.nodes = sDel.nodes.filter(n => n.id !== oldTailId)
+  sDel.size--
+  steps.push({ state: sDel, description: `Delete old tail node` })
 
   return steps
 }
@@ -316,7 +316,7 @@ function insert(state: ListState, pos: number, val: number): Step[] {
   const s5 = cloneState(s4)
   getNode(s5, nodeAtPos.id).prevId = newNode.id
   s5.size++
-  steps.push({ state: s5, description: `Set node[${pos}].prev → new, size = ${s5.size}` })
+  steps.push({ state: s5, description: `Set node[${pos}].prev → new` })
 
   return steps
 }
@@ -352,7 +352,7 @@ function erase(state: ListState, pos: number): Step[] {
   const s3 = cloneState(s2)
   s3.nodes = s3.nodes.filter(n => n.id !== target.id)
   s3.size--
-  steps.push({ state: s3, description: `Delete node[${pos}], size = ${s3.size}` })
+  steps.push({ state: s3, description: `Delete node[${pos}]` })
 
   return steps
 }

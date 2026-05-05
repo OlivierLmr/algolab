@@ -110,37 +110,36 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const newId = state.nextNodeId
       const newNode: FLNode = { id: newId, value: val, nextId: null }
 
-      // Substep 1: Create new node (floating, not linked)
-      const step1State: ForwardListState = {
+      // Step 1: Create new node (floating, not linked)
+      const s1: ForwardListState = {
         nodes: [...state.nodes, newNode],
-        headId: state.headId,
-        size: state.size,
-        nextNodeId: state.nextNodeId + 1,
-        floatingAnchorIdx: 0, // appears below head position
-      }
-
-      // Substep 2: Set new.next = head
-      const step2Node: FLNode = { ...newNode, nextId: state.headId }
-      const step2State: ForwardListState = {
-        nodes: step1State.nodes.map(n => n.id === newId ? step2Node : n),
         headId: state.headId,
         size: state.size,
         nextNodeId: state.nextNodeId + 1,
         floatingAnchorIdx: 0,
       }
 
-      // Substep 3: Set head = new, size++
-      const step3State: ForwardListState = {
-        nodes: step2State.nodes,
+      // Step 2: Set new.next = head
+      const s2: ForwardListState = {
+        nodes: s1.nodes.map(n => n.id === newId ? { ...n, nextId: state.headId } : n),
+        headId: state.headId,
+        size: state.size,
+        nextNodeId: state.nextNodeId + 1,
+        floatingAnchorIdx: 0,
+      }
+
+      // Step 3: Set head = new, size++
+      const s3: ForwardListState = {
+        nodes: s2.nodes,
         headId: newId,
         size: state.size + 1,
         nextNodeId: state.nextNodeId + 1,
       }
 
       return [
-        { state: step1State, description: `Create new node with value ${val}` },
-        { state: step2State, description: `Set new.next = head` },
-        { state: step3State, description: `Set head = new, size = ${state.size + 1}` },
+        { state: s1, description: `Create new node with value ${val}` },
+        { state: s2, description: `Set new.next = head` },
+        { state: s3, description: `Set head = new` },
       ]
     }
 
@@ -150,25 +149,25 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const headNode = state.nodes.find(n => n.id === state.headId)!
       const newHeadId = headNode.nextId
 
-      // Substep 1: Set head = head.next, size--
-      const step1State: ForwardListState = {
+      // Step 1: Set head = head.next
+      const s1: ForwardListState = {
         nodes: [...state.nodes],
         headId: newHeadId,
-        size: state.size - 1,
+        size: state.size,
         nextNodeId: state.nextNodeId,
       }
 
-      // Substep 2: Delete old head node
-      const step2State: ForwardListState = {
-        nodes: state.nodes.filter(n => n.id !== state.headId),
+      // Step 2: Delete old head node, size--
+      const s2: ForwardListState = {
+        nodes: s1.nodes.filter(n => n.id !== state.headId),
         headId: newHeadId,
         size: state.size - 1,
         nextNodeId: state.nextNodeId,
       }
 
       return [
-        { state: step1State, description: `Set head = head.next, size = ${state.size - 1}` },
-        { state: step2State, description: `Delete old head node` },
+        { state: s1, description: `Set head = head.next` },
+        { state: s2, description: `Delete old head node` },
       ]
     }
 
@@ -183,38 +182,36 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const newId = state.nextNodeId
       const newNode: FLNode = { id: newId, value: val, nextId: null }
 
-      // Substep 1: Create new node (floating)
-      const step1State: ForwardListState = {
+      // Step 1: Create new node (floating)
+      const s1: ForwardListState = {
         nodes: [...state.nodes, newNode],
-        headId: state.headId,
-        size: state.size,
-        nextNodeId: state.nextNodeId + 1,
-        floatingAnchorIdx: pos, // appears below target node
-      }
-
-      // Substep 2: Set new.next = target.next
-      const step2Node: FLNode = { ...newNode, nextId: targetNode.nextId }
-      const step2State: ForwardListState = {
-        nodes: step1State.nodes.map(n => n.id === newId ? step2Node : n),
         headId: state.headId,
         size: state.size,
         nextNodeId: state.nextNodeId + 1,
         floatingAnchorIdx: pos,
       }
 
-      // Substep 3: Set target.next = new, size++
-      const updatedTarget: FLNode = { ...targetNode, nextId: newId }
-      const step3State: ForwardListState = {
-        nodes: step2State.nodes.map(n => n.id === targetNode.id ? updatedTarget : n),
+      // Step 2: Set new.next = target.next
+      const s2: ForwardListState = {
+        nodes: s1.nodes.map(n => n.id === newId ? { ...n, nextId: targetNode.nextId } : n),
+        headId: state.headId,
+        size: state.size,
+        nextNodeId: state.nextNodeId + 1,
+        floatingAnchorIdx: pos,
+      }
+
+      // Step 3: Set target.next = new, size++
+      const s3: ForwardListState = {
+        nodes: s2.nodes.map(n => n.id === targetNode.id ? { ...n, nextId: newId } : n),
         headId: state.headId,
         size: state.size + 1,
         nextNodeId: state.nextNodeId + 1,
       }
 
       return [
-        { state: step1State, description: `Create new node with value ${val}` },
-        { state: step2State, description: `Set new.next = target.next` },
-        { state: step3State, description: `Set target.next = new, size = ${state.size + 1}` },
+        { state: s1, description: `Create new node with value ${val}` },
+        { state: s2, description: `Set new.next = target.next` },
+        { state: s3, description: `Set target.next = new` },
       ]
     }
 
@@ -227,26 +224,25 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const targetNode = getNodeAtPosition(state, pos)!
       const removedNode = state.nodes.find(n => n.id === targetNode.nextId)!
 
-      // Substep 1: Set target.next = removed.next (bypass), size--
-      const updatedTarget: FLNode = { ...targetNode, nextId: removedNode.nextId }
-      const step1State: ForwardListState = {
-        nodes: state.nodes.map(n => n.id === targetNode.id ? updatedTarget : n),
+      // Step 1: Set target.next = removed.next (bypass)
+      const s1: ForwardListState = {
+        nodes: state.nodes.map(n => n.id === targetNode.id ? { ...n, nextId: removedNode.nextId } : n),
         headId: state.headId,
-        size: state.size - 1,
+        size: state.size,
         nextNodeId: state.nextNodeId,
       }
 
-      // Substep 2: Delete removed node
-      const step2State: ForwardListState = {
-        nodes: step1State.nodes.filter(n => n.id !== removedNode.id),
+      // Step 2: Delete removed node, size--
+      const s2: ForwardListState = {
+        nodes: s1.nodes.filter(n => n.id !== removedNode.id),
         headId: state.headId,
         size: state.size - 1,
         nextNodeId: state.nextNodeId,
       }
 
       return [
-        { state: step1State, description: `Set target.next = removed.next, size = ${state.size - 1}` },
-        { state: step2State, description: `Delete removed node` },
+        { state: s1, description: `Set target.next = removed.next` },
+        { state: s2, description: `Delete removed node` },
       ]
     }
 

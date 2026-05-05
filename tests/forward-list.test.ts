@@ -77,7 +77,7 @@ describe('forward_list: push_front', () => {
     expect(head.nextId).toBe(0) // points to old head
   })
 
-  it('produces 3 substeps (create, link, update head)', () => {
+  it('produces 3 substeps (create, link, head)', () => {
     const state = forwardListDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_front', { val: 0 })
     expect(steps.length).toBe(3)
@@ -127,7 +127,7 @@ describe('forward_list: pop_front', () => {
     expect(() => apply(state, 'pop_front')).toThrow('pop_front on empty forward_list')
   })
 
-  it('produces 2 substeps', () => {
+  it('produces 2 substeps (head, delete)', () => {
     const state = forwardListDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'pop_front')
     expect(steps.length).toBe(2)
@@ -138,10 +138,10 @@ describe('forward_list: pop_front', () => {
   it('first substep still has old node in nodes array', () => {
     const state = forwardListDS.createInitialState([1, 2])
     const steps = applySteps(state, 'pop_front')
-    // Substep 1: head updated but old node still present
+    // Step 1: head updated but old node still present
     expect(steps[0].state.headId).toBe(1)
     expect(steps[0].state.nodes.find(n => n.id === 0)).toBeDefined()
-    // Substep 2: old node removed
+    // Step 2: old node removed
     expect(steps[1].state.nodes.find(n => n.id === 0)).toBeUndefined()
   })
 })
@@ -237,7 +237,7 @@ describe('forward_list: erase_after', () => {
     expect(() => apply(state, 'erase_after', { pos: 0 })).toThrow()
   })
 
-  it('produces 2 substeps', () => {
+  it('produces 2 substeps (bypass, delete)', () => {
     const state = forwardListDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'erase_after', { pos: 0 })
     expect(steps.length).toBe(2)
