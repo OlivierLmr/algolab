@@ -407,6 +407,9 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     return idx >= 0 ? `node[${idx}]` : `node(id=${id})`
   }
 
+  // Floating anchor: position below the node just before the gap in the top row
+  const floatAnchor = Math.max(0, rangeStart - 1)
+
   const steps: Step[] = []
   let current = cloneState(state)
 
@@ -414,7 +417,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
-    s.floatingAnchorIdx = rangeStart
+    s.floatingAnchorIdx = floatAnchor
     steps.push({ state: s, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
   }
 
@@ -422,7 +425,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
-    s.floatingAnchorIdx = rangeStart
+    s.floatingAnchorIdx = floatAnchor
     if (beforeRangeId !== null) {
       getNode(s, beforeRangeId).nextId = afterRangeId
       steps.push({ state: s, description: `Set ${nodeLabel(beforeRangeId)}.next → ${nodeLabel(afterRangeId)}` })
@@ -437,7 +440,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
-    s.floatingAnchorIdx = rangeStart
+    s.floatingAnchorIdx = floatAnchor
     if (afterRangeId !== null) {
       getNode(s, afterRangeId).prevId = beforeRangeId
       steps.push({ state: s, description: `Set ${nodeLabel(afterRangeId)}.prev → ${nodeLabel(beforeRangeId)}` })
@@ -448,43 +451,57 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     current = s
   }
 
-  // --- Step 3: Subchain points to new neighbours ---
-  // subchain_head.prev → insertAfter, subchain_tail.next → insertBefore
+  // --- Step 3: Connect tail side bidirectionally ---
+  // subchain_tail.next → insertBefore, insertBefore.prev → subchain_tail
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
-    s.floatingAnchorIdx = rangeStart
-    getNode(s, subchainHeadId).prevId = insertAfterNodeId
+    s.floatingAnchorIdx = floatAnchor
     getNode(s, subchainTailId).nextId = insertBeforeNodeId
-    steps.push({
-      state: s,
-      description: `Set subchain_head.prev → ${nodeLabel(insertAfterNodeId)}, subchain_tail.next → ${nodeLabel(insertBeforeNodeId)}`,
-    })
+    if (insertBeforeNodeId !== null) {
+      getNode(s, insertBeforeNodeId).prevId = subchainTailId
+      steps.push({
+        state: s,
+        description: `Set subchain_tail.next → ${nodeLabel(insertBeforeNodeId)}, ${nodeLabel(insertBeforeNodeId)}.prev → subchain_tail`,
+      })
+    } else {
+      s.tailId = subchainTailId
+      steps.push({
+        state: s,
+        description: `Set subchain_tail.next → null, end → subchain_tail`,
+      })
+    }
     current = s
   }
 
-  // --- Step 4: New neighbours point to subchain (final — nodes return to ordered row) ---
-  // insertAfter.next → subchain_head (or begin → subchain_head)
-  // insertBefore.prev → subchain_tail (or end → subchain_tail)
+  // --- Step 4: Connect head side bidirectionally ---
+  // subchain_head.prev → insertAfter, insertAfter.next → subchain_head
+  {
+    const s = cloneState(current)
+    s.floatingNodeIds = rangeNodeIds
+    s.floatingAnchorIdx = floatAnchor
+    getNode(s, subchainHeadId).prevId = insertAfterNodeId
+    if (insertAfterNodeId !== null) {
+      getNode(s, insertAfterNodeId).nextId = subchainHeadId
+      steps.push({
+        state: s,
+        description: `Set subchain_head.prev → ${nodeLabel(insertAfterNodeId)}, ${nodeLabel(insertAfterNodeId)}.next → subchain_head`,
+      })
+    } else {
+      s.headId = subchainHeadId
+      steps.push({
+        state: s,
+        description: `Set subchain_head.prev → null, begin → subchain_head`,
+      })
+    }
+    current = s
+  }
+
+  // --- Step 5: Visual cleanup — nodes return to ordered row (no pointer changes) ---
   {
     const s = cloneState(current)
     // No floatingNodeIds — all nodes rejoin the ordered row
-    if (insertAfterNodeId !== null) {
-      getNode(s, insertAfterNodeId).nextId = subchainHeadId
-    } else {
-      s.headId = subchainHeadId
-    }
-    if (insertBeforeNodeId !== null) {
-      getNode(s, insertBeforeNodeId).prevId = subchainTailId
-    } else {
-      s.tailId = subchainTailId
-    }
-    const afterLabel = insertAfterNodeId !== null ? `${nodeLabel(insertAfterNodeId)}.next` : 'begin'
-    const beforeLabel = insertBeforeNodeId !== null ? `${nodeLabel(insertBeforeNodeId)}.prev` : 'end'
-    steps.push({
-      state: s,
-      description: `Set ${afterLabel} → subchain_head, ${beforeLabel} → subchain_tail`,
-    })
+    steps.push({ state: s, description: `Splice complete` })
   }
 
   return steps

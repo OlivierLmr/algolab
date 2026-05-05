@@ -485,27 +485,29 @@ describe('list: splice', () => {
     expect(values(s2)).toEqual([1, 4, 5, 2, 3])
   })
 
-  it('has 5 substeps: visual + 2 unlink + 2 relink', () => {
+  it('has 6 substeps: visual + 2 unlink + 2 bidirectional relink + visual cleanup', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     // Step 0: visual pre-step
     // Step 1: unlink forward (beforeRange.next → afterRange)
     // Step 2: unlink backward (afterRange.prev → beforeRange)
-    // Step 3: subchain → new neighbours (2 pointers)
-    // Step 4: new neighbours → subchain (2 pointers, final)
-    expect(steps.length).toBe(5)
+    // Step 3: connect tail side bidirectionally
+    // Step 4: connect head side bidirectionally
+    // Step 5: visual cleanup (nodes return to single row)
+    expect(steps.length).toBe(6)
     expect(steps[0].description).toContain('Splicing')
-    for (const step of steps.slice(1)) {
+    for (const step of steps.slice(1, 5)) {
       expect(step.description).toMatch(/Set/)
     }
+    expect(steps[5].description).toContain('complete')
   })
 
   it('floating nodes persist across all intermediate steps', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
 
-    // Steps 0-3 should have floatingNodeIds set (nodes stay below)
-    for (let i = 0; i < 4; i++) {
+    // Steps 0-4 should have floatingNodeIds set (nodes stay below)
+    for (let i = 0; i < 5; i++) {
       const layout = listDS.computeLayout(steps[i].state)
       const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
       const nodeYs = new Map<number, number>()
@@ -518,11 +520,25 @@ describe('list: splice', () => {
       expect(nodeYs.get(3)!).toBeGreaterThan(topY) // node 3 below
     }
 
-    // Final step (4): all nodes back in one row
-    const finalLayout = listDS.computeLayout(steps[4].state)
+    // Final step (5): all nodes back in one row
+    const finalLayout = listDS.computeLayout(steps[5].state)
     const finalValueCells = finalLayout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
     const finalYs = new Set(finalValueCells.map(c => c.y))
     expect(finalYs.size).toBe(1) // all at same y
+  })
+
+  it('floating nodes appear below their original position', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    const layout = listDS.computeLayout(steps[0].state)
+    const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    const nodeXs = new Map<number, number>()
+    for (const cell of valueCells) {
+      const parts = cell.id.split(':')
+      nodeXs.set(Number(parts[2]), cell.x)
+    }
+    // Node 2 (value 3) should be below node 1 (value 2), not below node 4 (value 5)
+    expect(nodeXs.get(2)).toBe(nodeXs.get(1)) // same x as value 2
   })
 
   it('throws on empty range', () => {
