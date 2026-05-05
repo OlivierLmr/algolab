@@ -16,6 +16,7 @@ import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prev
 import { isDSMode } from './datastructures/state.ts'
 import { DSVisualizer } from './components/datastructures/DSVisualizer.tsx'
 import { DSControls } from './components/datastructures/DSControls.tsx'
+import { DSHistory } from './components/datastructures/DSHistory.tsx'
 
 function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string, string>, step?: import('./types.ts').Step | null) {
   return segments.map((seg, i) => {
@@ -118,10 +119,13 @@ export function App() {
         <ChangelogBanner />
         {dsMode ? (
           <div class="ds-main">
-            <DSControls />
-            <div class="canvas-wrapper">
-              <DSVisualizer />
+            <div class="ds-body">
+              <DSControls />
+              <div class="canvas-wrapper">
+                <DSVisualizer />
+              </div>
             </div>
+            <DSHistory />
           </div>
         ) : (
           <>

@@ -1,15 +1,13 @@
 import { useSignal } from '@preact/signals'
 import type { OperationDef } from '../../datastructures/types.ts'
 import {
-  currentDS, currentDSSnapshot, dsHistory, dsHistoryIndex,
-  applyDSOp, dsUndo, dsRedo, initDS,
+  currentDS, currentDSSnapshot,
+  applyDSOp, initDS,
 } from '../../datastructures/state.ts'
 
 export function DSControls() {
   const ds = currentDS.value
   const snapshot = currentDSSnapshot.value
-  const historyLen = dsHistory.value.length
-  const histIdx = dsHistoryIndex.value
   const inputText = useSignal('1, 2, 3, 4, 5')
 
   if (!snapshot) return null
@@ -43,39 +41,6 @@ export function DSControls() {
           <OperationButton key={op.name} op={op} />
         ))}
       </div>
-
-      <div class="ds-controls-history">
-        <button
-          class="ds-controls-btn"
-          disabled={histIdx <= 0}
-          onClick={dsUndo}
-          title="Undo"
-        >
-          &#8592; Undo
-        </button>
-        <span class="ds-controls-history-pos">
-          {histIdx + 1} / {historyLen}
-        </span>
-        <button
-          class="ds-controls-btn"
-          disabled={histIdx >= historyLen - 1}
-          onClick={dsRedo}
-          title="Redo"
-        >
-          Redo &#8594;
-        </button>
-      </div>
-
-      <div class="ds-controls-log">
-        {dsHistory.value.map((snap, i) => (
-          <span
-            key={i}
-            class={`ds-controls-log-entry${i === histIdx ? ' ds-controls-log-current' : ''}`}
-          >
-            {snap.label}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -91,7 +56,6 @@ function OperationButton({ op }: { op: OperationDef }) {
       }
       applyDSOp(op.name, args)
     } catch (e) {
-      // Show error briefly — for now just log
       console.warn(`Operation failed: ${e instanceof Error ? e.message : e}`)
     }
   }
@@ -102,19 +66,29 @@ function OperationButton({ op }: { op: OperationDef }) {
 
   return (
     <div class="ds-op">
-      <button class="ds-op-btn" onClick={execute}>{op.label}</button>
+      <span class="ds-op-name">{op.name}</span>
+      <span class="ds-op-paren">(</span>
       {op.args.map((arg, i) => (
-        <input
-          key={arg.name}
-          class="ds-op-arg"
-          type="number"
-          value={argValues[i].value}
-          onInput={(e) => { argValues[i].value = (e.target as HTMLInputElement).value }}
-          onKeyDown={handleKeyDown}
-          placeholder={arg.label}
-          title={arg.label}
-        />
+        <>
+          {i > 0 && <span class="ds-op-comma">,</span>}
+          <div key={arg.name} class="ds-op-arg-group">
+            <label class="ds-op-arg-label">{arg.label}</label>
+            <input
+              class="ds-op-arg-input"
+              type="number"
+              value={argValues[i].value}
+              onInput={(e) => { argValues[i].value = (e.target as HTMLInputElement).value }}
+              onKeyDown={handleKeyDown}
+            />
+          </div>
+        </>
       ))}
+      <span class="ds-op-paren">)</span>
+      <button class="ds-op-submit" onClick={execute} title="Execute">
+        <svg viewBox="0 0 20 20" width="18" height="18">
+          <polyline points="4,10 9,15 16,5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
     </div>
   )
 }

@@ -141,7 +141,7 @@ function computeLayout(state: VectorState): DSLayout {
 
     if (field.isPointer) {
       dataFieldCenterX = fieldX + CELL_SIZE / 2
-      dataFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE
+      dataFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2  // Center of the dot
     }
 
     fieldX += CELL_SIZE + FIELD_GAP

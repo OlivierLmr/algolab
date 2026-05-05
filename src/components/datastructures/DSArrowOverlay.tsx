@@ -35,16 +35,19 @@ export function DSArrowOverlay({ arrows, width, height }: Props) {
       </defs>
       {arrows.map((arrow, i) => {
         const color = arrow.color ?? '#666'
-        // Compute a path with a slight curve
-        const dx = arrow.toX - arrow.fromX
+        // S-curve: both endpoints are vertical.
+        // Start going straight down, then curve horizontally, then arrive straight down.
         const dy = arrow.toY - arrow.fromY
-        const midX = arrow.fromX + dx * 0.5
-        const midY = arrow.fromY + dy * 0.7
+        const drop = dy * 0.35
+        const cp1X = arrow.fromX
+        const cp1Y = arrow.fromY + drop
+        const cp2X = arrow.toX
+        const cp2Y = arrow.toY - drop
 
         return (
           <path
             key={i}
-            d={`M${arrow.fromX},${arrow.fromY} Q${midX},${midY} ${arrow.toX},${arrow.toY}`}
+            d={`M${arrow.fromX},${arrow.fromY} C${cp1X},${cp1Y} ${cp2X},${cp2Y} ${arrow.toX},${arrow.toY}`}
             fill="none"
             stroke={color}
             stroke-width="1.5"

@@ -874,21 +874,29 @@ body {
   overflow: hidden;
 }
 
-/* DS Controls */
+.ds-body {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* DS Controls — left column */
 .ds-controls {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   flex-shrink: 0;
+  width: 280px;
+  overflow-y: auto;
 }
 
 .ds-controls-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ds-controls-title {
@@ -907,100 +915,177 @@ body {
 
 .ds-controls-input {
   font-family: monospace;
-  font-size: 13px;
-  padding: 4px 8px;
+  font-size: 12px;
+  padding: 3px 6px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  width: 160px;
+  width: 110px;
 }
 
 .ds-controls-btn {
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 3px 8px;
+  font-size: 11px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
 }
 
-.ds-controls-btn:hover:not(:disabled) {
+.ds-controls-btn:hover {
   background: #f0f0f0;
-}
-
-.ds-controls-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .ds-controls-ops {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 
+/* Operation row — function call style */
 .ds-op {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
+  padding: 4px 0;
 }
 
-.ds-op-btn {
-  padding: 5px 10px;
-  font-size: 12px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  border: 1px solid #aaa;
-  border-radius: 4px;
-  background: #fafafa;
-  cursor: pointer;
+.ds-op-name {
+  font: bold 14px 'SF Mono', 'Fira Code', monospace;
+  color: #333;
+  white-space: nowrap;
 }
 
-.ds-op-btn:hover {
-  background: #eee;
+.ds-op-paren {
+  font: 14px 'SF Mono', 'Fira Code', monospace;
+  color: #888;
+  margin: 0 1px;
 }
 
-.ds-op-arg {
-  width: 50px;
-  padding: 4px 6px;
-  font-size: 12px;
+.ds-op-comma {
+  font: 14px 'SF Mono', 'Fira Code', monospace;
+  color: #888;
+  margin: 0 4px 0 2px;
+}
+
+.ds-op-arg-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.ds-op-arg-label {
+  font-size: 10px;
+  color: #999;
+  font-family: sans-serif;
+  line-height: 1;
+}
+
+.ds-op-arg-input {
+  width: 36px;
+  padding: 2px 4px;
+  font-size: 13px;
   font-family: monospace;
+  text-align: center;
   border: 1px solid #ccc;
   border-radius: 4px;
-  text-align: center;
+  background: #f8f8f8;
 }
 
-.ds-controls-history {
+.ds-op-arg-input:focus {
+  border-color: #888;
+  outline: none;
+  background: #fff;
+}
+
+/* Remove spinner arrows from number inputs */
+.ds-op-arg-input::-webkit-inner-spin-button,
+.ds-op-arg-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ds-op-arg-input {
+  -moz-appearance: textfield;
+}
+
+.ds-op-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 6px;
+  border: 1.5px solid #aaa;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.ds-op-submit:hover {
+  background: #f0f0f0;
+  color: #333;
+  border-color: #888;
+}
+
+/* DS History — bottom bar */
+.ds-history {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  flex-shrink: 0;
+  min-height: 36px;
 }
 
-.ds-controls-history-pos {
-  font-size: 12px;
-  color: #888;
-  font-family: monospace;
+.ds-history-btn {
+  padding: 2px 8px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.ds-controls-log {
+.ds-history-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.ds-history-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ds-history-log {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  font-size: 11px;
+  flex: 1;
+  font-size: 12px;
   font-family: monospace;
   color: #aaa;
 }
 
-.ds-controls-log-entry {
+.ds-history-entry {
   padding: 1px 6px;
   border-radius: 3px;
   background: #f5f5f5;
 }
 
-.ds-controls-log-current {
+.ds-history-current {
   background: #e0e8f0;
   color: #333;
   font-weight: 600;
+}
+
+.ds-history-future {
+  opacity: 0.4;
 }
 
 /* DS struct field */
