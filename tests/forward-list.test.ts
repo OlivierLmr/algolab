@@ -285,13 +285,33 @@ describe('forward_list: splice_after (C++ range semantics)', () => {
     expect(getValues(s2)).toEqual([30, 10, 20, 40])
   })
 
-  it('produces 3 substeps', () => {
+  it('has 5 substeps: visual + unlink + tail + head + visual cleanup', () => {
     const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'splice_after', { pos: 0, first: 2, last: 5 })
-    expect(steps.length).toBe(3)
-    expect(steps[0].description).toContain('Unlink')
-    expect(steps[1].description).toContain('tail.next')
-    expect(steps[2].description).toContain('pos.next')
+    expect(steps.length).toBe(5)
+    expect(steps[0].description).toContain('Splicing')
+    expect(steps[1].description).toMatch(/Set/)
+    expect(steps[2].description).toContain('tail')
+    expect(steps[3].description).toMatch(/Set/)
+    expect(steps[4].description).toContain('complete')
+  })
+
+  it('floating nodes persist across intermediate steps and return to row at end', () => {
+    const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice_after', { pos: 0, first: 1, last: 4 })
+    // Steps 0-3: floating nodes below
+    for (let i = 0; i < 4; i++) {
+      const layout = forwardListDS.computeLayout(steps[i].state)
+      const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+      const linkedY = valueCells.find(e => e.id.includes(':0:'))?.y // node 0 is linked
+      const floating = valueCells.filter(e => e.y !== linkedY)
+      expect(floating.length).toBe(2) // nodes 2,3 below
+    }
+    // Step 4: all nodes in one row
+    const finalLayout = forwardListDS.computeLayout(steps[4].state)
+    const finalCells = finalLayout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    const ys = new Set(finalCells.map(c => c.y))
+    expect(ys.size).toBe(1)
   })
 
   it('throws when range is empty (first+1 == last)', () => {
@@ -435,19 +455,16 @@ describe('forward_list: layout', () => {
 
   it('multiple floating nodes in splice are spread horizontally, not overlapping', () => {
     const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
-    // Splice nodes at positions 2, 3 (range (1, 4)) — two floating nodes after unlink
+    // Splice nodes at positions 2, 3 (range (1, 4)) — two floating nodes
     const steps = applySteps(state, 'splice_after', { pos: 0, first: 1, last: 4 })
-    // After step 0 (unlink): nodes at positions 2 and 3 become floating
+    // Step 0 (visual pre-step): nodes 2 and 3 forced below
     const layout = forwardListDS.computeLayout(steps[0].state)
-    // Find floating node cells — they should be at floatingY (below linked row)
     const linkedCells = layout.elements.filter(e =>
       e.kind === 'cell' && e.id.startsWith('cell:node:') && e.id.endsWith(':value')
     )
     const linkedY = linkedCells.find(e => e.id.includes(':0:'))?.y // node 0 is still linked
     const floatingCells = linkedCells.filter(e => e.y !== linkedY)
-    // There should be 2 floating nodes (ids 2 and 3)
     expect(floatingCells.length).toBe(2)
-    // Their X positions should differ (spread horizontally)
     const xs = floatingCells.map(e => e.x)
     expect(xs[0]).not.toBe(xs[1])
   })

@@ -421,33 +421,24 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     steps.push({ state: s, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
   }
 
-  // --- Step 1: Unlink forward — beforeRange.next → afterRange (or begin → afterRange) ---
+  // --- Step 1: Unlink — close the gap left by the subchain ---
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
     s.floatingAnchorIdx = floatAnchor
     if (beforeRangeId !== null) {
       getNode(s, beforeRangeId).nextId = afterRangeId
-      steps.push({ state: s, description: `Set ${nodeLabel(beforeRangeId)}.next → ${nodeLabel(afterRangeId)}` })
     } else {
       s.headId = afterRangeId
-      steps.push({ state: s, description: `Set begin → ${nodeLabel(afterRangeId)}` })
     }
-    current = s
-  }
-
-  // --- Step 2: Unlink backward — afterRange.prev → beforeRange (or end → beforeRange) ---
-  {
-    const s = cloneState(current)
-    s.floatingNodeIds = rangeNodeIds
-    s.floatingAnchorIdx = floatAnchor
     if (afterRangeId !== null) {
       getNode(s, afterRangeId).prevId = beforeRangeId
-      steps.push({ state: s, description: `Set ${nodeLabel(afterRangeId)}.prev → ${nodeLabel(beforeRangeId)}` })
     } else {
       s.tailId = beforeRangeId
-      steps.push({ state: s, description: `Set end → ${nodeLabel(beforeRangeId)}` })
     }
+    const fwdLabel = beforeRangeId !== null ? `${nodeLabel(beforeRangeId)}.next → ${nodeLabel(afterRangeId)}` : `begin → ${nodeLabel(afterRangeId)}`
+    const bwdLabel = afterRangeId !== null ? `${nodeLabel(afterRangeId)}.prev → ${nodeLabel(beforeRangeId)}` : `end → ${nodeLabel(beforeRangeId)}`
+    steps.push({ state: s, description: `Set ${fwdLabel}, ${bwdLabel}` })
     current = s
   }
 

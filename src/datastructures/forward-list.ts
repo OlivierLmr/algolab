@@ -17,6 +17,8 @@ export interface ForwardListState {
   nextNodeId: number
   /** Hint for layout: position of the anchor node that a floating node should appear below. */
   floatingAnchorIdx?: number
+  /** Hint for layout: node IDs to render in the floating row regardless of linkage. */
+  floatingNodeIds?: number[]
 }
 
 // --- Layout constants ---
@@ -66,12 +68,6 @@ function getOrderedNodes(state: ForwardListState): FLNode[] {
     currentId = node.nextId
   }
   return result
-}
-
-/** Get floating nodes: those in state.nodes but not reachable from headId. */
-function getFloatingNodes(state: ForwardListState): FLNode[] {
-  const linkedIds = new Set(getOrderedNodes(state).map(n => n.id))
-  return state.nodes.filter(n => !linkedIds.has(n.id))
 }
 
 /** Get node at a 0-indexed position by traversal. Returns null if out of bounds. */
@@ -282,68 +278,130 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const rangeEnd = lastIdx - 1
       const subchainHead = ordered[rangeStart]
       const subchainTail = ordered[rangeEnd]
+      const rangeNodeIds = ordered.slice(rangeStart, lastIdx).map(n => n.id)
 
       // Validate pos is not inside the range being moved
       if (posIdx >= rangeStart && posIdx <= rangeEnd) {
         throw new Error(`splice_after: pos ${posIdx} is inside the range being moved [${rangeStart}, ${rangeEnd}]`)
       }
 
-      // Substep 1: Unlink subchain from (first, last)
-      // Set first.next = last (or head = last if first is before_begin)
-      let step1Nodes = state.nodes.map(n => ({ ...n }))
-      let step1HeadId = state.headId
-      if (firstNode !== null) {
-        step1Nodes = step1Nodes.map(n => n.id === firstNode.id ? { ...n, nextId: lastNode?.id ?? null } : n)
-      } else {
-        // first is before_begin → head becomes last
-        step1HeadId = lastNode?.id ?? null
-      }
-      const step1State: ForwardListState = {
-        nodes: step1Nodes,
-        headId: step1HeadId,
-        size: state.size,
-        nextNodeId: state.nextNodeId,
+      // Floating anchor: below the node just before the gap
+      const floatAnchor = Math.max(0, rangeStart - 1)
+
+      // Label helper
+      const nodeLabel = (idx: number) => `node[${idx}]`
+
+      const steps: Step[] = []
+      let currentNodes = state.nodes.map(n => ({ ...n }))
+      let currentHeadId = state.headId
+
+      // --- Step 0: Visual pre-step — show subchain below (no pointer changes) ---
+      steps.push({
+        state: {
+          nodes: currentNodes,
+          headId: currentHeadId,
+          size: state.size,
+          nextNodeId: state.nextNodeId,
+          floatingNodeIds: rangeNodeIds,
+          floatingAnchorIdx: floatAnchor,
+        },
+        description: `Splicing nodes [${rangeStart}..${rangeEnd}]`,
+      })
+
+      // --- Step 1: Unlink — first.next → last (or head → last) ---
+      {
+        const nodes = currentNodes.map(n => ({ ...n }))
+        let headId = currentHeadId
+        if (firstNode !== null) {
+          const fn = nodes.find(n => n.id === firstNode.id)!
+          fn.nextId = lastNode?.id ?? null
+        } else {
+          headId = lastNode?.id ?? null
+        }
+        currentNodes = nodes
+        currentHeadId = headId
+        const desc = firstNode !== null
+          ? `Set ${nodeLabel(firstIdx)}.next → ${lastNode ? nodeLabel(lastIdx) : 'null'}`
+          : `Set head → ${lastNode ? nodeLabel(lastIdx) : 'null'}`
+        steps.push({
+          state: {
+            nodes: currentNodes,
+            headId: currentHeadId,
+            size: state.size,
+            nextNodeId: state.nextNodeId,
+            floatingNodeIds: rangeNodeIds,
+            floatingAnchorIdx: floatAnchor,
+          },
+          description: desc,
+        })
       }
 
-      // Substep 2: Set subchain_tail.next = pos.next
-      const posNodeInStep1 = posNode ? step1Nodes.find(n => n.id === posNode.id)! : null
-      const afterPos = posNodeInStep1 ? posNodeInStep1.nextId : step1HeadId
-      const step2Nodes = step1Nodes.map(n =>
-        n.id === subchainTail.id ? { ...n, nextId: afterPos } : n
-      )
-      const step2State: ForwardListState = {
-        nodes: step2Nodes,
-        headId: step1HeadId,
-        size: state.size,
-        nextNodeId: state.nextNodeId,
+      // Compute afterPos: what pos.next is in the current (unlinked) state
+      const posNodeNow = posNode ? currentNodes.find(n => n.id === posNode.id)! : null
+      const afterPos = posNodeNow ? posNodeNow.nextId : currentHeadId
+
+      // --- Step 2: Connect tail — subchain_tail.next → afterPos ---
+      {
+        const nodes = currentNodes.map(n => ({ ...n }))
+        const tailN = nodes.find(n => n.id === subchainTail.id)!
+        tailN.nextId = afterPos
+        currentNodes = nodes
+        const afterLabel = afterPos !== null
+          ? nodeLabel(ordered.findIndex(n => n.id === afterPos))
+          : 'null'
+        steps.push({
+          state: {
+            nodes: currentNodes,
+            headId: currentHeadId,
+            size: state.size,
+            nextNodeId: state.nextNodeId,
+            floatingNodeIds: rangeNodeIds,
+            floatingAnchorIdx: floatAnchor,
+          },
+          description: `Set subchain_tail.next → ${afterLabel}`,
+        })
       }
 
-      // Substep 3: Set pos.next = subchain_head (or head = subchain_head if pos is before_begin)
-      let step3Nodes: FLNode[]
-      let step3HeadId: number | null
-      if (posNode !== null) {
-        step3Nodes = step2Nodes.map(n =>
-          n.id === posNode.id ? { ...n, nextId: subchainHead.id } : n
-        )
-        step3HeadId = step2State.headId
-      } else {
-        // pos = -1 (before_begin): subchain becomes the new head
-        step3Nodes = [...step2Nodes]
-        step3HeadId = subchainHead.id
-      }
-      const step3State: ForwardListState = {
-        nodes: step3Nodes,
-        headId: step3HeadId,
-        size: state.size,
-        nextNodeId: state.nextNodeId,
+      // --- Step 3: Connect head — pos.next → subchain_head (or head → subchain_head) ---
+      {
+        const nodes = currentNodes.map(n => ({ ...n }))
+        let headId = currentHeadId
+        if (posNode !== null) {
+          const pn = nodes.find(n => n.id === posNode.id)!
+          pn.nextId = subchainHead.id
+        } else {
+          headId = subchainHead.id
+        }
+        currentNodes = nodes
+        currentHeadId = headId
+        const desc = posNode !== null
+          ? `Set ${nodeLabel(posIdx)}.next → subchain_head`
+          : `Set head → subchain_head`
+        steps.push({
+          state: {
+            nodes: currentNodes,
+            headId: currentHeadId,
+            size: state.size,
+            nextNodeId: state.nextNodeId,
+            floatingNodeIds: rangeNodeIds,
+            floatingAnchorIdx: floatAnchor,
+          },
+          description: desc,
+        })
       }
 
-      const rangeLen = rangeEnd - rangeStart + 1
-      return [
-        { state: step1State, description: `Unlink ${rangeLen} node${rangeLen > 1 ? 's' : ''} from range (${firstIdx}, ${lastIdx})` },
-        { state: step2State, description: `Set subchain tail.next = pos.next` },
-        { state: step3State, description: `Set pos.next = subchain head` },
-      ]
+      // --- Step 4: Visual cleanup — nodes return to ordered row ---
+      steps.push({
+        state: {
+          nodes: currentNodes,
+          headId: currentHeadId,
+          size: state.size,
+          nextNodeId: state.nextNodeId,
+        },
+        description: `Splice complete`,
+      })
+
+      return steps
     }
 
     default:
@@ -396,8 +454,11 @@ function computeLayout(state: ForwardListState): DSLayout {
 
   // Nodes laid out horizontally below struct header
   const nodesY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_ARRAY_GAP
-  const orderedNodes = getOrderedNodes(state)
-  const floatingNodes = getFloatingNodes(state)
+  const forcedFloating = new Set(state.floatingNodeIds ?? [])
+  const allOrdered = getOrderedNodes(state)
+  const orderedNodes = allOrdered.filter(n => !forcedFloating.has(n.id))
+  const orderedSet = new Set(orderedNodes.map(n => n.id))
+  const floatingNodes = state.nodes.filter(n => !orderedSet.has(n.id))
 
   // Position map: nodeId → { x, y } of the node's value cell
   const nodePositions = new Map<number, { x: number; y: number }>()
