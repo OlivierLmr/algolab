@@ -13,6 +13,21 @@ function applySteps(state: ForwardListState, op: string, args: Record<string, nu
   return forwardListDS.applyOperation(state, op, args)
 }
 
+/** Traverse the list from head and return values in order. */
+function getValues(state: ForwardListState): number[] {
+  const values: number[] = []
+  let currentId = state.headId
+  const visited = new Set<number>()
+  while (currentId !== null) {
+    if (visited.has(currentId)) break
+    visited.add(currentId)
+    const node = state.nodes.find(n => n.id === currentId)!
+    values.push(node.value)
+    currentId = node.nextId
+  }
+  return values
+}
+
 describe('forward_list: initial state', () => {
   it('creates empty list', () => {
     const state = forwardListDS.createInitialState([])
@@ -231,55 +246,70 @@ describe('forward_list: erase_after', () => {
   })
 })
 
-describe('forward_list: splice_after', () => {
-  it('moves node from one position to after another', () => {
+describe('forward_list: splice_after (C++ range semantics)', () => {
+  // C++ splice_after(pos, first, last): moves nodes in open range (first, last)
+  // i.e., nodes after `first` up to but not including `last`, inserted after `pos`.
+  // `last` = size means "to end of list".
+
+  it('moves a single node (first+2 == last)', () => {
     const state = forwardListDS.createInitialState([10, 20, 30, 40])
-    // Move node at pos 2 (value 30) to after pos 0 (value 10)
-    const s2 = apply(state, 'splice_after', { dst: 0, src: 2 })
-    // Expected: 10 -> 30 -> 20 -> 40
-    let currentId = s2.headId
-    const values: number[] = []
-    while (currentId !== null) {
-      const node = s2.nodes.find(n => n.id === currentId)!
-      values.push(node.value)
-      currentId = node.nextId
-    }
-    expect(values).toEqual([10, 30, 20, 40])
+    // Move range (1, 3): node after pos 1 (=pos 2, val 30) up to not including pos 3
+    // Insert after pos 0. Result: 10 -> 30 -> 20 -> 40
+    const s2 = apply(state, 'splice_after', { pos: 0, first: 1, last: 3 })
+    expect(getValues(s2)).toEqual([10, 30, 20, 40])
   })
 
-  it('moves head node', () => {
-    const state = forwardListDS.createInitialState([10, 20, 30])
-    // Move head (pos 0, value 10) to after pos 1 (value 20)
-    const s2 = apply(state, 'splice_after', { dst: 1, src: 0 })
-    // Expected: 20 -> 10 -> 30
-    let currentId = s2.headId
-    const values: number[] = []
-    while (currentId !== null) {
-      const node = s2.nodes.find(n => n.id === currentId)!
-      values.push(node.value)
-      currentId = node.nextId
-    }
-    expect(values).toEqual([20, 10, 30])
+  it('moves multiple nodes', () => {
+    const state = forwardListDS.createInitialState([10, 20, 30, 40, 50])
+    // Move range (1, 4): nodes at pos 2 (30) and pos 3 (40), insert after pos 0
+    // Result: 10 -> 30 -> 40 -> 20 -> 50
+    const s2 = apply(state, 'splice_after', { pos: 0, first: 1, last: 4 })
+    expect(getValues(s2)).toEqual([10, 30, 40, 20, 50])
+  })
+
+  it('moves to end of list (last = size)', () => {
+    const state = forwardListDS.createInitialState([10, 20, 30, 40])
+    // Move range (0, 4): nodes at pos 1,2,3 (20,30,40) to end — but we move after pos 0
+    // Actually let's move tail to front: move range (2, 4) after pos -1? No.
+    // Move range (1, 4) [nodes 2,3] after pos 0
+    // Move (1, size=4): nodes at pos 2, 3 → after pos 0
+    const s2 = apply(state, 'splice_after', { pos: 0, first: 1, last: 4 })
+    expect(getValues(s2)).toEqual([10, 30, 40, 20])
+  })
+
+  it('splices from head (first = -1 means before_begin)', () => {
+    const state = forwardListDS.createInitialState([10, 20, 30, 40])
+    // Move range (-1, 2): nodes at pos 0 (10) and pos 1 (20), insert after pos 2
+    // Result: 30 -> 10 -> 20 -> 40
+    const s2 = apply(state, 'splice_after', { pos: 2, first: -1, last: 2 })
+    expect(getValues(s2)).toEqual([30, 10, 20, 40])
   })
 
   it('produces 3 substeps', () => {
-    const state = forwardListDS.createInitialState([1, 2, 3])
-    const steps = applySteps(state, 'splice_after', { dst: 0, src: 2 })
+    const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice_after', { pos: 0, first: 2, last: 5 })
     expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('Unlink')
-    expect(steps[1].description).toContain('source.next')
-    expect(steps[2].description).toContain('target.next')
+    expect(steps[1].description).toContain('tail.next')
+    expect(steps[2].description).toContain('pos.next')
   })
 
-  it('throws when dst equals src', () => {
+  it('throws when range is empty (first+1 == last)', () => {
     const state = forwardListDS.createInitialState([1, 2, 3])
-    expect(() => apply(state, 'splice_after', { dst: 1, src: 1 })).toThrow()
+    // (1, 2) is empty — no nodes between pos 1 and pos 2
+    expect(() => apply(state, 'splice_after', { pos: 0, first: 1, last: 2 })).toThrow()
+  })
+
+  it('throws when pos is inside the range being moved', () => {
+    const state = forwardListDS.createInitialState([1, 2, 3, 4, 5])
+    // Moving (1, 4) = nodes 2,3 — pos=2 is inside
+    expect(() => apply(state, 'splice_after', { pos: 2, first: 1, last: 4 })).toThrow()
   })
 
   it('throws on invalid positions', () => {
-    const state = forwardListDS.createInitialState([1, 2])
-    expect(() => apply(state, 'splice_after', { dst: -1, src: 0 })).toThrow()
-    expect(() => apply(state, 'splice_after', { dst: 0, src: 2 })).toThrow()
+    const state = forwardListDS.createInitialState([1, 2, 3])
+    expect(() => apply(state, 'splice_after', { pos: -2, first: 0, last: 2 })).toThrow()
+    expect(() => apply(state, 'splice_after', { pos: 0, first: 0, last: 5 })).toThrow()
   })
 })
 

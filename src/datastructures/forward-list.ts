@@ -251,43 +251,56 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
     }
 
     case 'splice_after': {
-      const dstPos = args.dst ?? 0
-      const srcPos = args.src ?? 1
+      // C++ semantics: splice_after(pos, first, last)
+      // Moves nodes in open range (first, last) — i.e., after `first` up to but not including `last`.
+      // Inserts them after `pos`.
+      // `first` = -1 means before_begin (range starts at head).
+      // `last` = size means end (range goes to tail).
+      const posIdx = args.pos ?? 0
+      const firstIdx = args.first ?? 0
+      const lastIdx = args.last ?? state.size
 
-      if (dstPos < 0 || dstPos >= state.size) {
-        throw new Error(`splice_after dst position ${dstPos} out of range [0, ${state.size - 1}]`)
+      // Validation
+      if (posIdx < -1 || posIdx >= state.size) {
+        throw new Error(`splice_after pos ${posIdx} out of range [-1, ${state.size - 1}]`)
       }
-      if (srcPos < 0 || srcPos >= state.size) {
-        throw new Error(`splice_after src position ${srcPos} out of range [0, ${state.size - 1}]`)
+      if (firstIdx < -1 || firstIdx >= state.size) {
+        throw new Error(`splice_after first ${firstIdx} out of range [-1, ${state.size - 1}]`)
       }
-      if (dstPos === srcPos) {
-        throw new Error(`splice_after: dst and src must be different positions`)
+      if (lastIdx < 0 || lastIdx > state.size) {
+        throw new Error(`splice_after last ${lastIdx} out of range [0, ${state.size}]`)
+      }
+      if (firstIdx + 1 >= lastIdx) {
+        throw new Error(`splice_after: empty range (first=${firstIdx}, last=${lastIdx})`)
       }
 
       const ordered = getOrderedNodes(state)
-      const targetNode = ordered[dstPos]
-      const sourceNode = ordered[srcPos]
 
-      // Find predecessor of source
-      let predNode: FLNode | null = null
-      if (srcPos === 0) {
-        // source is head — predecessor is "head pointer" conceptually
-        predNode = null
-      } else {
-        predNode = ordered[srcPos - 1]
+      // Resolve nodes: first and last are boundaries (not moved)
+      const firstNode: FLNode | null = firstIdx >= 0 ? ordered[firstIdx] : null
+      const lastNode: FLNode | null = lastIdx < state.size ? ordered[lastIdx] : null
+      const posNode: FLNode | null = posIdx >= 0 ? ordered[posIdx] : null
+
+      // The subchain to move: nodes at positions (firstIdx+1) .. (lastIdx-1)
+      const rangeStart = firstIdx + 1
+      const rangeEnd = lastIdx - 1
+      const subchainHead = ordered[rangeStart]
+      const subchainTail = ordered[rangeEnd]
+
+      // Validate pos is not inside the range being moved
+      if (posIdx >= rangeStart && posIdx <= rangeEnd) {
+        throw new Error(`splice_after: pos ${posIdx} is inside the range being moved [${rangeStart}, ${rangeEnd}]`)
       }
 
-      // Substep 1: Unlink source from its predecessor
-      let step1Nodes: FLNode[]
-      let step1HeadId: number | null
-      if (predNode === null) {
-        // Source is head, so head = source.next
-        step1Nodes = [...state.nodes]
-        step1HeadId = sourceNode.nextId
+      // Substep 1: Unlink subchain from (first, last)
+      // Set first.next = last (or head = last if first is before_begin)
+      let step1Nodes = state.nodes.map(n => ({ ...n }))
+      let step1HeadId = state.headId
+      if (firstNode !== null) {
+        step1Nodes = step1Nodes.map(n => n.id === firstNode.id ? { ...n, nextId: lastNode?.id ?? null } : n)
       } else {
-        const updatedPred: FLNode = { ...predNode, nextId: sourceNode.nextId }
-        step1Nodes = state.nodes.map(n => n.id === predNode!.id ? updatedPred : n)
-        step1HeadId = state.headId
+        // first is before_begin → head becomes last
+        step1HeadId = lastNode?.id ?? null
       }
       const step1State: ForwardListState = {
         nodes: step1Nodes,
@@ -296,11 +309,12 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
         nextNodeId: state.nextNodeId,
       }
 
-      // Substep 2: Set source.next = target.next
-      // Need to get target from step1 state (target might have been modified if it was pred)
-      const step1Target = step1Nodes.find(n => n.id === targetNode.id)!
-      const updatedSource2: FLNode = { ...sourceNode, nextId: step1Target.nextId }
-      const step2Nodes = step1Nodes.map(n => n.id === sourceNode.id ? updatedSource2 : n)
+      // Substep 2: Set subchain_tail.next = pos.next
+      const posNodeInStep1 = posNode ? step1Nodes.find(n => n.id === posNode.id)! : null
+      const afterPos = posNodeInStep1 ? posNodeInStep1.nextId : step1HeadId
+      const step2Nodes = step1Nodes.map(n =>
+        n.id === subchainTail.id ? { ...n, nextId: afterPos } : n
+      )
       const step2State: ForwardListState = {
         nodes: step2Nodes,
         headId: step1HeadId,
@@ -308,20 +322,31 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
         nextNodeId: state.nextNodeId,
       }
 
-      // Substep 3: Set target.next = source
-      const updatedTarget3: FLNode = { ...step1Target, nextId: sourceNode.id }
-      const step3Nodes = step2Nodes.map(n => n.id === targetNode.id ? updatedTarget3 : n)
+      // Substep 3: Set pos.next = subchain_head (or head = subchain_head if pos is before_begin)
+      let step3Nodes: FLNode[]
+      let step3HeadId: number | null
+      if (posNode !== null) {
+        step3Nodes = step2Nodes.map(n =>
+          n.id === posNode.id ? { ...n, nextId: subchainHead.id } : n
+        )
+        step3HeadId = step2State.headId
+      } else {
+        // pos = -1 (before_begin): subchain becomes the new head
+        step3Nodes = [...step2Nodes]
+        step3HeadId = subchainHead.id
+      }
       const step3State: ForwardListState = {
         nodes: step3Nodes,
-        headId: step1HeadId,
+        headId: step3HeadId,
         size: state.size,
         nextNodeId: state.nextNodeId,
       }
 
+      const rangeLen = rangeEnd - rangeStart + 1
       return [
-        { state: step1State, description: `Unlink source node (pos ${srcPos}) from predecessor` },
-        { state: step2State, description: `Set source.next = target.next` },
-        { state: step3State, description: `Set target.next = source` },
+        { state: step1State, description: `Unlink ${rangeLen} node${rangeLen > 1 ? 's' : ''} from range (${firstIdx}, ${lastIdx})` },
+        { state: step2State, description: `Set subchain tail.next = pos.next` },
+        { state: step3State, description: `Set pos.next = subchain head` },
       ]
     }
 
@@ -522,7 +547,7 @@ export const forwardListDS: DataStructure<ForwardListState> = {
     { name: 'pop_front', label: 'pop_front()', args: [] },
     { name: 'insert_after', label: 'insert_after(pos, val)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }, { name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'erase_after', label: 'erase_after(pos)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }] },
-    { name: 'splice_after', label: 'splice_after(dst, src)', args: [{ name: 'dst', label: 'Dest pos', defaultValue: 0 }, { name: 'src', label: 'Src pos', defaultValue: 1 }] },
+    { name: 'splice_after', label: 'splice_after(pos, first, last)', args: [{ name: 'pos', label: 'pos', defaultValue: 0 }, { name: 'first', label: 'first', defaultValue: 1 }, { name: 'last', label: 'last', defaultValue: 3 }] },
   ],
   createInitialState,
   applyOperation,
