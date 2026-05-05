@@ -13,6 +13,10 @@ export interface DequeState {
   chunkCap: number             // fixed chunk size (always 4)
   chunkBeg: number             // index of first element within first active chunk
   taille: number               // total number of elements
+  /** During map growth: the old map being replaced. */
+  oldChunks?: (number[] | null)[]
+  oldMapCap?: number
+  oldMapBeg?: number
 }
 
 // =============================================================================
@@ -117,34 +121,53 @@ function growMapSteps(state: DequeState): Step[] {
   const newMapCap = state.mapCap * 2
   const active = numActiveChunks(state)
 
-  // Step 1: Allocate new map
+  // Capture old map for visual display during transition
+  const oldChunks = state.chunks.map(c => c ? [...c] : null)
+  const oldMapCap = state.mapCap
+  const oldMapBeg = state.mapBeg
+
+  // Step 1: Allocate new empty map (old map still shown)
+  const newChunksEmpty: (number[] | null)[] = new Array(newMapCap).fill(null)
+  const newMapBeg = Math.floor((newMapCap - active) / 2)
   const step1: DequeState = {
-    ...state,
-    chunks: state.chunks.map(c => c ? [...c] : null),
+    chunks: newChunksEmpty.map(c => c ? [...c] : null),
+    mapCap: newMapCap,
+    mapBeg: newMapBeg,
+    chunkCap: state.chunkCap,
+    chunkBeg: state.chunkBeg,
+    taille: state.taille,
+    oldChunks, oldMapCap, oldMapBeg,
   }
   steps.push({ state: step1, description: `Allocate new map (capacity ${newMapCap})` })
 
-  // Step 2: Unwrap circular active chunks into center of new map
-  const newChunks: (number[] | null)[] = new Array(newMapCap).fill(null)
-  const newMapBeg = Math.floor((newMapCap - active) / 2)
+  // Step 2: Copy active chunk pointers from old to new (both shown)
+  const newChunksCopied: (number[] | null)[] = new Array(newMapCap).fill(null)
   for (let i = 0; i < active; i++) {
     const srcIdx = chunkPhysical(state, i)
-    newChunks[newMapBeg + i] = state.chunks[srcIdx]
+    newChunksCopied[newMapBeg + i] = state.chunks[srcIdx]
       ? [...state.chunks[srcIdx]!]
       : null
   }
   const step2: DequeState = {
-    chunks: newChunks.map(c => c ? [...c] : null),
+    chunks: newChunksCopied.map(c => c ? [...c] : null),
+    mapCap: newMapCap,
+    mapBeg: newMapBeg,
+    chunkCap: state.chunkCap,
+    chunkBeg: state.chunkBeg,
+    taille: state.taille,
+    oldChunks, oldMapCap, oldMapBeg,
+  }
+  steps.push({ state: step2, description: `Copy ${active} map pointer${active !== 1 ? 's' : ''} to new map` })
+
+  // Step 3: Delete old map (only new map remains)
+  const step3: DequeState = {
+    chunks: newChunksCopied.map(c => c ? [...c] : null),
     mapCap: newMapCap,
     mapBeg: newMapBeg,
     chunkCap: state.chunkCap,
     chunkBeg: state.chunkBeg,
     taille: state.taille,
   }
-  steps.push({ state: step2, description: `Copy ${active} map pointer${active !== 1 ? 's' : ''} to new map` })
-
-  // Step 3: Delete old map
-  const step3 = cloneState(step2)
   steps.push({ state: step3, description: `Delete old map` })
 
   return steps
@@ -364,6 +387,7 @@ const CHUNK_CELL_GAP = CELL_GAP
 function computeLayout(state: DequeState): DSLayout {
   const elements: FlatElement[] = []
   const arrows: DSArrow[] = []
+  const hasOldMap = state.oldChunks !== undefined
 
   // --- Struct fields row ---
   const fields: { name: string; displayValue: string; isPointer: boolean }[] = [
@@ -404,8 +428,40 @@ function computeLayout(state: DequeState): DSLayout {
     }
   }
 
-  // --- Map row ---
-  const mapRowY = STRUCT_Y + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_MAP_GAP
+  // --- Old map row (shown dimmed during growth, above new map) ---
+  let oldMapBottomY = STRUCT_Y + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_MAP_GAP
+
+  if (hasOldMap) {
+    const oldMapRowY = oldMapBottomY
+    const oldMapRowX = STRUCT_X
+
+    for (let i = 0; i < state.oldMapCap!; i++) {
+      const cellX = oldMapRowX + i * (CELL_SIZE + CELL_GAP)
+      const hasChunk = state.oldChunks![i] !== null
+
+      elements.push({
+        id: `cell:oldmap:${i}`,
+        x: cellX,
+        y: oldMapRowY,
+        width: CELL_SIZE,
+        height: CELL_SIZE,
+        kind: 'cell',
+        data: {
+          arrayName: 'oldmap',
+          index: i,
+          value: { num: 0, arrays: [] },
+          dimmed: !hasChunk,
+          displayOverride: hasChunk ? '•' : undefined,
+        } as CellData,
+        opacity: 0.4,
+      })
+    }
+
+    oldMapBottomY = oldMapRowY + CELL_SIZE + 20 // gap between old and new map
+  }
+
+  // --- New map row ---
+  const mapRowY = oldMapBottomY
   const mapRowX = STRUCT_X
 
   for (let i = 0; i < state.mapCap; i++) {
@@ -430,7 +486,7 @@ function computeLayout(state: DequeState): DSLayout {
     })
   }
 
-  // Arrow from map struct field to first map cell
+  // Arrow from map struct field to first new map cell
   if (state.mapCap > 0) {
     const firstMapCellCenterX = mapRowX + CELL_SIZE / 2
     arrows.push({
@@ -442,7 +498,7 @@ function computeLayout(state: DequeState): DSLayout {
     })
   }
 
-  // --- Chunk columns below map ---
+  // --- Chunk columns below new map ---
   const chunksTopY = mapRowY + CELL_SIZE + MAP_TO_CHUNKS_GAP
 
   for (let i = 0; i < state.mapCap; i++) {
@@ -487,8 +543,14 @@ function computeLayout(state: DequeState): DSLayout {
   }
 
   // --- Compute total dimensions ---
-  const rightEdge = mapRowX + state.mapCap * (CELL_SIZE + CELL_GAP) - CELL_GAP
-  const bottomEdge = chunksTopY + state.chunkCap * (CELL_SIZE + CHUNK_CELL_GAP) - CHUNK_CELL_GAP
+  const rightEdge = Math.max(
+    mapRowX + state.mapCap * (CELL_SIZE + CELL_GAP) - CELL_GAP,
+    hasOldMap ? STRUCT_X + state.oldMapCap! * (CELL_SIZE + CELL_GAP) - CELL_GAP : 0,
+  )
+  const hasChunks = state.chunks.some(c => c !== null)
+  const bottomEdge = hasChunks
+    ? chunksTopY + state.chunkCap * (CELL_SIZE + CHUNK_CELL_GAP) - CHUNK_CELL_GAP
+    : mapRowY + CELL_SIZE
 
   return {
     elements,

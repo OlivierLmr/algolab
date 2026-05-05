@@ -527,4 +527,40 @@ describe('deque: layout', () => {
       expect(layout.width).toBeGreaterThan(0)
     }
   })
+
+  it('shows old map cells during growth substeps', () => {
+    // Force map growth: fill all slots then push
+    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    // Fill all map slots by pushing
+    for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
+    for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
+    while (s.chunkBeg > 0) s = apply(s, 'push_front', { val: -99 })
+    // Next push_front triggers growth
+    const steps = applySteps(s, 'push_front', { val: -100 })
+    // Find the "Allocate new map" step
+    const allocStep = steps.find(st => st.description.includes('Allocate new map'))
+    expect(allocStep).toBeDefined()
+    const layout = dequeDS.computeLayout(allocStep!.state)
+    // Should have both old map cells and new map cells
+    const oldMapCells = layout.elements.filter(e => e.id.startsWith('cell:oldmap:'))
+    const newMapCells = layout.elements.filter(e => e.id.startsWith('cell:map:'))
+    expect(oldMapCells.length).toBe(s.mapCap)
+    expect(newMapCells.length).toBe(s.mapCap * 2)
+    // Old map cells should have reduced opacity
+    expect(oldMapCells[0].opacity).toBeLessThan(1.0)
+  })
+
+  it('old map disappears after delete step', () => {
+    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
+    for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
+    while (s.chunkBeg > 0) s = apply(s, 'push_front', { val: -99 })
+    const steps = applySteps(s, 'push_front', { val: -100 })
+    // Find the "Delete old map" step
+    const deleteStep = steps.find(st => st.description.includes('Delete old map'))
+    expect(deleteStep).toBeDefined()
+    const layout = dequeDS.computeLayout(deleteStep!.state)
+    const oldMapCells = layout.elements.filter(e => e.id.startsWith('cell:oldmap:'))
+    expect(oldMapCells.length).toBe(0)
+  })
 })
