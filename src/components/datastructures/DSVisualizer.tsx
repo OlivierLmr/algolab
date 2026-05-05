@@ -1,11 +1,14 @@
-import { useMemo } from 'preact/hooks'
-import { currentDSLayout } from '../../datastructures/state.ts'
+import { currentDSLayout, currentDSOp, currentDSDescription, isIntermediateSubstep, dsSubstepIndex } from '../../datastructures/state.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../../layout/types.ts'
 import { CELL_SIZE, DIMMED_OPACITY } from '../../layout/constants.ts'
 import { DSArrowOverlay } from './DSArrowOverlay.tsx'
 
 export function DSVisualizer() {
   const layout = currentDSLayout.value
+  const op = currentDSOp.value
+  const description = currentDSDescription.value
+  const isIntermediate = isIntermediateSubstep.value
+  const substepIdx = dsSubstepIndex.value
 
   if (!layout) {
     return <div class="viz-container" />
@@ -13,6 +16,14 @@ export function DSVisualizer() {
 
   return (
     <div class="viz-container">
+      {isIntermediate && op && (
+        <div class="ds-executing-banner">
+          <span class="ds-executing-label">Executing {op.label}...</span>
+          <span class="ds-executing-step">
+            step {substepIdx + 1}/{op.substeps.length}: {description}
+          </span>
+        </div>
+      )}
       <div
         class="viz-scene"
         style={{

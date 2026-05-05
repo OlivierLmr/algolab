@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { vectorDS, type VectorState } from '../src/datastructures/vector.ts'
 
+/** Apply operation and return the final state (last substep). */
 function apply(state: VectorState, op: string, args: Record<string, number> = {}): VectorState {
+  const substeps = vectorDS.applyOperation(state, op, args)
+  expect(substeps.length).toBeGreaterThan(0)
+  return substeps[substeps.length - 1].state
+}
+
+/** Apply operation and return all substeps. */
+function applySteps(state: VectorState, op: string, args: Record<string, number> = {}) {
   return vectorDS.applyOperation(state, op, args)
 }
 
@@ -250,5 +258,89 @@ describe('vector: layout', () => {
     expect(fields.length).toBe(3)
     const cells = layout.elements.filter(e => e.kind === 'cell')
     expect(cells.length).toBe(0)
+  })
+})
+
+describe('vector: substeps', () => {
+  it('push_back without realloc produces 1 substep', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    // capacity is 2, push triggers realloc, so first reserve
+    const reserved = apply(state, 'reserve', { cap: 8 })
+    const steps = applySteps(reserved, 'push_back', { val: 3 })
+    expect(steps.length).toBe(1)
+    expect(steps[0].description).toContain('Write')
+  })
+
+  it('push_back with realloc produces 3 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_back', { val: 3 })
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('Allocate')
+    expect(steps[1].description).toContain('Copy')
+    expect(steps[2].description).toContain('Write')
+    // Each substep has valid state
+    expect(steps[0].state.capacity).toBe(4)
+    expect(steps[0].state.size).toBe(2)
+    expect(steps[2].state.data.slice(0, 3)).toEqual([1, 2, 3])
+  })
+
+  it('insert with shift produces 2 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2, 3])
+    // capacity is 4, room for one more
+    const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
+    expect(steps.length).toBe(2)
+    expect(steps[0].description).toContain('Shift')
+    expect(steps[1].description).toContain('Write')
+    expect(steps[1].state.data.slice(0, 4)).toEqual([1, 99, 2, 3])
+  })
+
+  it('insert at end produces 1 substep (no shift needed)', () => {
+    const state = vectorDS.createInitialState([1, 2, 3])
+    const steps = applySteps(state, 'insert', { pos: 3, val: 4 })
+    expect(steps.length).toBe(1)
+    expect(steps[0].description).toContain('Write')
+  })
+
+  it('insert with realloc produces 4 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 0, val: 0 })
+    expect(steps.length).toBe(4)
+    expect(steps[0].description).toContain('Allocate')
+    expect(steps[1].description).toContain('Copy')
+    expect(steps[2].description).toContain('Shift')
+    expect(steps[3].description).toContain('Write')
+  })
+
+  it('erase from middle produces 2 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2, 3])
+    const steps = applySteps(state, 'erase', { pos: 0 })
+    expect(steps.length).toBe(2)
+    expect(steps[0].description).toContain('Shift')
+    expect(steps[1].description).toContain('Remove')
+  })
+
+  it('erase last element produces 1 substep (no shift)', () => {
+    const state = vectorDS.createInitialState([1, 2, 3])
+    const steps = applySteps(state, 'erase', { pos: 2 })
+    expect(steps.length).toBe(1)
+    expect(steps[0].description).toContain('Remove')
+  })
+
+  it('reserve produces 2 substeps', () => {
+    const state = vectorDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'reserve', { cap: 16 })
+    expect(steps.length).toBe(2)
+    expect(steps[0].description).toContain('Allocate')
+    expect(steps[1].description).toContain('Copy')
+  })
+
+  it('all intermediate substeps have valid renderable state', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
+    for (const step of steps) {
+      const layout = vectorDS.computeLayout(step.state)
+      expect(layout.elements.length).toBeGreaterThan(0)
+      expect(layout.width).toBeGreaterThan(0)
+    }
   })
 })

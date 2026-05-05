@@ -1,13 +1,13 @@
 import { useSignal } from '@preact/signals'
 import type { OperationDef } from '../../datastructures/types.ts'
 import {
-  currentDS, currentDSSnapshot,
+  currentDS, currentDSState,
   applyDSOp, initDS,
 } from '../../datastructures/state.ts'
 
 export function DSControls() {
   const ds = currentDS.value
-  const snapshot = currentDSSnapshot.value
+  const snapshot = currentDSState.value
   const inputText = useSignal('1, 2, 3, 4, 5')
 
   if (!snapshot) return null

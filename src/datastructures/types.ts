@@ -31,10 +31,16 @@ export interface OperationDef {
   args: ArgDef[]
 }
 
-/** Snapshot of a data structure state with metadata about what produced it. */
-export interface DSSnapshot<S> {
+/** A single intermediate step within an operation. */
+export interface DSSubstep<S> {
   state: S
-  label: string           // e.g. "push_back(42)" or "initial"
+  description: string     // e.g. "Allocate new array (capacity 16)"
+}
+
+/** A recorded operation with all its substeps. */
+export interface DSOperation {
+  label: string           // e.g. "insert(0, 99)" or "initial"
+  substeps: DSSubstep<any>[]
 }
 
 /**
@@ -42,13 +48,13 @@ export interface DSSnapshot<S> {
  * implements this interface with its own state type.
  *
  * The design separates state (pure data), operations (pure functions that produce
- * new states), and layout (pure function from state to visual elements). This
- * keeps each concern independently testable.
+ * new states with intermediate substeps), and layout (pure function from state to
+ * visual elements). This keeps each concern independently testable.
  */
 export interface DataStructure<S> {
   name: string
   operations: OperationDef[]
   createInitialState(values: number[]): S
-  applyOperation(state: S, op: string, args: Record<string, number>): S
+  applyOperation(state: S, op: string, args: Record<string, number>): DSSubstep<S>[]
   computeLayout(state: S): DSLayout
 }

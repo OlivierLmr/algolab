@@ -1,4 +1,4 @@
-import type { DataStructure, DSLayout, DSArrow } from './types.ts'
+import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
 import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
 
@@ -34,69 +34,102 @@ function createInitialState(values: number[]): VectorState {
   return { data, size, capacity }
 }
 
-function growIfNeeded(state: VectorState): VectorState {
-  if (state.size < state.capacity) return state
+type Step = DSSubstep<VectorState>
+
+/** Produce reallocation substeps if at capacity, returning the grown state. */
+function growSteps(state: VectorState): { steps: Step[]; grown: VectorState } {
+  if (state.size < state.capacity) return { steps: [], grown: state }
   const newCap = state.capacity === 0 ? 1 : state.capacity * 2
-  const newData = [...state.data]
-  while (newData.length < newCap) newData.push(0)
-  return { ...state, data: newData, capacity: newCap }
+  // Step 1: allocate
+  const allocData = new Array(newCap).fill(0)
+  const allocated: VectorState = { data: allocData, size: state.size, capacity: newCap }
+  // Step 2: copy
+  const copyData = [...allocData]
+  for (let i = 0; i < state.size; i++) copyData[i] = state.data[i]
+  const copied: VectorState = { data: copyData, size: state.size, capacity: newCap }
+  return {
+    steps: [
+      { state: allocated, description: `Allocate new array (capacity ${newCap})` },
+      { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''} to new array` },
+    ],
+    grown: copied,
+  }
 }
 
-function applyOperation(state: VectorState, op: string, args: Record<string, number>): VectorState {
+function applyOperation(state: VectorState, op: string, args: Record<string, number>): Step[] {
   switch (op) {
     case 'push_back': {
       const val = args.val ?? 0
-      const grown = growIfNeeded(state)
+      const { steps, grown } = growSteps(state)
       const data = [...grown.data]
       data[grown.size] = val
-      return { data, size: grown.size + 1, capacity: grown.capacity }
+      const final: VectorState = { data, size: grown.size + 1, capacity: grown.capacity }
+      return [...steps, { state: final, description: `Write ${val} at position ${grown.size}` }]
     }
     case 'pop_back': {
       if (state.size === 0) throw new Error('pop_back on empty vector')
       const data = [...state.data]
       data[state.size - 1] = 0
-      return { data, size: state.size - 1, capacity: state.capacity }
+      return [{ state: { data, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}` }]
     }
     case 'insert': {
       const pos = args.pos ?? 0
       const val = args.val ?? 0
       if (pos < 0 || pos > state.size) throw new Error(`insert position ${pos} out of range [0, ${state.size}]`)
-      const grown = growIfNeeded(state)
-      const data = [...grown.data]
-      // Shift elements right
-      for (let i = grown.size; i > pos; i--) {
-        data[i] = data[i - 1]
-      }
-      data[pos] = val
-      return { data, size: grown.size + 1, capacity: grown.capacity }
+      const { steps, grown } = growSteps(state)
+      // Shift right
+      const shifted = [...grown.data]
+      for (let i = grown.size; i > pos; i--) shifted[i] = shifted[i - 1]
+      shifted[pos] = 0  // placeholder before write
+      const shiftState: VectorState = { data: shifted, size: grown.size + 1, capacity: grown.capacity }
+      const shiftSteps: Step[] = grown.size > pos
+        ? [{ state: shiftState, description: `Shift elements [${pos}..${grown.size - 1}] right` }]
+        : []
+      // Write
+      const final = [...shifted]
+      final[pos] = val
+      const finalState: VectorState = { data: final, size: grown.size + 1, capacity: grown.capacity }
+      return [...steps, ...shiftSteps, { state: finalState, description: `Write ${val} at position ${pos}` }]
     }
     case 'erase': {
       const pos = args.pos ?? 0
       if (state.size === 0) throw new Error('erase on empty vector')
       if (pos < 0 || pos >= state.size) throw new Error(`erase position ${pos} out of range [0, ${state.size - 1}]`)
-      const data = [...state.data]
-      // Shift elements left
-      for (let i = pos; i < state.size - 1; i++) {
-        data[i] = data[i + 1]
+      const steps: Step[] = []
+      // Shift left
+      if (pos < state.size - 1) {
+        const shifted = [...state.data]
+        for (let i = pos; i < state.size - 1; i++) shifted[i] = shifted[i + 1]
+        shifted[state.size - 1] = state.data[state.size - 1]  // not yet cleared
+        steps.push({ state: { data: shifted, size: state.size, capacity: state.capacity }, description: `Shift elements [${pos + 1}..${state.size - 1}] left` })
       }
-      data[state.size - 1] = 0
-      return { data, size: state.size - 1, capacity: state.capacity }
+      // Remove last
+      const final = steps.length > 0 ? [...steps[steps.length - 1].state.data] : [...state.data]
+      final[state.size - 1] = 0
+      steps.push({ state: { data: final, size: state.size - 1, capacity: state.capacity }, description: `Remove element at position ${state.size - 1}` })
+      return steps
     }
     case 'reserve': {
       const cap = args.cap ?? 0
-      if (cap <= state.capacity) return state
-      const data = [...state.data]
-      while (data.length < cap) data.push(0)
-      return { data, size: state.size, capacity: cap }
+      if (cap <= state.capacity) return [{ state, description: 'No reallocation needed' }]
+      const allocData = new Array(cap).fill(0)
+      const allocated: VectorState = { data: allocData, size: state.size, capacity: cap }
+      const copyData = [...allocData]
+      for (let i = 0; i < state.size; i++) copyData[i] = state.data[i]
+      const copied: VectorState = { data: copyData, size: state.size, capacity: cap }
+      return [
+        { state: allocated, description: `Allocate new array (capacity ${cap})` },
+        { state: copied, description: `Copy ${state.size} element${state.size !== 1 ? 's' : ''}` },
+      ]
     }
     case 'clear': {
       const data = new Array(state.capacity).fill(0)
-      return { data, size: 0, capacity: state.capacity }
+      return [{ state: { data, size: 0, capacity: state.capacity }, description: 'Clear all elements' }]
     }
     case 'shrink_to_fit': {
-      if (state.capacity === state.size) return state
+      if (state.capacity === state.size) return [{ state, description: 'Already at minimum capacity' }]
       const data = state.data.slice(0, state.size)
-      return { data, size: state.size, capacity: state.size }
+      return [{ state: { data, size: state.size, capacity: state.size }, description: `Reallocate to exact size (${state.size})` }]
     }
     default:
       throw new Error(`Unknown operation: ${op}`)

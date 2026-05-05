@@ -13,7 +13,7 @@ import { DslDocs } from './components/DslDocs.tsx'
 import type { DescriptionSegment } from './types.ts'
 import { evaluateTooltip } from './tooltip.ts'
 import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth, sidebarOpen } from './state.ts'
-import { isDSMode } from './datastructures/state.ts'
+import { isDSMode, dsNext, dsPrev, dsNextSubstep, dsPrevSubstep } from './datastructures/state.ts'
 import { DSVisualizer } from './components/datastructures/DSVisualizer.tsx'
 import { DSControls } from './components/datastructures/DSControls.tsx'
 import { DSHistory } from './components/datastructures/DSHistory.tsx'
@@ -95,7 +95,13 @@ export function App() {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (dsMode) return
+      if (dsMode) {
+        if (e.shiftKey && e.key === 'ArrowRight') { e.preventDefault(); dsNextSubstep() }
+        else if (e.shiftKey && e.key === 'ArrowLeft') { e.preventDefault(); dsPrevSubstep() }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); dsNext() }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); dsPrev() }
+        return
+      }
       if (e.shiftKey && e.key === 'ArrowRight') { e.preventDefault(); stepOver() }
       else if (e.shiftKey && e.key === 'ArrowLeft') { e.preventDefault(); stepOverBack() }
       else if (e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); stepOut() }

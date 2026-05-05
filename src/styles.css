@@ -1062,11 +1062,18 @@ body {
   cursor: default;
 }
 
-.ds-history-log {
+.ds-history-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ds-history-ops {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  flex: 1;
   font-size: 12px;
   font-family: monospace;
   color: #aaa;
@@ -1076,16 +1083,65 @@ body {
   padding: 1px 6px;
   border-radius: 3px;
   background: #f5f5f5;
+  cursor: pointer;
 }
 
-.ds-history-current {
-  background: #e0e8f0;
-  color: #333;
+.ds-history-entry:hover {
+  background: #e8e8e8;
+}
+
+.ds-history-substeps {
+  display: flex;
+  gap: 6px;
+  padding-left: 2px;
+}
+
+.ds-substep-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  border: 1.5px solid #bbb;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.ds-substep-dot:hover {
+  background: #ccc;
+}
+
+.ds-substep-visited {
+  background: #a0c4e8;
+  border-color: #6a9fca;
+}
+
+.ds-substep-current {
+  background: #4a90d9;
+  border-color: #2b6cb0;
+}
+
+/* DS Executing banner */
+.ds-executing-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #fef9e7;
+  border: 1px solid #f0d060;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.ds-executing-label {
   font-weight: 600;
+  font-family: monospace;
+  color: #7a5f00;
 }
 
-.ds-history-future {
-  opacity: 0.4;
+.ds-executing-step {
+  color: #666;
+  font-style: italic;
 }
 
 /* DS struct field */
