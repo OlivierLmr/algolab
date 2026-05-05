@@ -1043,14 +1043,40 @@ body {
   min-height: 36px;
 }
 
+.ds-history-nav {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .ds-history-btn {
-  padding: 2px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 8px 2px;
   font-size: 14px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
   flex-shrink: 0;
+  min-width: 32px;
+}
+
+.ds-history-btn .ds-btn-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ds-history-btn .ds-btn-shortcut {
+  font-size: 9px;
+  color: #999;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.ds-history-btn-sub {
+  border-style: dashed;
 }
 
 .ds-history-btn:hover:not(:disabled) {
