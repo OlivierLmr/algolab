@@ -117,10 +117,10 @@ function DSCellElement({ el }: { el: FlatElement }) {
         }}
       >
         <span class="viz-cell-value">
-          {data.dimmed ? '' : String(data.value.num)}
+          {data.dimmed ? '' : (data.displayOverride ?? String(data.value.num))}
         </span>
       </div>
-      <div class="viz-cell-index">{data.index}</div>
+      {data.index >= 0 && <div class="viz-cell-index">{data.index}</div>}
     </div>
   )
 }

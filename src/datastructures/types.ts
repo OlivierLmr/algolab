@@ -1,12 +1,14 @@
 import type { FlatElement } from '../layout/types.ts'
 
-/** Arrow drawn from a struct field to an internal memory structure. */
+/** Arrow drawn between elements in a data structure visualization. */
 export interface DSArrow {
   fromX: number
   fromY: number
   toX: number
   toY: number
   color?: string
+  /** 's-curve' for vertical struct→array arrows, 'straight' for horizontal node→node. Default: 's-curve'. */
+  style?: 's-curve' | 'straight'
 }
 
 /** Layout output for a data structure visualization. */

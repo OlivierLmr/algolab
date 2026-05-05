@@ -62,15 +62,16 @@ describe('forward_list: push_front', () => {
     expect(head.nextId).toBe(0) // points to old head
   })
 
-  it('produces 2 substeps', () => {
+  it('produces 3 substeps (create, link, update head)', () => {
     const state = forwardListDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_front', { val: 0 })
-    expect(steps.length).toBe(2)
+    expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('Create new node')
-    expect(steps[1].description).toContain('head')
+    expect(steps[1].description).toContain('new.next')
+    expect(steps[2].description).toContain('head')
   })
 
-  it('first substep has unlinked node', () => {
+  it('first substep has unlinked floating node', () => {
     const state = forwardListDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_front', { val: 0 })
     // In substep 1, the new node exists but head hasn't changed
@@ -78,6 +79,14 @@ describe('forward_list: push_front', () => {
     const newNode = steps[0].state.nodes.find(n => n.id === state.nextNodeId)!
     expect(newNode.value).toBe(0)
     expect(newNode.nextId).toBeNull()
+  })
+
+  it('second substep links new.next = head but head not yet updated', () => {
+    const state = forwardListDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_front', { val: 0 })
+    const newNode = steps[1].state.nodes.find(n => n.id === state.nextNodeId)!
+    expect(newNode.nextId).toBe(state.headId)
+    expect(steps[1].state.headId).toBe(state.headId) // head not yet changed
   })
 })
 
@@ -161,12 +170,20 @@ describe('forward_list: insert_after', () => {
     expect(() => apply(state, 'insert_after', { pos: 0, val: 1 })).toThrow()
   })
 
-  it('produces 2 substeps', () => {
+  it('produces 3 substeps (create, link new.next, link target.next)', () => {
     const state = forwardListDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'insert_after', { pos: 1, val: 99 })
-    expect(steps.length).toBe(2)
+    expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('Create new node')
-    expect(steps[1].description).toContain('Link')
+    expect(steps[1].description).toContain('new.next')
+    expect(steps[2].description).toContain('target.next')
+  })
+
+  it('first substep has floating node not yet linked', () => {
+    const state = forwardListDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'insert_after', { pos: 0, val: 99 })
+    const newNode = steps[0].state.nodes.find(n => n.id === state.nextNodeId)!
+    expect(newNode.nextId).toBeNull() // not linked yet
   })
 })
 
@@ -209,8 +226,60 @@ describe('forward_list: erase_after', () => {
     const state = forwardListDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'erase_after', { pos: 0 })
     expect(steps.length).toBe(2)
-    expect(steps[0].description).toContain('Unlink')
+    expect(steps[0].description).toContain('target.next')
     expect(steps[1].description).toContain('Delete')
+  })
+})
+
+describe('forward_list: splice_after', () => {
+  it('moves node from one position to after another', () => {
+    const state = forwardListDS.createInitialState([10, 20, 30, 40])
+    // Move node at pos 2 (value 30) to after pos 0 (value 10)
+    const s2 = apply(state, 'splice_after', { dst: 0, src: 2 })
+    // Expected: 10 -> 30 -> 20 -> 40
+    let currentId = s2.headId
+    const values: number[] = []
+    while (currentId !== null) {
+      const node = s2.nodes.find(n => n.id === currentId)!
+      values.push(node.value)
+      currentId = node.nextId
+    }
+    expect(values).toEqual([10, 30, 20, 40])
+  })
+
+  it('moves head node', () => {
+    const state = forwardListDS.createInitialState([10, 20, 30])
+    // Move head (pos 0, value 10) to after pos 1 (value 20)
+    const s2 = apply(state, 'splice_after', { dst: 1, src: 0 })
+    // Expected: 20 -> 10 -> 30
+    let currentId = s2.headId
+    const values: number[] = []
+    while (currentId !== null) {
+      const node = s2.nodes.find(n => n.id === currentId)!
+      values.push(node.value)
+      currentId = node.nextId
+    }
+    expect(values).toEqual([20, 10, 30])
+  })
+
+  it('produces 3 substeps', () => {
+    const state = forwardListDS.createInitialState([1, 2, 3])
+    const steps = applySteps(state, 'splice_after', { dst: 0, src: 2 })
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('Unlink')
+    expect(steps[1].description).toContain('source.next')
+    expect(steps[2].description).toContain('target.next')
+  })
+
+  it('throws when dst equals src', () => {
+    const state = forwardListDS.createInitialState([1, 2, 3])
+    expect(() => apply(state, 'splice_after', { dst: 1, src: 1 })).toThrow()
+  })
+
+  it('throws on invalid positions', () => {
+    const state = forwardListDS.createInitialState([1, 2])
+    expect(() => apply(state, 'splice_after', { dst: -1, src: 0 })).toThrow()
+    expect(() => apply(state, 'splice_after', { dst: 0, src: 2 })).toThrow()
   })
 })
 
@@ -222,11 +291,22 @@ describe('forward_list: layout', () => {
     expect(fields.length).toBe(2) // head, size
   })
 
-  it('produces node cells for each node', () => {
+  it('produces two cells per node (value + pointer)', () => {
     const state = forwardListDS.createInitialState([10, 20, 30])
     const layout = forwardListDS.computeLayout(state)
     const cells = layout.elements.filter(e => e.kind === 'cell')
-    expect(cells.length).toBe(3)
+    expect(cells.length).toBe(6) // 3 nodes × 2 cells each
+  })
+
+  it('pointer cells have displayOverride', () => {
+    const state = forwardListDS.createInitialState([10, 20])
+    const layout = forwardListDS.computeLayout(state)
+    const ptrCells = layout.elements.filter(e => e.id.endsWith(':ptr'))
+    expect(ptrCells.length).toBe(2)
+    // First node's ptr should be "•" (points to next)
+    expect((ptrCells[0].data as any).displayOverride).toBe('•')
+    // Last node's ptr should be "∅" (null)
+    expect((ptrCells[1].data as any).displayOverride).toBe('×')
   })
 
   it('produces straight arrows between consecutive nodes', () => {
@@ -251,7 +331,6 @@ describe('forward_list: layout', () => {
     const labels = layout.elements.filter(e => e.kind === 'array-label')
     expect(labels.length).toBe(1)
     expect((labels[0].data as any).text).toBe('∅')
-    // No arrows when empty
     expect(layout.arrows.length).toBe(0)
   })
 
@@ -269,6 +348,31 @@ describe('forward_list: layout', () => {
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
     expect(straightArrows.length).toBe(0)
     expect(sCurveArrows.length).toBe(1)
+  })
+
+  it('floating node in intermediate substep renders below', () => {
+    const state = forwardListDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_front', { val: 0 })
+    // Step 0: new node is floating (not reachable from head)
+    const layout = forwardListDS.computeLayout(steps[0].state)
+    const cells = layout.elements.filter(e => e.kind === 'cell')
+    expect(cells.length).toBe(6) // 2 linked nodes + 1 floating node, each 2 cells
+    // Floating node cells should be below (higher Y value)
+    const linkedCells = cells.filter(e => !e.id.includes(`:${state.nextNodeId}:`))
+    const floatingCells = cells.filter(e => e.id.includes(`:${state.nextNodeId}:`))
+    expect(floatingCells[0].y).toBeGreaterThan(linkedCells[0].y)
+  })
+
+  it('floating node with next pointer has an arrow to target', () => {
+    const state = forwardListDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_front', { val: 0 })
+    // Step 1: new.next = head (floating node now points to node 0)
+    const layout = forwardListDS.computeLayout(steps[1].state)
+    // Should have: 1 straight arrow (1→2 linked) + 1 straight arrow (floating→node0) + 1 s-curve (head field→node0)
+    const straightArrows = layout.arrows.filter(a => a.style === 'straight')
+    expect(straightArrows.length).toBeGreaterThanOrEqual(2) // linked→linked + floating→linked
+    const sCurves = layout.arrows.filter(a => a.style === 's-curve')
+    expect(sCurves.length).toBe(1) // head field → first node only
   })
 
   it('all substeps produce valid layouts', () => {

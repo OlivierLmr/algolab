@@ -13,6 +13,8 @@ export interface CellData {
   dimmed: boolean
   /** Gauge fill ratio (0–1), undefined if not gauged. */
   gaugeRatio?: number
+  /** Override the displayed text (e.g. "•" or "∅" for pointer cells). */
+  displayOverride?: string
 }
 
 export interface LabelData {

@@ -2,9 +2,11 @@ import { signal, computed } from '@preact/signals'
 import type { DataStructure, DSOperation, DSLayout } from './types.ts'
 import { vectorDS } from './vector.ts'
 import { forwardListDS } from './forward-list.ts'
+import { listDS } from './list.ts'
+import { dequeDS } from './deque.ts'
 
 // Registry of available data structures
-export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS]
+export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS, listDS, dequeDS]
 
 // Mode and selection
 export const isDSMode = signal(false)

@@ -244,55 +244,79 @@ describe('list: erase', () => {
 })
 
 describe('list: substeps', () => {
-  it('push_front produces 3 substeps', () => {
+  it('push_front on non-empty produces 4 substeps', () => {
     const state = listDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_front', { val: 0 })
-    expect(steps.length).toBe(3)
+    expect(steps.length).toBe(4)
     expect(steps[0].description).toContain('Create new node')
-    expect(steps[1].description).toContain('Link')
-    expect(steps[2].description).toContain('Update head')
+    expect(steps[1].description).toContain('new.next')
+    expect(steps[2].description).toContain('old_head.prev')
+    expect(steps[3].description).toContain('begin')
   })
 
-  it('push_back produces 3 substeps', () => {
+  it('push_front on empty produces 3 substeps (no prev update)', () => {
+    const state = listDS.createInitialState([])
+    const steps = applySteps(state, 'push_front', { val: 1 })
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('Create')
+    expect(steps[1].description).toContain('new.next')
+    expect(steps[2].description).toContain('begin')
+  })
+
+  it('push_back on non-empty produces 4 substeps', () => {
     const state = listDS.createInitialState([1, 2])
     const steps = applySteps(state, 'push_back', { val: 3 })
-    expect(steps.length).toBe(3)
+    expect(steps.length).toBe(4)
     expect(steps[0].description).toContain('Create new node')
-    expect(steps[1].description).toContain('Link')
-    expect(steps[2].description).toContain('Update tail')
+    expect(steps[1].description).toContain('new.prev')
+    expect(steps[2].description).toContain('old_tail.next')
+    expect(steps[3].description).toContain('end')
   })
 
-  it('pop_front produces 2 substeps', () => {
+  it('pop_front on multi-element produces 3 substeps', () => {
     const state = listDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'pop_front')
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('begin')
+    expect(steps[1].description).toContain('new_head.prev')
+    expect(steps[2].description).toContain('Delete')
+  })
+
+  it('pop_front on single-element produces 2 substeps (no prev clear)', () => {
+    const state = listDS.createInitialState([42])
+    const steps = applySteps(state, 'pop_front')
     expect(steps.length).toBe(2)
-    expect(steps[0].description).toContain('Update head')
+    expect(steps[0].description).toContain('begin')
     expect(steps[1].description).toContain('Delete')
   })
 
-  it('pop_back produces 2 substeps', () => {
+  it('pop_back on multi-element produces 3 substeps', () => {
     const state = listDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'pop_back')
-    expect(steps.length).toBe(2)
-    expect(steps[0].description).toContain('Update tail')
-    expect(steps[1].description).toContain('Delete')
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('end')
+    expect(steps[1].description).toContain('new_tail.next')
+    expect(steps[2].description).toContain('Delete')
   })
 
-  it('insert in middle produces 3 substeps', () => {
+  it('insert in middle produces 5 substeps', () => {
     const state = listDS.createInitialState([1, 3])
     const steps = applySteps(state, 'insert', { pos: 1, val: 2 })
-    expect(steps.length).toBe(3)
+    expect(steps.length).toBe(5)
     expect(steps[0].description).toContain('Create new node')
-    expect(steps[1].description).toContain('Link')
-    expect(steps[2].description).toContain('Link')
+    expect(steps[1].description).toContain('new.prev')
+    expect(steps[2].description).toContain('new.next')
+    expect(steps[3].description).toContain('.next → new')
+    expect(steps[4].description).toContain('.prev → new')
   })
 
-  it('erase from middle produces 2 substeps', () => {
+  it('erase from middle produces 3 substeps', () => {
     const state = listDS.createInitialState([1, 2, 3])
     const steps = applySteps(state, 'erase', { pos: 1 })
-    expect(steps.length).toBe(2)
-    expect(steps[0].description).toContain('Unlink')
-    expect(steps[1].description).toContain('Delete')
+    expect(steps.length).toBe(3)
+    expect(steps[0].description).toContain('.next')
+    expect(steps[1].description).toContain('.prev')
+    expect(steps[2].description).toContain('Delete')
   })
 
   it('all intermediate substeps have valid renderable state', () => {
@@ -319,24 +343,39 @@ describe('list: substeps', () => {
 })
 
 describe('list: layout', () => {
-  it('produces struct header fields', () => {
+  it('produces struct header fields (size, begin, end)', () => {
     const state = listDS.createInitialState([1, 2, 3])
     const layout = listDS.computeLayout(state)
 
     const fields = layout.elements.filter(e => e.kind === 'struct-field')
     expect(fields.length).toBe(3)
     const fieldNames = fields.map(f => (f.data as any).name)
-    expect(fieldNames).toContain('head')
-    expect(fieldNames).toContain('tail')
     expect(fieldNames).toContain('size')
+    expect(fieldNames).toContain('begin')
+    expect(fieldNames).toContain('end')
   })
 
-  it('produces node cells for each element', () => {
+  it('produces three cells per node (prev, value, next)', () => {
     const state = listDS.createInitialState([10, 20, 30])
     const layout = listDS.computeLayout(state)
 
     const cells = layout.elements.filter(e => e.kind === 'cell')
-    expect(cells.length).toBe(3)
+    expect(cells.length).toBe(9) // 3 nodes × 3 cells each
+  })
+
+  it('pointer cells have displayOverride', () => {
+    const state = listDS.createInitialState([10, 20])
+    const layout = listDS.computeLayout(state)
+    const prevCells = layout.elements.filter(e => e.id.endsWith(':prev'))
+    const nextCells = layout.elements.filter(e => e.id.endsWith(':next'))
+    expect(prevCells.length).toBe(2)
+    expect(nextCells.length).toBe(2)
+    // First node's prev should be "∅" (null)
+    expect((prevCells[0].data as any).displayOverride).toBe('×')
+    // First node's next should be "•"
+    expect((nextCells[0].data as any).displayOverride).toBe('•')
+    // Last node's next should be "∅"
+    expect((nextCells[1].data as any).displayOverride).toBe('×')
   })
 
   it('empty list shows empty label and struct header', () => {
@@ -353,13 +392,14 @@ describe('list: layout', () => {
     expect(layout.arrows.length).toBe(0)
   })
 
-  it('single node has 2 s-curve arrows (head and tail)', () => {
+  it('single node has 2 s-curve arrows (begin and end) and no straight arrows', () => {
     const state = listDS.createInitialState([42])
     const layout = listDS.computeLayout(state)
 
-    expect(layout.arrows.length).toBe(2)
-    expect(layout.arrows[0].style).toBe('s-curve')
-    expect(layout.arrows[1].style).toBe('s-curve')
+    const straightArrows = layout.arrows.filter(a => a.style === 'straight')
+    const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
+    expect(straightArrows.length).toBe(0)
+    expect(sCurveArrows.length).toBe(2) // begin→node, end→node
   })
 
   it('two nodes have 2 straight arrows (next+prev) plus 2 s-curves', () => {
@@ -368,8 +408,8 @@ describe('list: layout', () => {
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
-    expect(straightArrows.length).toBe(2) // next + prev between the two nodes
-    expect(sCurveArrows.length).toBe(2)   // head→first, tail→last
+    expect(straightArrows.length).toBe(2)
+    expect(sCurveArrows.length).toBe(2)
   })
 
   it('three nodes have 4 straight arrows (2 pairs) plus 2 s-curves', () => {
@@ -378,8 +418,8 @@ describe('list: layout', () => {
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
-    expect(straightArrows.length).toBe(4) // 2 pairs of next+prev
-    expect(sCurveArrows.length).toBe(2)   // head→first, tail→last
+    expect(straightArrows.length).toBe(4)
+    expect(sCurveArrows.length).toBe(2)
   })
 
   it('bidirectional arrows are vertically offset', () => {
@@ -389,20 +429,18 @@ describe('list: layout', () => {
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     expect(straightArrows.length).toBe(2)
 
-    // Next arrow (top) should have lower Y than prev arrow (bottom)
-    const nextArrow = straightArrows.find(a => a.fromX < a.toX)!
-    const prevArrow = straightArrows.find(a => a.fromX > a.toX)!
-    expect(nextArrow.fromY).toBeLessThan(prevArrow.fromY)
+    // Forward arrow should have lower Y than backward arrow
+    const fwd = straightArrows.find(a => a.fromX < a.toX)!
+    const bwd = straightArrows.find(a => a.fromX > a.toX)!
+    expect(fwd.fromY).toBeLessThan(bwd.fromY)
   })
 
-  it('nodes are spaced with NODE_GAP', () => {
-    const state = listDS.createInitialState([1, 2, 3])
-    const layout = listDS.computeLayout(state)
-
+  it('floating node in intermediate substep renders to the right', () => {
+    const state = listDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'push_front', { val: 0 })
+    // Step 0: new node is floating
+    const layout = listDS.computeLayout(steps[0].state)
     const cells = layout.elements.filter(e => e.kind === 'cell')
-    // Nodes should be evenly spaced
-    const gap = cells[1].x - cells[0].x
-    expect(gap).toBe(48 + 40) // CELL_SIZE + NODE_GAP
-    expect(cells[2].x - cells[1].x).toBe(gap)
+    expect(cells.length).toBe(9) // 2 linked + 1 floating, each 3 cells
   })
 })

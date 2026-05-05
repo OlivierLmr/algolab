@@ -1,6 +1,6 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
-import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT, DIMMED_OPACITY } from '../layout/constants.ts'
+import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
 
 // --- State ---
 
@@ -17,6 +17,8 @@ export interface ListState {
   tailId: number | null
   size: number
   nextNodeId: number
+  /** Hint for layout: position of the anchor node that a floating node should appear below. */
+  floatingAnchorIdx?: number
 }
 
 // --- Layout constants ---
@@ -26,7 +28,9 @@ const STRUCT_Y = 40
 const FIELD_GAP = CELL_GAP
 const FIELD_LABEL_HEIGHT = 70
 const STRUCT_TO_ARRAY_GAP = 60
-const NODE_GAP = 40 // Wider gap to fit bidirectional arrows
+const NODE_GAP = 50
+/** Width of a single triple-cell node: prev + value + next with internal gaps. */
+const NODE_WIDTH = 3 * CELL_SIZE + 2 * CELL_GAP
 
 // --- Helpers ---
 
@@ -50,7 +54,10 @@ function cloneState(state: ListState): ListState {
 function orderedNodeIds(state: ListState): number[] {
   const ids: number[] = []
   let current = state.headId
+  const visited = new Set<number>()
   while (current !== null) {
+    if (visited.has(current)) break
+    visited.add(current)
     ids.push(current)
     current = getNode(state, current).nextId
   }
@@ -96,7 +103,7 @@ function createInitialState(values: number[]): ListState {
 function pushFront(state: ListState, val: number): Step[] {
   const steps: Step[] = []
 
-  // Step 1: Create new node
+  // Step 1: Create new node (floating, prev=null, next=null)
   const s1 = cloneState(state)
   const newNode: DLLNode = {
     id: s1.nextNodeId,
@@ -106,25 +113,33 @@ function pushFront(state: ListState, val: number): Step[] {
   }
   s1.nodes.push(newNode)
   s1.nextNodeId++
+  s1.floatingAnchorIdx = 0
   steps.push({ state: s1, description: `Create new node with value ${val}` })
 
-  // Step 2: Link new node to current head
+  // Step 2: Set new.next = head
   const s2 = cloneState(s1)
-  const n2 = getNode(s2, newNode.id)
-  n2.nextId = s2.headId
-  if (s2.headId !== null) {
-    getNode(s2, s2.headId).prevId = newNode.id
-  }
-  steps.push({ state: s2, description: `Link: new.next → head${s2.headId !== null ? `, head.prev → new` : ''}` })
+  getNode(s2, newNode.id).nextId = s2.headId
+  s2.floatingAnchorIdx = 0
+  steps.push({ state: s2, description: `Set new.next → head` })
 
-  // Step 3: Update head (and tail if list was empty)
-  const s3 = cloneState(s2)
-  s3.headId = newNode.id
-  if (s3.tailId === null) {
-    s3.tailId = newNode.id
+  // Step 3: Set old_head.prev = new (skip if list was empty)
+  if (state.headId !== null) {
+    const s3 = cloneState(s2)
+    getNode(s3, state.headId).prevId = newNode.id
+    s3.floatingAnchorIdx = 0
+    steps.push({ state: s3, description: `Set old_head.prev → new` })
   }
-  s3.size++
-  steps.push({ state: s3, description: `Update head → new node, size = ${s3.size}` })
+
+  // Step 4: Set begin = new, size++
+  const sPrev = steps[steps.length - 1].state
+  const s4 = cloneState(sPrev)
+  s4.headId = newNode.id
+  if (s4.tailId === null) {
+    s4.tailId = newNode.id
+  }
+  s4.size++
+  delete s4.floatingAnchorIdx
+  steps.push({ state: s4, description: `Set begin → new, size = ${s4.size}` })
 
   return steps
 }
@@ -132,7 +147,7 @@ function pushFront(state: ListState, val: number): Step[] {
 function pushBack(state: ListState, val: number): Step[] {
   const steps: Step[] = []
 
-  // Step 1: Create new node
+  // Step 1: Create new node (floating, prev=null, next=null)
   const s1 = cloneState(state)
   const newNode: DLLNode = {
     id: s1.nextNodeId,
@@ -142,25 +157,33 @@ function pushBack(state: ListState, val: number): Step[] {
   }
   s1.nodes.push(newNode)
   s1.nextNodeId++
+  s1.floatingAnchorIdx = Math.max(0, state.size - 1)
   steps.push({ state: s1, description: `Create new node with value ${val}` })
 
-  // Step 2: Link new node to current tail
+  // Step 2: Set new.prev = tail
   const s2 = cloneState(s1)
-  const n2 = getNode(s2, newNode.id)
-  n2.prevId = s2.tailId
-  if (s2.tailId !== null) {
-    getNode(s2, s2.tailId).nextId = newNode.id
-  }
-  steps.push({ state: s2, description: `Link: new.prev → tail${s2.tailId !== null ? `, tail.next → new` : ''}` })
+  getNode(s2, newNode.id).prevId = s2.tailId
+  s2.floatingAnchorIdx = Math.max(0, state.size - 1)
+  steps.push({ state: s2, description: `Set new.prev → tail` })
 
-  // Step 3: Update tail (and head if list was empty)
-  const s3 = cloneState(s2)
-  s3.tailId = newNode.id
-  if (s3.headId === null) {
-    s3.headId = newNode.id
+  // Step 3: Set old_tail.next = new (skip if list was empty)
+  if (state.tailId !== null) {
+    const s3 = cloneState(s2)
+    getNode(s3, state.tailId).nextId = newNode.id
+    s3.floatingAnchorIdx = Math.max(0, state.size - 1)
+    steps.push({ state: s3, description: `Set old_tail.next → new` })
   }
-  s3.size++
-  steps.push({ state: s3, description: `Update tail → new node, size = ${s3.size}` })
+
+  // Step 4: Set end = new, size++
+  const sPrev = steps[steps.length - 1].state
+  const s4 = cloneState(sPrev)
+  s4.tailId = newNode.id
+  if (s4.headId === null) {
+    s4.headId = newNode.id
+  }
+  s4.size++
+  delete s4.floatingAnchorIdx
+  steps.push({ state: s4, description: `Set end → new, size = ${s4.size}` })
 
   return steps
 }
@@ -170,23 +193,29 @@ function popFront(state: ListState): Step[] {
   const steps: Step[] = []
 
   const oldHeadId = state.headId!
+  const oldHead = getNode(state, oldHeadId)
 
-  // Step 1: Update head to head.next, clear new head's prev
+  // Step 1: Set begin = head.next, size--
   const s1 = cloneState(state)
-  const oldHead = getNode(s1, oldHeadId)
   s1.headId = oldHead.nextId
-  if (s1.headId !== null) {
-    getNode(s1, s1.headId).prevId = null
-  } else {
+  if (s1.headId === null) {
     s1.tailId = null
   }
-  steps.push({ state: s1, description: `Update head → head.next${s1.headId !== null ? `, clear new head.prev` : ', list now empty'}` })
+  s1.size--
+  steps.push({ state: s1, description: `Set begin → head.next, size = ${s1.size}` })
 
-  // Step 2: Delete old head, decrement size
-  const s2 = cloneState(s1)
-  s2.nodes = s2.nodes.filter(n => n.id !== oldHeadId)
-  s2.size--
-  steps.push({ state: s2, description: `Delete old head node, size = ${s2.size}` })
+  // Step 2: Set new_head.prev = null (skip if list now empty)
+  if (s1.headId !== null) {
+    const s2 = cloneState(s1)
+    getNode(s2, s2.headId!).prevId = null
+    steps.push({ state: s2, description: `Set new_head.prev → null` })
+  }
+
+  // Step 3: Delete old head node
+  const sPrev = steps[steps.length - 1].state
+  const s3 = cloneState(sPrev)
+  s3.nodes = s3.nodes.filter(n => n.id !== oldHeadId)
+  steps.push({ state: s3, description: `Delete old head node` })
 
   return steps
 }
@@ -196,23 +225,29 @@ function popBack(state: ListState): Step[] {
   const steps: Step[] = []
 
   const oldTailId = state.tailId!
+  const oldTail = getNode(state, oldTailId)
 
-  // Step 1: Update tail to tail.prev, clear new tail's next
+  // Step 1: Set end = tail.prev, size--
   const s1 = cloneState(state)
-  const oldTail = getNode(s1, oldTailId)
   s1.tailId = oldTail.prevId
-  if (s1.tailId !== null) {
-    getNode(s1, s1.tailId).nextId = null
-  } else {
+  if (s1.tailId === null) {
     s1.headId = null
   }
-  steps.push({ state: s1, description: `Update tail → tail.prev${s1.tailId !== null ? `, clear new tail.next` : ', list now empty'}` })
+  s1.size--
+  steps.push({ state: s1, description: `Set end → tail.prev, size = ${s1.size}` })
 
-  // Step 2: Delete old tail, decrement size
-  const s2 = cloneState(s1)
-  s2.nodes = s2.nodes.filter(n => n.id !== oldTailId)
-  s2.size--
-  steps.push({ state: s2, description: `Delete old tail node, size = ${s2.size}` })
+  // Step 2: Set new_tail.next = null (skip if list now empty)
+  if (s1.tailId !== null) {
+    const s2 = cloneState(s1)
+    getNode(s2, s2.tailId!).nextId = null
+    steps.push({ state: s2, description: `Set new_tail.next → null` })
+  }
+
+  // Step 3: Delete old tail node
+  const sPrev = steps[steps.length - 1].state
+  const s3 = cloneState(sPrev)
+  s3.nodes = s3.nodes.filter(n => n.id !== oldTailId)
+  steps.push({ state: s3, description: `Delete old tail node` })
 
   return steps
 }
@@ -220,7 +255,7 @@ function popBack(state: ListState): Step[] {
 function insert(state: ListState, pos: number, val: number): Step[] {
   if (pos < 0 || pos > state.size) throw new Error(`insert position ${pos} out of range [0, ${state.size}]`)
 
-  // Delegate edge cases to push_front/push_back
+  // Delegate edge cases
   if (pos === 0) return pushFront(state, val)
   if (pos === state.size) return pushBack(state, val)
 
@@ -228,7 +263,7 @@ function insert(state: ListState, pos: number, val: number): Step[] {
   const nodeAtPos = getNodeAtPos(state, pos)
   const prevNode = getNodeAtPos(state, pos - 1)
 
-  // Step 1: Create new node
+  // Step 1: Create new node (floating)
   const s1 = cloneState(state)
   const newNode: DLLNode = {
     id: s1.nextNodeId,
@@ -238,21 +273,31 @@ function insert(state: ListState, pos: number, val: number): Step[] {
   }
   s1.nodes.push(newNode)
   s1.nextNodeId++
+  s1.floatingAnchorIdx = pos
   steps.push({ state: s1, description: `Create new node with value ${val}` })
 
-  // Step 2: Link new node's prev and next
+  // Step 2: Set new.prev = node[pos-1]
   const s2 = cloneState(s1)
-  const n2 = getNode(s2, newNode.id)
-  n2.prevId = prevNode.id
-  n2.nextId = nodeAtPos.id
-  steps.push({ state: s2, description: `Link: new.prev → node[${pos - 1}], new.next → node[${pos}]` })
+  getNode(s2, newNode.id).prevId = prevNode.id
+  s2.floatingAnchorIdx = pos
+  steps.push({ state: s2, description: `Set new.prev → node[${pos - 1}]` })
 
-  // Step 3: Update neighbors to point to new node
+  // Step 3: Set new.next = node[pos]
   const s3 = cloneState(s2)
-  getNode(s3, prevNode.id).nextId = newNode.id
-  getNode(s3, nodeAtPos.id).prevId = newNode.id
-  s3.size++
-  steps.push({ state: s3, description: `Link: node[${pos - 1}].next → new, node[${pos}].prev → new, size = ${s3.size}` })
+  getNode(s3, newNode.id).nextId = nodeAtPos.id
+  s3.floatingAnchorIdx = pos
+  steps.push({ state: s3, description: `Set new.next → node[${pos}]` })
+
+  // Step 4: Set node[pos-1].next = new
+  const s4 = cloneState(s3)
+  getNode(s4, prevNode.id).nextId = newNode.id
+  steps.push({ state: s4, description: `Set node[${pos - 1}].next → new` })
+
+  // Step 5: Set node[pos].prev = new, size++
+  const s5 = cloneState(s4)
+  getNode(s5, nodeAtPos.id).prevId = newNode.id
+  s5.size++
+  steps.push({ state: s5, description: `Set node[${pos}].prev → new, size = ${s5.size}` })
 
   return steps
 }
@@ -261,29 +306,34 @@ function erase(state: ListState, pos: number): Step[] {
   if (state.size === 0) throw new Error('erase on empty list')
   if (pos < 0 || pos >= state.size) throw new Error(`erase position ${pos} out of range [0, ${state.size - 1}]`)
 
-  // Delegate edge cases to pop_front/pop_back
+  // Delegate edge cases
   if (pos === 0) return popFront(state)
   if (pos === state.size - 1) return popBack(state)
 
   const steps: Step[] = []
   const target = getNodeAtPos(state, pos)
 
-  // Step 1: Unlink from neighbors
+  // Step 1: Set node[pos-1].next = node[pos].next
   const s1 = cloneState(state)
   const t1 = getNode(s1, target.id)
   if (t1.prevId !== null) {
     getNode(s1, t1.prevId).nextId = t1.nextId
   }
-  if (t1.nextId !== null) {
-    getNode(s1, t1.nextId).prevId = t1.prevId
-  }
-  steps.push({ state: s1, description: `Unlink node[${pos}] from neighbors` })
+  steps.push({ state: s1, description: `Set node[${pos - 1}].next → node[${pos}].next` })
 
-  // Step 2: Delete node, decrement size
+  // Step 2: Set node[pos+1].prev = node[pos].prev
   const s2 = cloneState(s1)
-  s2.nodes = s2.nodes.filter(n => n.id !== target.id)
-  s2.size--
-  steps.push({ state: s2, description: `Delete node[${pos}], size = ${s2.size}` })
+  const t2 = getNode(s2, target.id)
+  if (t2.nextId !== null) {
+    getNode(s2, t2.nextId).prevId = t2.prevId
+  }
+  steps.push({ state: s2, description: `Set node[${pos + 1}].prev → node[${pos}].prev` })
+
+  // Step 3: Delete node[pos], size--
+  const s3 = cloneState(s2)
+  s3.nodes = s3.nodes.filter(n => n.id !== target.id)
+  s3.size--
+  steps.push({ state: s3, description: `Delete node[${pos}], size = ${s3.size}` })
 
   return steps
 }
@@ -313,19 +363,19 @@ function computeLayout(state: ListState): DSLayout {
   const elements: FlatElement[] = []
   const arrows: DSArrow[] = []
 
-  // Struct header: head | tail | size
+  // Struct header: size | begin | end
   const fields = [
-    { name: 'head', displayValue: state.headId !== null ? `→${state.headId}` : '∅', isPointer: true },
-    { name: 'tail', displayValue: state.tailId !== null ? `→${state.tailId}` : '∅', isPointer: true },
     { name: 'size', displayValue: String(state.size), isPointer: false },
+    { name: 'begin', displayValue: state.headId !== null ? '•' : '∅', isPointer: true },
+    { name: 'end', displayValue: state.tailId !== null ? '•' : '∅', isPointer: true },
   ]
 
   let fieldX = STRUCT_X
   const fieldY = STRUCT_Y
-  let headFieldCenterX = 0
-  let headFieldCenterY = 0
-  let tailFieldCenterX = 0
-  let tailFieldCenterY = 0
+  let beginFieldCenterX = 0
+  let beginFieldCenterY = 0
+  let endFieldCenterX = 0
+  let endFieldCenterY = 0
 
   for (const field of fields) {
     const data: StructFieldData = {
@@ -345,13 +395,13 @@ function computeLayout(state: ListState): DSLayout {
       opacity: 1.0,
     })
 
-    if (field.name === 'head') {
-      headFieldCenterX = fieldX + CELL_SIZE / 2
-      headFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
+    if (field.name === 'begin') {
+      beginFieldCenterX = fieldX + CELL_SIZE / 2
+      beginFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
     }
-    if (field.name === 'tail') {
-      tailFieldCenterX = fieldX + CELL_SIZE / 2
-      tailFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
+    if (field.name === 'end') {
+      endFieldCenterX = fieldX + CELL_SIZE / 2
+      endFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
     }
 
     fieldX += CELL_SIZE + FIELD_GAP
@@ -361,9 +411,11 @@ function computeLayout(state: ListState): DSLayout {
   const nodesY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_ARRAY_GAP
   const nodesX = STRUCT_X
 
-  const nodeIds = orderedNodeIds(state)
+  const orderedIds = orderedNodeIds(state)
+  const orderedSet = new Set(orderedIds)
+  const floatingIds = state.nodes.filter(n => !orderedSet.has(n.id)).map(n => n.id)
 
-  if (nodeIds.length === 0) {
+  if (orderedIds.length === 0 && floatingIds.length === 0) {
     // Show empty label
     elements.push({
       id: 'label:empty',
@@ -384,91 +436,260 @@ function computeLayout(state: ListState): DSLayout {
     }
   }
 
-  // Position each node
+  // Position each ordered node (triple cells)
   const nodePositions = new Map<number, { x: number; y: number }>()
-  for (let i = 0; i < nodeIds.length; i++) {
-    const nodeId = nodeIds[i]
-    const node = getNode(state, nodeId)
-    const cellX = nodesX + i * (CELL_SIZE + NODE_GAP)
-    const cellY = nodesY
+  let currentX = nodesX
 
-    nodePositions.set(nodeId, { x: cellX, y: cellY })
+  for (let i = 0; i < orderedIds.length; i++) {
+    const nodeId = orderedIds[i]
+    nodePositions.set(nodeId, { x: currentX, y: nodesY })
+    emitNodeCells(elements, state, nodeId, currentX, nodesY)
+    currentX += NODE_WIDTH + NODE_GAP
+  }
 
-    const cellData: CellData = {
-      arrayName: 'list',
-      index: i,
-      value: { num: node.value, arrays: [] },
-      dimmed: false,
+  // Position floating nodes BELOW the anchor position
+  const FLOATING_Y_GAP = 20
+  const floatingY = nodesY + CELL_SIZE + FLOATING_Y_GAP
+
+  for (const nodeId of floatingIds) {
+    const anchorIdx = state.floatingAnchorIdx ?? 0
+    const clampedAnchor = Math.min(anchorIdx, Math.max(0, orderedIds.length - 1))
+    const floatX = orderedIds.length > 0
+      ? STRUCT_X + clampedAnchor * (NODE_WIDTH + NODE_GAP)
+      : STRUCT_X
+    nodePositions.set(nodeId, { x: floatX, y: floatingY })
+    emitNodeCells(elements, state, nodeId, floatX, floatingY)
+  }
+
+  // Bidirectional arrows between consecutive ordered nodes
+  const ARROW_OFFSET_Y = 4
+  for (let i = 0; i < orderedIds.length - 1; i++) {
+    const fromPos = nodePositions.get(orderedIds[i])!
+    const toPos = nodePositions.get(orderedIds[i + 1])!
+
+    // Forward arrow: next cell (3rd) center → next node's prev cell (1st) center
+    const fromNextCellCenterX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+    const toPrevCellCenterX = toPos.x + CELL_SIZE / 2
+
+    if (fromPos.y === toPos.y) {
+      // Same row: straight horizontal arrows with vertical offset
+      // Arrows start/end at dot centers in the pointer cells
+      const cellCenterY = fromPos.y + CELL_SIZE / 2
+      const nextDotX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2  // center of next-ptr cell
+      const prevDotX = toPos.x + CELL_SIZE / 2  // center of prev-ptr cell
+      arrows.push({
+        fromX: nextDotX,
+        fromY: cellCenterY - ARROW_OFFSET_Y,
+        toX: prevDotX,
+        toY: cellCenterY - ARROW_OFFSET_Y,
+        style: 'straight',
+      })
+      arrows.push({
+        fromX: prevDotX,
+        fromY: cellCenterY + ARROW_OFFSET_Y,
+        toX: nextDotX,
+        toY: cellCenterY + ARROW_OFFSET_Y,
+        style: 'straight',
+      })
+    } else {
+      // Different rows: s-curve arrows
+      arrows.push({
+        fromX: fromNextCellCenterX,
+        fromY: fromPos.y + CELL_SIZE,
+        toX: toPrevCellCenterX,
+        toY: toPos.y,
+        style: 's-curve',
+      })
+      arrows.push({
+        fromX: toPrevCellCenterX,
+        fromY: toPos.y + CELL_SIZE,
+        toX: fromNextCellCenterX,
+        toY: fromPos.y,
+        style: 's-curve',
+      })
+    }
+  }
+
+  // Arrows from/to floating nodes (straight diagonal, like forward-list)
+  for (const floatId of floatingIds) {
+    const floatNode = getNode(state, floatId)
+    const floatPos = nodePositions.get(floatId)!
+
+    // Arrow from floating's next-ptr dot to target node's value cell center
+    if (floatNode.nextId !== null && nodePositions.has(floatNode.nextId)) {
+      const targetPos = nodePositions.get(floatNode.nextId)!
+      const nextDotX = floatPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const nextDotY = floatPos.y + CELL_SIZE / 2
+      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
+      const targetCenterY = targetPos.y + CELL_SIZE / 2
+      arrows.push({
+        fromX: nextDotX,
+        fromY: nextDotY,
+        toX: targetCenterX,
+        toY: targetCenterY,
+        style: 'straight',
+      })
     }
 
-    elements.push({
-      id: `cell:node:${nodeId}`,
-      x: cellX,
-      y: cellY,
-      width: CELL_SIZE,
-      height: CELL_SIZE,
-      kind: 'cell',
-      data: cellData,
-      opacity: 1.0,
+    // Arrow from floating's prev-ptr dot to target node's value cell center
+    if (floatNode.prevId !== null && nodePositions.has(floatNode.prevId)) {
+      const targetPos = nodePositions.get(floatNode.prevId)!
+      const prevDotX = floatPos.x + CELL_SIZE / 2
+      const prevDotY = floatPos.y + CELL_SIZE / 2
+      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
+      const targetCenterY = targetPos.y + CELL_SIZE / 2
+      arrows.push({
+        fromX: prevDotX,
+        fromY: prevDotY,
+        toX: targetCenterX,
+        toY: targetCenterY,
+        style: 'straight',
+      })
+    }
+  }
+
+  // Arrows from ordered nodes pointing to floating nodes
+  for (const ordId of orderedIds) {
+    const ordNode = getNode(state, ordId)
+    const ordPos = nodePositions.get(ordId)!
+
+    if (ordNode.nextId !== null && floatingIds.includes(ordNode.nextId) && nodePositions.has(ordNode.nextId)) {
+      const targetPos = nodePositions.get(ordNode.nextId)!
+      const nextDotX = ordPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const nextDotY = ordPos.y + CELL_SIZE / 2
+      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
+      const targetCenterY = targetPos.y + CELL_SIZE / 2
+      arrows.push({
+        fromX: nextDotX,
+        fromY: nextDotY,
+        toX: targetCenterX,
+        toY: targetCenterY,
+        style: 'straight',
+      })
+    }
+
+    if (ordNode.prevId !== null && floatingIds.includes(ordNode.prevId) && nodePositions.has(ordNode.prevId)) {
+      const targetPos = nodePositions.get(ordNode.prevId)!
+      const prevDotX = ordPos.x + CELL_SIZE / 2
+      const prevDotY = ordPos.y + CELL_SIZE / 2
+      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
+      const targetCenterY = targetPos.y + CELL_SIZE / 2
+      arrows.push({
+        fromX: prevDotX,
+        fromY: prevDotY,
+        toX: targetCenterX,
+        toY: targetCenterY,
+        style: 'straight',
+      })
+    }
+  }
+
+  // S-curve arrow from begin field to first node's value cell (center, top)
+  if (state.headId !== null && orderedIds.length > 0) {
+    const firstPos = nodePositions.get(orderedIds[0])!
+    const valueCellCenterX = firstPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
+    arrows.push({
+      fromX: beginFieldCenterX,
+      fromY: beginFieldCenterY,
+      toX: valueCellCenterX,
+      toY: firstPos.y,
+      style: 's-curve',
     })
   }
 
-  // Bidirectional arrows between consecutive nodes
-  const ARROW_OFFSET_Y = 4
-  for (let i = 0; i < nodeIds.length - 1; i++) {
-    const fromPos = nodePositions.get(nodeIds[i])!
-    const toPos = nodePositions.get(nodeIds[i + 1])!
-    const cellCenterY = nodesY + CELL_SIZE / 2
-
-    // Next arrow: left node → right node (top)
+  // S-curve arrow from end field to last node's value cell (center, top)
+  if (state.tailId !== null && orderedIds.length > 0) {
+    const lastPos = nodePositions.get(orderedIds[orderedIds.length - 1])!
+    const valueCellCenterX = lastPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
     arrows.push({
-      fromX: fromPos.x + CELL_SIZE,
-      fromY: cellCenterY - ARROW_OFFSET_Y,
-      toX: toPos.x,
-      toY: cellCenterY - ARROW_OFFSET_Y,
-      style: 'straight',
-    })
-
-    // Prev arrow: right node → left node (bottom)
-    arrows.push({
-      fromX: toPos.x,
-      fromY: cellCenterY + ARROW_OFFSET_Y,
-      toX: fromPos.x + CELL_SIZE,
-      toY: cellCenterY + ARROW_OFFSET_Y,
-      style: 'straight',
+      fromX: endFieldCenterX,
+      fromY: endFieldCenterY,
+      toX: valueCellCenterX,
+      toY: lastPos.y,
+      style: 's-curve',
     })
   }
-
-  // S-curve arrow from head field to first node
-  const firstNodePos = nodePositions.get(nodeIds[0])!
-  arrows.push({
-    fromX: headFieldCenterX,
-    fromY: headFieldCenterY,
-    toX: firstNodePos.x + CELL_SIZE / 2,
-    toY: firstNodePos.y,
-    style: 's-curve',
-  })
-
-  // S-curve arrow from tail field to last node
-  const lastNodePos = nodePositions.get(nodeIds[nodeIds.length - 1])!
-  arrows.push({
-    fromX: tailFieldCenterX,
-    fromY: tailFieldCenterY,
-    toX: lastNodePos.x + CELL_SIZE / 2,
-    toY: lastNodePos.y,
-    style: 's-curve',
-  })
 
   // Compute total dimensions
-  const lastCellRight = nodesX + nodeIds.length * (CELL_SIZE + NODE_GAP) - NODE_GAP
-  const bottomY = nodesY + CELL_SIZE + INDEX_LABEL_HEIGHT
+  let rightEdge = fieldX
+  let bottomY = nodesY + CELL_SIZE
+  for (const pos of nodePositions.values()) {
+    rightEdge = Math.max(rightEdge, pos.x + NODE_WIDTH)
+    bottomY = Math.max(bottomY, pos.y + CELL_SIZE)
+  }
 
   return {
     elements,
     arrows,
-    width: Math.max(lastCellRight + 40, 400),
+    width: Math.max(rightEdge + 40, 400),
     height: bottomY + 40,
   }
+}
+
+/** Emit the three cells (prev, value, next) for a node at the given position. */
+function emitNodeCells(
+  elements: FlatElement[],
+  state: ListState,
+  nodeId: number,
+  x: number,
+  y: number,
+): void {
+  const node = getNode(state, nodeId)
+
+  // Prev pointer cell
+  elements.push({
+    id: `cell:node:${nodeId}:prev`,
+    x,
+    y,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    kind: 'cell',
+    data: {
+      arrayName: 'list',
+      index: -1,
+      value: { num: node.prevId ?? 0, arrays: [] },
+      dimmed: false,
+      displayOverride: node.prevId !== null ? '•' : '×',
+    } as CellData,
+    opacity: 1.0,
+  })
+
+  // Value cell
+  const valueX = x + CELL_SIZE + CELL_GAP
+  elements.push({
+    id: `cell:node:${nodeId}:value`,
+    x: valueX,
+    y,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    kind: 'cell',
+    data: {
+      arrayName: 'list',
+      index: -1,
+      value: { num: node.value, arrays: [] },
+      dimmed: false,
+    } as CellData,
+    opacity: 1.0,
+  })
+
+  // Next pointer cell
+  const nextX = x + 2 * (CELL_SIZE + CELL_GAP)
+  elements.push({
+    id: `cell:node:${nodeId}:next`,
+    x: nextX,
+    y,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    kind: 'cell',
+    data: {
+      arrayName: 'list',
+      index: -1,
+      value: { num: node.nextId ?? 0, arrays: [] },
+      dimmed: false,
+      displayOverride: node.nextId !== null ? '•' : '×',
+    } as CellData,
+    opacity: 1.0,
+  })
 }
 
 // --- Exported definition ---
