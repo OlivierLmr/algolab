@@ -374,7 +374,7 @@ function computeLayout(state: VectorState): DSLayout {
 // --- Exported definition ---
 
 export const vectorDS: DataStructure<VectorState> = {
-  name: 'vector<T>',
+  name: 'vector',
   defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_back', label: 'push_back(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },

@@ -632,7 +632,7 @@ function computeLayout(state: DequeState): DSLayout {
 // =============================================================================
 
 export const dequeDS: DataStructure<DequeState> = {
-  name: 'deque<T>',
+  name: 'deque',
   defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },

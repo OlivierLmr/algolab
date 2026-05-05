@@ -45,6 +45,11 @@ export function DSControls() {
           ))}
         </div>
       )}
+
+      <div class="ds-controls-disclaimer">
+        Note: this is a theoretical visualization. Real-world implementations
+        may do things differently or in different orders.
+      </div>
     </div>
   )
 }

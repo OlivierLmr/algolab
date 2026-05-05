@@ -768,7 +768,7 @@ function emitNodeCells(
 // --- Exported definition ---
 
 export const listDS: DataStructure<ListState> = {
-  name: 'list<T>',
+  name: 'doubly-linked list',
   defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },

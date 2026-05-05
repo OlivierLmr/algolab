@@ -9,9 +9,12 @@ import { siblingTreeDS } from './sibling-tree.ts'
 // Registry of available data structures
 export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS, listDS, dequeDS, siblingTreeDS]
 
-/** Derive a URL slug from a DS name (e.g. "vector<T>" → "vector"). */
+/** Derive a URL slug from a DS name (e.g. "doubly-linked list" → "doubly-linked-list"). */
 function dsSlug(ds: DataStructure<any>): string {
-  return ds.name.replace(/<.*>/, '')
+  return ds.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 /** Find DS index by slug, or -1 if not found. */

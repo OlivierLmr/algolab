@@ -583,7 +583,7 @@ function emitNodeCells(elements: FlatElement[], node: FLNode, x: number, y: numb
 // --- Exported definition ---
 
 export const forwardListDS: DataStructure<ForwardListState> = {
-  name: 'forward_list<T>',
+  name: 'singly-linked list',
   defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },
