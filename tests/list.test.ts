@@ -446,70 +446,69 @@ describe('list: layout', () => {
 })
 
 describe('list: splice', () => {
-  it('moves a single node to a different position', () => {
-    // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4)
-    // Open range (2,4) = node at pos 3 → value 4. Insert after pos 0 (value 1).
-    // Result: [1, 4, 2, 3, 5]
+  // C++ semantics: splice(pos, first, last) moves [first, last) to before pos.
+  // pos = insert before this position (pos = size means at end).
+  // first = first node to move (included).
+  // last = past-end (excluded, last = size means through tail).
+
+  it('moves a single node to front', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=0, first=3, last=4) → move [3,4) = node at 3 (val 4) before pos 0
+    // Result: [4, 1, 2, 3, 5]
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: 0, first: 3, last: 4 })
+    expect(values(s2)).toEqual([4, 1, 2, 3, 5])
+    expect(s2.size).toBe(5)
+  })
+
+  it('moves multiple nodes to front', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4) → move [2,4) = nodes 2,3 (val 3,4) before pos 0
+    // Result: [3, 4, 1, 2, 5]
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
     const s2 = apply(state, 'splice', { pos: 0, first: 2, last: 4 })
-    expect(values(s2)).toEqual([1, 4, 2, 3, 5])
-    expect(s2.size).toBe(5) // no size change in splice
-  })
-
-  it('moves multiple nodes', () => {
-    // [1, 2, 3, 4, 5] → splice(pos=0, first=1, last=4)
-    // Open range (1,4) = nodes at pos 2, 3 → values 3, 4. Insert after pos 0 (value 1).
-    // Result: [1, 3, 4, 2, 5]
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const s2 = apply(state, 'splice', { pos: 0, first: 1, last: 4 })
-    expect(values(s2)).toEqual([1, 3, 4, 2, 5])
-  })
-
-  it('moves range to front', () => {
-    // [1, 2, 3, 4, 5] → splice(pos=-1, first=2, last=5) → moves nodes 3,4 to front
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const s2 = apply(state, 'splice', { pos: -1, first: 2, last: 5 })
-    // Open range (2,5) = nodes at pos 3, 4 → values 4, 5
-    // Inserted after pos -1 (before head) → [4, 5, 1, 2, 3]
-    expect(values(s2)).toEqual([4, 5, 1, 2, 3])
-    expect(s2.size).toBe(5)
+    expect(values(s2)).toEqual([3, 4, 1, 2, 5])
   })
 
   it('moves range to end', () => {
-    // [1, 2, 3, 4, 5] → splice(pos=4, first=0, last=2) → moves node at pos 1 (value 2) after pos 4
+    // [1, 2, 3, 4, 5] → splice(pos=5, first=1, last=3) → move [1,3) = nodes 1,2 (val 2,3) before pos 5 (end)
+    // Result: [1, 4, 5, 2, 3]
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const s2 = apply(state, 'splice', { pos: 4, first: 0, last: 2 })
-    // Open range (0, 2) = node at pos 1 → value 2
-    // After pos 4 (value 5): [1, 3, 4, 5, 2]
-    expect(values(s2)).toEqual([1, 3, 4, 5, 2])
+    const s2 = apply(state, 'splice', { pos: 5, first: 1, last: 3 })
+    expect(values(s2)).toEqual([1, 4, 5, 2, 3])
     expect(s2.size).toBe(5)
+  })
+
+  it('moves range to middle', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=1, first=3, last=5) → move [3,5) = nodes 3,4 (val 4,5) before pos 1
+    // Result: [1, 4, 5, 2, 3]
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: 1, first: 3, last: 5 })
+    expect(values(s2)).toEqual([1, 4, 5, 2, 3])
   })
 
   it('each pointer change is its own substep', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
-    // Moving 1 node requires: unlink (prev.next + next.prev) then insert (4 pointer changes)
-    // Each pointer change should be separate
+    const steps = applySteps(state, 'splice', { pos: 0, first: 3, last: 4 })
+    // Moving 1 node: unlink (2 ptrs) + insert (4 ptrs) = 6 pointer changes
     expect(steps.length).toBeGreaterThanOrEqual(4)
-    // Every substep should describe a pointer change
     for (const step of steps) {
-      expect(step.description).toMatch(/Set |Unlink/)
+      expect(step.description).toMatch(/Set/)
     }
   })
 
   it('throws on empty range', () => {
     const state = listDS.createInitialState([1, 2, 3])
-    expect(() => apply(state, 'splice', { pos: 0, first: 1, last: 2 })).toThrow()
+    expect(() => apply(state, 'splice', { pos: 0, first: 2, last: 2 })).toThrow()
   })
 
   it('throws when pos is inside the moved range', () => {
     const state = listDS.createInitialState([1, 2, 3, 4])
-    expect(() => apply(state, 'splice', { pos: 2, first: 1, last: 4 })).toThrow()
+    // Move [1,3) before pos 2 — pos 2 is inside [1,3)
+    expect(() => apply(state, 'splice', { pos: 2, first: 1, last: 3 })).toThrow()
   })
 
   it('all substeps produce valid layouts', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 5 })
+    const steps = applySteps(state, 'splice', { pos: 0, first: 3, last: 5 })
     for (const step of steps) {
       const layout = listDS.computeLayout(step.state)
       expect(layout.elements.length).toBeGreaterThan(0)
@@ -519,16 +518,13 @@ describe('list: splice', () => {
 
   it('floating nodes during splice are spread horizontally', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const steps = applySteps(state, 'splice', { pos: 0, first: 1, last: 4 })
-    // After unlinking, nodes 2 and 3 should be floating
-    // Find a step where the range has been unlinked but not yet inserted
-    const unlinkStep = steps.find(s => s.description.includes('Unlink'))
-    if (unlinkStep) {
-      const layout = listDS.computeLayout(unlinkStep.state)
-      const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
-      const ys = [...new Set(valueCells.map(e => e.y))]
-      // Floating nodes should be on a different Y than linked ones
-      expect(ys.length).toBeGreaterThanOrEqual(2)
-    }
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    // After unlinking nodes 2,3: they become floating
+    // Find a step where the range has been unlinked but not yet fully relinked
+    const layout = listDS.computeLayout(steps[1].state) // after both unlink steps
+    const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    const ys = [...new Set(valueCells.map(e => e.y))]
+    // Floating nodes should be on a different Y than linked ones
+    expect(ys.length).toBeGreaterThanOrEqual(2)
   })
 })

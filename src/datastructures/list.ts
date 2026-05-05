@@ -358,96 +358,108 @@ function erase(state: ListState, pos: number): Step[] {
 }
 
 function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: number): Step[] {
-  // C++ semantics: splice(pos, first, last) moves nodes in open range (first, last).
-  // pos = -1 means before begin. first = -1 means before begin (range starts at head).
-  // last = size means end (range goes to tail).
-  if (posIdx < -1 || posIdx >= state.size) {
-    throw new Error(`splice pos ${posIdx} out of range [-1, ${state.size - 1}]`)
+  // C++ semantics: splice(pos, first, last) moves nodes in half-open range [first, last).
+  // pos = insert BEFORE this position. pos = size means insert at end.
+  // first = first node to move (included).
+  // last = past-end (excluded). last = size means "through tail".
+  if (posIdx < 0 || posIdx > state.size) {
+    throw new Error(`splice pos ${posIdx} out of range [0, ${state.size}]`)
   }
-  if (firstIdx < -1 || firstIdx >= state.size) {
-    throw new Error(`splice first ${firstIdx} out of range [-1, ${state.size - 1}]`)
+  if (firstIdx < 0 || firstIdx >= state.size) {
+    throw new Error(`splice first ${firstIdx} out of range [0, ${state.size - 1}]`)
   }
   if (lastIdx < 0 || lastIdx > state.size) {
     throw new Error(`splice last ${lastIdx} out of range [0, ${state.size}]`)
   }
-  if (firstIdx + 1 >= lastIdx) {
+  if (firstIdx >= lastIdx) {
     throw new Error(`splice: empty range (first=${firstIdx}, last=${lastIdx})`)
   }
 
-  const rangeStart = firstIdx + 1
-  const rangeEnd = lastIdx - 1
+  const rangeStart = firstIdx
+  const rangeEnd = lastIdx - 1 // last included node
 
   // Validate pos is not inside the range being moved
-  if (posIdx >= rangeStart && posIdx <= rangeEnd) {
+  if (posIdx > rangeStart && posIdx <= rangeEnd) {
     throw new Error(`splice: pos ${posIdx} is inside the range being moved [${rangeStart}, ${rangeEnd}]`)
   }
 
   const ordered = orderedNodeIds(state)
   const subchainHeadId = ordered[rangeStart]
   const subchainTailId = ordered[rangeEnd]
-  const firstNodeId = firstIdx >= 0 ? ordered[firstIdx] : null     // node before range
-  const lastNodeId = lastIdx < state.size ? ordered[lastIdx] : null // node after range
-  const posNodeId = posIdx >= 0 ? ordered[posIdx] : null
+  // Node before the range (null if range starts at head)
+  const beforeRangeId = rangeStart > 0 ? ordered[rangeStart - 1] : null
+  // Node after the range (null if range ends at tail)
+  const afterRangeId = lastIdx < state.size ? ordered[lastIdx] : null
+  // Node before which we insert (null if inserting at end)
+  const posNodeId = posIdx < state.size ? ordered[posIdx] : null
+  // Node after which we insert (null if inserting at front)
+  const beforePosId = posIdx > 0 ? ordered[posIdx - 1] : null
 
   const steps: Step[] = []
   let current = cloneState(state)
 
   // --- Phase 1: Unlink the subchain from its current position ---
 
-  // Step: Set first.next = last (or head = last if first is before_begin)
-  if (firstNodeId !== null) {
+  // Step: Set beforeRange.next = afterRange (or head = afterRange if range starts at head)
+  if (beforeRangeId !== null) {
     const s = cloneState(current)
-    getNode(s, firstNodeId).nextId = lastNodeId
-    steps.push({ state: s, description: `Set node[${firstIdx}].next → node[${lastIdx}]` })
+    getNode(s, beforeRangeId).nextId = afterRangeId
+    steps.push({ state: s, description: `Set node[${rangeStart - 1}].next → node[${lastIdx}]` })
     current = s
   } else {
     const s = cloneState(current)
-    s.headId = lastNodeId
+    s.headId = afterRangeId
     steps.push({ state: s, description: `Set begin → node[${lastIdx}]` })
     current = s
   }
 
-  // Step: Set last.prev = first (or tail = first if last is end)
-  if (lastNodeId !== null) {
+  // Step: Set afterRange.prev = beforeRange (or tail = beforeRange if range ends at tail)
+  if (afterRangeId !== null) {
     const s = cloneState(current)
-    getNode(s, lastNodeId).prevId = firstNodeId
-    steps.push({ state: s, description: `Set node[${lastIdx}].prev → node[${firstIdx}]` })
+    getNode(s, afterRangeId).prevId = beforeRangeId
+    steps.push({ state: s, description: `Set node[${lastIdx}].prev → node[${rangeStart - 1}]` })
     current = s
   } else {
     const s = cloneState(current)
-    s.tailId = firstNodeId
-    steps.push({ state: s, description: `Set end → node[${firstIdx}]` })
+    s.tailId = beforeRangeId
+    steps.push({ state: s, description: `Set end → node[${rangeStart - 1}]` })
     current = s
   }
 
-  // --- Phase 2: Insert subchain after pos ---
+  // --- Phase 2: Insert subchain before pos ---
+  // "Insert before pos" means: after beforePos (or at front if pos=0)
 
-  // The node currently after pos
-  const afterPosId = posNodeId !== null ? getNode(current, posNodeId).nextId : current.headId
+  // Determine the actual node currently at pos position (accounting for already unlinked state)
+  const insertAfterNodeId = posIdx === 0 ? null :
+    posIdx <= rangeStart ? beforePosId :
+    // If pos was after the range, we use the node at pos in the original order
+    // But since range was removed, adjust: beforePos = ordered[posIdx - 1] which is now afterRange's position
+    beforePosId
+  const insertBeforeNodeId = posNodeId
 
-  // Step: Set subchain_head.prev = pos (or null if pos is before_begin)
+  // Step: Set subchain_head.prev = insertAfter (or null if inserting at front)
   {
     const s = cloneState(current)
-    getNode(s, subchainHeadId).prevId = posNodeId
-    const posLabel = posNodeId !== null ? `node[${posIdx}]` : 'null'
-    steps.push({ state: s, description: `Set subchain_head.prev → ${posLabel}` })
+    getNode(s, subchainHeadId).prevId = insertAfterNodeId
+    const label = insertAfterNodeId !== null ? `node[${ordered.indexOf(insertAfterNodeId)}]` : 'null'
+    steps.push({ state: s, description: `Set subchain_head.prev → ${label}` })
     current = s
   }
 
-  // Step: Set subchain_tail.next = afterPos
+  // Step: Set subchain_tail.next = insertBefore (or null if inserting at end)
   {
     const s = cloneState(current)
-    getNode(s, subchainTailId).nextId = afterPosId
-    const afterLabel = afterPosId !== null ? `node[${ordered.indexOf(afterPosId)}]` : 'null'
-    steps.push({ state: s, description: `Set subchain_tail.next → ${afterLabel}` })
+    getNode(s, subchainTailId).nextId = insertBeforeNodeId
+    const label = insertBeforeNodeId !== null ? `node[${ordered.indexOf(insertBeforeNodeId)}]` : 'null'
+    steps.push({ state: s, description: `Set subchain_tail.next → ${label}` })
     current = s
   }
 
-  // Step: Set pos.next = subchain_head (or head = subchain_head if pos is before_begin)
-  if (posNodeId !== null) {
+  // Step: Set insertAfter.next = subchain_head (or head = subchain_head if inserting at front)
+  if (insertAfterNodeId !== null) {
     const s = cloneState(current)
-    getNode(s, posNodeId).nextId = subchainHeadId
-    steps.push({ state: s, description: `Set node[${posIdx}].next → subchain_head` })
+    getNode(s, insertAfterNodeId).nextId = subchainHeadId
+    steps.push({ state: s, description: `Set node[${ordered.indexOf(insertAfterNodeId)}].next → subchain_head` })
     current = s
   } else {
     const s = cloneState(current)
@@ -456,12 +468,11 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     current = s
   }
 
-  // Step: Set afterPos.prev = subchain_tail (or tail = subchain_tail if afterPos is null)
-  if (afterPosId !== null) {
+  // Step: Set insertBefore.prev = subchain_tail (or tail = subchain_tail if inserting at end)
+  if (insertBeforeNodeId !== null) {
     const s = cloneState(current)
-    getNode(s, afterPosId).prevId = subchainTailId
-    const afterLabel = ordered.indexOf(afterPosId)
-    steps.push({ state: s, description: `Set node[${afterLabel}].prev → subchain_tail` })
+    getNode(s, insertBeforeNodeId).prevId = subchainTailId
+    steps.push({ state: s, description: `Set node[${ordered.indexOf(insertBeforeNodeId)}].prev → subchain_tail` })
     current = s
   } else {
     const s = cloneState(current)
@@ -772,7 +783,7 @@ export const listDS: DataStructure<ListState> = {
     { name: 'pop_back', label: 'pop_back()', args: [] },
     { name: 'insert', label: 'insert(pos, val)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }, { name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'erase', label: 'erase(pos)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }] },
-    { name: 'splice', label: 'splice(pos, first, last)', args: [{ name: 'pos', label: 'pos', defaultValue: 0 }, { name: 'first', label: 'first', defaultValue: 1 }, { name: 'last', label: 'last', defaultValue: 3 }] },
+    { name: 'splice', label: 'splice(pos, first, last)', args: [{ name: 'pos', label: 'pos', defaultValue: 0 }, { name: 'first', label: 'first', defaultValue: 2 }, { name: 'last', label: 'last', defaultValue: 4 }] },
   ],
   createInitialState,
   applyOperation,
