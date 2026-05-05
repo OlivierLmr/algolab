@@ -1003,6 +1003,27 @@ body {
   font-weight: 600;
 }
 
+/* DS struct field */
+.ds-field-wrapper {
+  position: absolute;
+  transition: transform 200ms ease, opacity 200ms;
+}
+
+.ds-field-label {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+
+.ds-field-label-text {
+  font: bold 13px monospace;
+  color: #333;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
 /* DS field pointer indicator */
 .ds-field-pointer .viz-cell-value {
   font-size: 24px;

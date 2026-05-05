@@ -12,8 +12,8 @@ export interface VectorState {
 
 const STRUCT_X = 40
 const STRUCT_Y = 40
-const FIELD_GAP = 20
-const FIELD_LABEL_HEIGHT = 20
+const FIELD_GAP = CELL_GAP   // Same gap as array cells — fields touch
+const FIELD_LABEL_HEIGHT = 70  // Vertical labels need more height
 const STRUCT_TO_ARRAY_GAP = 60
 
 function nextPowerOf2(n: number): number {

@@ -50,16 +50,23 @@ function DSElement({ el }: { el: FlatElement }) {
 
 function StructFieldElement({ el }: { el: FlatElement }) {
   const data = el.data as StructFieldData
+  const labelHeight = el.height - CELL_SIZE
   return (
     <div
-      class="viz-variable-wrapper"
+      class="ds-field-wrapper"
       style={{
         transform: `translate(${el.x}px, ${el.y}px)`,
         width: CELL_SIZE,
+        height: el.height,
         opacity: el.opacity,
       }}
     >
-      <div class="viz-variable-label">{data.name}</div>
+      <div
+        class="ds-field-label"
+        style={{ height: labelHeight }}
+      >
+        <span class="ds-field-label-text">{data.name}</span>
+      </div>
       <div
         class={`viz-cell${data.isPointer ? ' ds-field-pointer' : ''}`}
         style={{
@@ -67,7 +74,6 @@ function StructFieldElement({ el }: { el: FlatElement }) {
           height: CELL_SIZE,
           borderColor: '#999',
           borderWidth: 1.5,
-          marginTop: 2,
         }}
       >
         <span class="viz-cell-value">{data.displayValue}</span>
