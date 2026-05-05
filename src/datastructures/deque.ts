@@ -308,14 +308,47 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
       const val = args.val ?? 0
       if (pos < 0 || pos > state.taille) throw new Error(`insert position ${pos} out of range [0, ${state.taille}]`)
 
-      // First make room using push_back(0) logic to ensure capacity
-      const pushSteps = applyOperation(state, 'push_back', { val: 0 })
-      const afterPush = pushSteps[pushSteps.length - 1].state
+      // Edge cases: delegate to push_front/push_back
+      if (pos === state.taille) return applyOperation(state, 'push_back', { val })
+      if (pos === 0) return applyOperation(state, 'push_front', { val })
 
-      // Now shift elements right from pos to taille-2 (taille already incremented by push_back)
-      const steps: Step[] = [...pushSteps]
+      // Choose the side with fewer elements to shift
+      const shiftLeft = pos < state.taille - pos
 
-      if (pos < state.taille) {
+      if (shiftLeft) {
+        // Make room at front
+        const pushSteps = applyOperation(state, 'push_front', { val: 0 })
+        const afterPush = pushSteps[pushSteps.length - 1].state
+        const steps: Step[] = [...pushSteps]
+
+        // Shift elements [1..pos] left by one (position 0 has the placeholder from push_front)
+        const shifted = cloneState(afterPush)
+        for (let i = 0; i < pos; i++) {
+          const srcOffset = Math.floor((shifted.chunkBeg + i + 1) / shifted.chunkCap)
+          const srcChunk = chunkPhysical(shifted, srcOffset)
+          const srcSlot = (shifted.chunkBeg + i + 1) % shifted.chunkCap
+          const dstOffset = Math.floor((shifted.chunkBeg + i) / shifted.chunkCap)
+          const dstChunk = chunkPhysical(shifted, dstOffset)
+          const dstSlot = (shifted.chunkBeg + i) % shifted.chunkCap
+          shifted.chunks[dstChunk]![dstSlot] = shifted.chunks[srcChunk]![srcSlot]
+        }
+        steps.push({ state: cloneState(shifted), description: `Shift elements [0..${pos - 1}] left` })
+
+        // Write value at position pos
+        const wOffset = Math.floor((shifted.chunkBeg + pos) / shifted.chunkCap)
+        const wChunk = chunkPhysical(shifted, wOffset)
+        const wSlot = (shifted.chunkBeg + pos) % shifted.chunkCap
+        shifted.chunks[wChunk]![wSlot] = val
+        steps.push({ state: cloneState(shifted), description: `Write ${val} at position ${pos}` })
+
+        return steps
+      } else {
+        // Make room at back
+        const pushSteps = applyOperation(state, 'push_back', { val: 0 })
+        const afterPush = pushSteps[pushSteps.length - 1].state
+        const steps: Step[] = [...pushSteps]
+
+        // Shift elements [pos..taille-2] right by one (taille already incremented by push_back)
         const shifted = cloneState(afterPush)
         for (let i = shifted.taille - 1; i > pos; i--) {
           const srcOffset = Math.floor((shifted.chunkBeg + i - 1) / shifted.chunkCap)
@@ -326,19 +359,17 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
           const dstSlot = (shifted.chunkBeg + i) % shifted.chunkCap
           shifted.chunks[dstChunk]![dstSlot] = shifted.chunks[srcChunk]![srcSlot]
         }
-        // Write value at position
+        steps.push({ state: cloneState(shifted), description: `Shift elements [${pos}..${state.taille - 1}] right` })
+
+        // Write value at position pos
         const wOffset = Math.floor((shifted.chunkBeg + pos) / shifted.chunkCap)
         const wChunk = chunkPhysical(shifted, wOffset)
         const wSlot = (shifted.chunkBeg + pos) % shifted.chunkCap
         shifted.chunks[wChunk]![wSlot] = val
-        steps.push({ state: shifted, description: `Shift elements right and write ${val} at position ${pos}` })
-      } else {
-        // Inserting at end — just overwrite the 0 we pushed
-        const final = setAt(afterPush, pos, val)
-        steps[steps.length - 1] = { state: final, description: `Write ${val} at position ${pos}` }
-      }
+        steps.push({ state: cloneState(shifted), description: `Write ${val} at position ${pos}` })
 
-      return steps
+        return steps
+      }
     }
 
     case 'erase': {

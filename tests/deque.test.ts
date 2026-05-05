@@ -376,6 +376,52 @@ describe('deque: insert', () => {
     expect(() => apply(state, 'insert', { pos: -1, val: 0 })).toThrow()
     expect(() => apply(state, 'insert', { pos: 3, val: 0 })).toThrow()
   })
+
+  it('insert closer to front shifts left', () => {
+    // [1, 2, 3, 4, 5], insert at pos=1 — 1 element before vs 4 after → shift left
+    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
+    expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 99, 2, 3, 4, 5])
+    // Should have a "left" shift step
+    const shiftStep = steps.find(s => s.description.includes('Shift'))
+    expect(shiftStep).toBeDefined()
+    expect(shiftStep!.description).toContain('left')
+  })
+
+  it('insert closer to back shifts right', () => {
+    // [1, 2, 3, 4, 5], insert at pos=4 — 4 elements before vs 1 after → shift right
+    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'insert', { pos: 4, val: 99 })
+    expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 2, 3, 4, 99, 5])
+    const shiftStep = steps.find(s => s.description.includes('Shift'))
+    expect(shiftStep).toBeDefined()
+    expect(shiftStep!.description).toContain('right')
+  })
+
+  it('insert has separate shift and write steps', () => {
+    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'insert', { pos: 4, val: 99 })
+    // Last step should be the write
+    expect(steps[steps.length - 1].description).toContain('Write')
+    // Second to last should be the shift
+    expect(steps[steps.length - 2].description).toContain('Shift')
+  })
+
+  it('insert at pos=0 delegates to push_front', () => {
+    const state = dequeDS.createInitialState([2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 0, val: 1 })
+    // push_front writes directly, no shift step
+    expect(steps.every(s => !s.description.includes('Shift'))).toBe(true)
+    expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 2, 3, 4])
+  })
+
+  it('insert at pos=size delegates to push_back', () => {
+    const state = dequeDS.createInitialState([1, 2])
+    const steps = applySteps(state, 'insert', { pos: 2, val: 3 })
+    // push_back writes directly, no shift step
+    expect(steps.every(s => !s.description.includes('Shift'))).toBe(true)
+    expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 2, 3])
+  })
 })
 
 describe('deque: erase', () => {
