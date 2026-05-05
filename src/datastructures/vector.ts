@@ -1,6 +1,7 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
 import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT, INDEX_LABEL_HEIGHT } from '../layout/constants.ts'
+import { parseNumberList } from './parse-utils.ts'
 
 export interface VectorState {
   data: number[]    // Backing array (length === capacity)
@@ -34,7 +35,8 @@ function nextPowerOf2(n: number): number {
 
 // --- Operations ---
 
-function createInitialState(values: number[]): VectorState {
+function createInitialState(input: string): VectorState {
+  const values = parseNumberList(input)
   const size = values.length
   const capacity = nextPowerOf2(size)
   const data = [...values]
@@ -373,6 +375,7 @@ function computeLayout(state: VectorState): DSLayout {
 
 export const vectorDS: DataStructure<VectorState> = {
   name: 'vector<T>',
+  defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_back', label: 'push_back(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'pop_back', label: 'pop_back()', args: [] },

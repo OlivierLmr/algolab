@@ -28,7 +28,7 @@ function logicalElements(state: DequeState): number[] {
 
 describe('deque: initial state', () => {
   it('creates empty deque', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     expect(state.taille).toBe(0)
     expect(state.chunkCap).toBe(4)
     expect(state.mapBeg).toBe(1)
@@ -36,7 +36,7 @@ describe('deque: initial state', () => {
   })
 
   it('creates single element deque', () => {
-    const state = dequeDS.createInitialState([42])
+    const state = dequeDS.createInitialState("42")
     expect(state.taille).toBe(1)
     expect(state.chunkCap).toBe(4)
     expect(state.chunkBeg).toBe(0)
@@ -44,7 +44,7 @@ describe('deque: initial state', () => {
   })
 
   it('creates multi-element deque spanning one chunk', () => {
-    const state = dequeDS.createInitialState([10, 20, 30])
+    const state = dequeDS.createInitialState("10, 20, 30")
     expect(state.taille).toBe(3)
     expect(state.chunkCap).toBe(4)
     expect(logicalElements(state)).toEqual([10, 20, 30])
@@ -53,7 +53,7 @@ describe('deque: initial state', () => {
   })
 
   it('creates deque spanning multiple chunks', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5, 6, 7])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5, 6, 7")
     expect(state.taille).toBe(7)
     expect(logicalElements(state)).toEqual([1, 2, 3, 4, 5, 6, 7])
     // Should span 2 chunks (ceil(7/4) = 2)
@@ -62,7 +62,7 @@ describe('deque: initial state', () => {
   })
 
   it('mapCap leaves room on both sides', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4])
+    const state = dequeDS.createInitialState("1, 2, 3, 4")
     // 1 chunk needed, mapCap = max(4, 1+2) = 4, mapBeg = 1
     expect(state.mapCap).toBe(4)
     expect(state.mapBeg).toBe(1)
@@ -73,14 +73,14 @@ describe('deque: initial state', () => {
 
 describe('deque: push_back', () => {
   it('appends within existing chunk', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'push_back', { val: 4 })
     expect(s2.taille).toBe(4)
     expect(logicalElements(s2)).toEqual([1, 2, 3, 4])
   })
 
   it('allocates new chunk when last chunk is full', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4])
+    const state = dequeDS.createInitialState("1, 2, 3, 4")
     // First chunk is full (4 elements), push_back needs new chunk
     const steps = applySteps(state, 'push_back', { val: 5 })
     expect(steps.length).toBe(2) // allocate chunk + write
@@ -91,14 +91,14 @@ describe('deque: push_back', () => {
   })
 
   it('push_back on empty deque', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     const s2 = apply(state, 'push_back', { val: 99 })
     expect(s2.taille).toBe(1)
     expect(logicalElements(s2)).toEqual([99])
   })
 
   it('push_back within chunk produces 1 substep', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     const steps = applySteps(state, 'push_back', { val: 3 })
     expect(steps.length).toBe(1)
     expect(steps[0].description).toContain('Write')
@@ -106,7 +106,7 @@ describe('deque: push_back', () => {
 
   it('grows map when no room after last active chunk', () => {
     // Fill map completely: mapCap=4, mapBeg=1, need 3 chunks = 12 elements
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12")
     // mapCap = max(4, ceil(12/4)+2) = max(4, 5) = 5; mapBeg=1; 3 active chunks at [1,2,3]
     // Push back needs new chunk at slot 4 which may or may not be available
     // Let's push enough to trigger map growth
@@ -127,7 +127,7 @@ describe('deque: push_back', () => {
 describe('deque: push_front', () => {
   it('prepends when chunkBeg > 0', () => {
     // Create a state where chunkBeg > 0 by doing pop_front first
-    let state = dequeDS.createInitialState([1, 2, 3])
+    let state = dequeDS.createInitialState("1, 2, 3")
     state = apply(state, 'pop_front') // chunkBeg becomes 1
     expect(state.chunkBeg).toBe(1)
     const s2 = apply(state, 'push_front', { val: 0 })
@@ -137,7 +137,7 @@ describe('deque: push_front', () => {
   })
 
   it('allocates new chunk before when chunkBeg == 0', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     expect(state.chunkBeg).toBe(0)
     // push_front needs new chunk since chunkBeg==0
     const steps = applySteps(state, 'push_front', { val: 0 })
@@ -148,14 +148,14 @@ describe('deque: push_front', () => {
   })
 
   it('push_front on empty deque', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     const s2 = apply(state, 'push_front', { val: 42 })
     expect(s2.taille).toBe(1)
     expect(logicalElements(s2)).toEqual([42])
   })
 
   it('interleaved push_front and push_back maintain order', () => {
-    let s = dequeDS.createInitialState([])
+    let s = dequeDS.createInitialState("")
     s = apply(s, 'push_back', { val: 3 })
     s = apply(s, 'push_front', { val: 2 })
     s = apply(s, 'push_back', { val: 4 })
@@ -165,7 +165,7 @@ describe('deque: push_front', () => {
 
   it('wraps mapBeg to end when room exists (circular buffer)', () => {
     // Start: mapCap=4, mapBeg=1, 1 chunk at [1], slots [0,2,3] free
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // push_front: chunkBeg=0, allocate new chunk at mapBeg-1=0
     s = apply(s, 'push_front', { val: 0 })
     expect(s.mapBeg).toBe(0)
@@ -187,7 +187,7 @@ describe('deque: push_front', () => {
 
   it('grows map only when ALL slots are occupied', () => {
     // Fill all 4 map slots by pushing front and back alternately
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // mapCap=4, mapBeg=1, chunk at [1]. Push back to fill [2], [3]
     for (let i = 5; i <= 12; i++) {
       s = apply(s, 'push_back', { val: i })
@@ -212,7 +212,7 @@ describe('deque: push_front', () => {
 
 describe('deque: pop_front', () => {
   it('removes front element', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'pop_front')
     expect(s2.taille).toBe(2)
     expect(logicalElements(s2)).toEqual([2, 3])
@@ -220,12 +220,12 @@ describe('deque: pop_front', () => {
   })
 
   it('pop_front on empty throws', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     expect(() => apply(state, 'pop_front')).toThrow('pop_front on empty deque')
   })
 
   it('deallocates chunk when chunkBeg reaches chunkCap', () => {
-    let state = dequeDS.createInitialState([1, 2, 3, 4, 5, 6, 7, 8])
+    let state = dequeDS.createInitialState("1, 2, 3, 4, 5, 6, 7, 8")
     // 2 chunks, pop front 4 times to empty first chunk
     for (let i = 0; i < 3; i++) {
       state = apply(state, 'pop_front')
@@ -244,19 +244,19 @@ describe('deque: pop_front', () => {
 
 describe('deque: pop_back', () => {
   it('removes back element', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'pop_back')
     expect(s2.taille).toBe(2)
     expect(logicalElements(s2)).toEqual([1, 2])
   })
 
   it('pop_back on empty throws', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     expect(() => apply(state, 'pop_back')).toThrow('pop_back on empty deque')
   })
 
   it('deallocates chunk when it becomes empty', () => {
-    let state = dequeDS.createInitialState([1, 2, 3, 4, 5, 6, 7, 8])
+    let state = dequeDS.createInitialState("1, 2, 3, 4, 5, 6, 7, 8")
     // Pop back 3 times to leave 1 element in second chunk
     for (let i = 0; i < 3; i++) {
       state = apply(state, 'pop_back')
@@ -274,7 +274,7 @@ describe('deque: circular map buffer', () => {
     // Create state where active chunks are near the end of the map
     // mapCap=4, mapBeg=1, chunk at [1]. Pop front until chunk[1] is freed,
     // then push_back should allocate at end. Let's manipulate directly.
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // mapCap=4, mapBeg=1, chunk at [1], slots [0,2,3] free
     // push_back 4 more to fill [2] then [3]
     s = apply(s, 'push_back', { val: 5 })
@@ -295,7 +295,7 @@ describe('deque: circular map buffer', () => {
   })
 
   it('pop_front with wrapped map advances mapBeg circularly', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // Push front enough to wrap mapBeg
     for (let i = 0; i >= -3; i--) {
       s = apply(s, 'push_front', { val: i })
@@ -313,7 +313,7 @@ describe('deque: circular map buffer', () => {
   })
 
   it('getAt works correctly across wrapped boundary', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // Push front to fill slot before mapBeg, possibly wrapping
     s = apply(s, 'push_front', { val: 0 })
     s = apply(s, 'push_front', { val: -1 })
@@ -326,7 +326,7 @@ describe('deque: circular map buffer', () => {
   })
 
   it('insert works with wrapped map', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // Push front to create wrapping
     for (let i = 0; i >= -3; i--) {
       s = apply(s, 'push_front', { val: i })
@@ -339,7 +339,7 @@ describe('deque: circular map buffer', () => {
   })
 
   it('erase works with wrapped map', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     for (let i = 0; i >= -3; i--) {
       s = apply(s, 'push_front', { val: i })
     }
@@ -351,35 +351,35 @@ describe('deque: circular map buffer', () => {
 
 describe('deque: insert', () => {
   it('inserts at beginning', () => {
-    const state = dequeDS.createInitialState([2, 3, 4])
+    const state = dequeDS.createInitialState("2, 3, 4")
     const s2 = apply(state, 'insert', { pos: 0, val: 1 })
     expect(s2.taille).toBe(4)
     expect(logicalElements(s2)).toEqual([1, 2, 3, 4])
   })
 
   it('inserts in middle', () => {
-    const state = dequeDS.createInitialState([1, 3, 4])
+    const state = dequeDS.createInitialState("1, 3, 4")
     const s2 = apply(state, 'insert', { pos: 1, val: 2 })
     expect(s2.taille).toBe(4)
     expect(logicalElements(s2)).toEqual([1, 2, 3, 4])
   })
 
   it('inserts at end', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     const s2 = apply(state, 'insert', { pos: 2, val: 3 })
     expect(s2.taille).toBe(3)
     expect(logicalElements(s2)).toEqual([1, 2, 3])
   })
 
   it('insert at invalid position throws', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     expect(() => apply(state, 'insert', { pos: -1, val: 0 })).toThrow()
     expect(() => apply(state, 'insert', { pos: 3, val: 0 })).toThrow()
   })
 
   it('insert closer to front shifts left', () => {
     // [1, 2, 3, 4, 5], insert at pos=1 — 1 element before vs 4 after → shift left
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
     expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 99, 2, 3, 4, 5])
     // Should have a "left" shift step
@@ -390,7 +390,7 @@ describe('deque: insert', () => {
 
   it('insert closer to back shifts right', () => {
     // [1, 2, 3, 4, 5], insert at pos=4 — 4 elements before vs 1 after → shift right
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'insert', { pos: 4, val: 99 })
     expect(logicalElements(steps[steps.length - 1].state)).toEqual([1, 2, 3, 4, 99, 5])
     const shiftStep = steps.find(s => s.description.includes('Shift'))
@@ -399,7 +399,7 @@ describe('deque: insert', () => {
   })
 
   it('insert has separate shift and write steps (no intermediate "Write 0")', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'insert', { pos: 4, val: 99 })
     // Last step should be the write of the actual value
     expect(steps[steps.length - 1].description).toContain('Write')
@@ -413,7 +413,7 @@ describe('deque: insert', () => {
   })
 
   it('insert at pos=0 delegates to push_front', () => {
-    const state = dequeDS.createInitialState([2, 3, 4])
+    const state = dequeDS.createInitialState("2, 3, 4")
     const steps = applySteps(state, 'insert', { pos: 0, val: 1 })
     // push_front writes directly, no shift step
     expect(steps.every(s => !s.description.includes('Shift'))).toBe(true)
@@ -421,7 +421,7 @@ describe('deque: insert', () => {
   })
 
   it('insert at pos=size delegates to push_back', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     const steps = applySteps(state, 'insert', { pos: 2, val: 3 })
     // push_back writes directly, no shift step
     expect(steps.every(s => !s.description.includes('Shift'))).toBe(true)
@@ -431,47 +431,47 @@ describe('deque: insert', () => {
 
 describe('deque: erase', () => {
   it('erases from beginning', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 0 })
     expect(s2.taille).toBe(2)
     expect(logicalElements(s2)).toEqual([2, 3])
   })
 
   it('erases from middle', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 1 })
     expect(s2.taille).toBe(2)
     expect(logicalElements(s2)).toEqual([1, 3])
   })
 
   it('erases last element', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 2 })
     expect(s2.taille).toBe(2)
     expect(logicalElements(s2)).toEqual([1, 2])
   })
 
   it('erase at invalid position throws', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     expect(() => apply(state, 'erase', { pos: -1 })).toThrow()
     expect(() => apply(state, 'erase', { pos: 2 })).toThrow()
   })
 
   it('erase on empty throws', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     expect(() => apply(state, 'erase', { pos: 0 })).toThrow()
   })
 })
 
 describe('deque: substep counts', () => {
   it('push_back within chunk produces 1 substep', () => {
-    const state = dequeDS.createInitialState([1, 2])
+    const state = dequeDS.createInitialState("1, 2")
     const steps = applySteps(state, 'push_back', { val: 3 })
     expect(steps.length).toBe(1)
   })
 
   it('push_back needing new chunk produces 2 substeps', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4])
+    const state = dequeDS.createInitialState("1, 2, 3, 4")
     const steps = applySteps(state, 'push_back', { val: 5 })
     expect(steps.length).toBe(2)
     expect(steps[0].description).toContain('Allocate')
@@ -479,19 +479,19 @@ describe('deque: substep counts', () => {
   })
 
   it('pop_front without dealloc produces 1 substep', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'pop_front')
     expect(steps.length).toBe(1)
   })
 
   it('pop_back without dealloc produces 1 substep', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'pop_back')
     expect(steps.length).toBe(1)
   })
 
   it('erase from middle produces shift + pop_back substeps', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'erase', { pos: 0 })
     expect(steps.length).toBeGreaterThanOrEqual(2)
     expect(steps[0].description).toContain('Shift')
@@ -501,7 +501,7 @@ describe('deque: substep counts', () => {
 
 describe('deque: layout', () => {
   it('produces 6 struct header fields', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const layout = dequeDS.computeLayout(state)
     const fields = layout.elements.filter(e => e.kind === 'struct-field')
     expect(fields.length).toBe(6)
@@ -510,14 +510,14 @@ describe('deque: layout', () => {
   })
 
   it('produces map cells equal to mapCap', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const layout = dequeDS.computeLayout(state)
     const mapCells = layout.elements.filter(e => e.id.startsWith('cell:map:'))
     expect(mapCells.length).toBe(state.mapCap)
   })
 
   it('active map cells are not dimmed, inactive ones are', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const layout = dequeDS.computeLayout(state)
     const mapCells = layout.elements.filter(e => e.id.startsWith('cell:map:'))
     for (let i = 0; i < state.mapCap; i++) {
@@ -532,7 +532,7 @@ describe('deque: layout', () => {
   })
 
   it('produces chunk cells for each active chunk', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
+    const state = dequeDS.createInitialState("1, 2, 3, 4, 5")
     const layout = dequeDS.computeLayout(state)
     // 2 active chunks, each with chunkCap=4 cells
     const chunkCells = layout.elements.filter(e => e.id.startsWith('cell:chunk:'))
@@ -542,7 +542,7 @@ describe('deque: layout', () => {
 
   it('dims unused slots in first and last chunks', () => {
     // chunkBeg=0, 3 elements in first chunk (slot 3 is unused in last chunk sense)
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const layout = dequeDS.computeLayout(state)
     const chunkCells = layout.elements.filter(e => e.id.startsWith('cell:chunk:'))
     const dimmed = chunkCells.filter(e => (e.data as CellData).dimmed)
@@ -551,7 +551,7 @@ describe('deque: layout', () => {
   })
 
   it('produces arrows from map field to map row and from map cells to chunks', () => {
-    const state = dequeDS.createInitialState([1, 2, 3])
+    const state = dequeDS.createInitialState("1, 2, 3")
     const layout = dequeDS.computeLayout(state)
     // 1 arrow from struct field to map + 1 arrow per active chunk
     const activeChunkCount = state.chunks.filter(c => c !== null).length
@@ -559,7 +559,7 @@ describe('deque: layout', () => {
   })
 
   it('empty deque has struct fields and map cells but no chunk cells', () => {
-    const state = dequeDS.createInitialState([])
+    const state = dequeDS.createInitialState("")
     const layout = dequeDS.computeLayout(state)
     const fields = layout.elements.filter(e => e.kind === 'struct-field')
     expect(fields.length).toBe(6)
@@ -570,7 +570,7 @@ describe('deque: layout', () => {
   })
 
   it('all intermediate substeps produce valid renderable layouts', () => {
-    const state = dequeDS.createInitialState([1, 2, 3, 4])
+    const state = dequeDS.createInitialState("1, 2, 3, 4")
     const steps = applySteps(state, 'insert', { pos: 1, val: 99 })
     for (const step of steps) {
       const layout = dequeDS.computeLayout(step.state)
@@ -581,7 +581,7 @@ describe('deque: layout', () => {
 
   it('shows old map cells and chunks during growth substeps', () => {
     // Force map growth: fill all slots then push
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     // Fill all map slots by pushing
     for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
     for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
@@ -606,7 +606,7 @@ describe('deque: layout', () => {
   })
 
   it('after copy step, old map arrows point to valid chunk positions below new map', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
     for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
     while (s.chunkBeg > 0) s = apply(s, 'push_front', { val: -99 })
@@ -627,7 +627,7 @@ describe('deque: layout', () => {
   })
 
   it('old map disappears after delete step', () => {
-    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    let s = dequeDS.createInitialState("1, 2, 3, 4")
     for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
     for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
     while (s.chunkBeg > 0) s = apply(s, 'push_front', { val: -99 })

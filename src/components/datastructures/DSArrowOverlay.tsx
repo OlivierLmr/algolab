@@ -59,7 +59,7 @@ export function DSArrowOverlay({ arrows, width, height }: Props) {
             stroke={color}
             stroke-width="1.5"
             opacity={opacity}
-            marker-end="url(#ds-arrowhead)"
+            marker-end={arrow.noArrowhead ? undefined : 'url(#ds-arrowhead)'}
           />
         )
       })}

@@ -1227,3 +1227,84 @@ body {
   font-size: 24px;
   line-height: 1;
 }
+
+/* DS tree-circle (abstract tree node) */
+.ds-tree-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #999;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 200ms ease, opacity 200ms;
+}
+
+.ds-tree-circle-label {
+  font: 14px monospace;
+  color: #222;
+}
+
+/* DS vertical column-header label */
+.ds-vertical-label {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+  pointer-events: none;
+}
+
+.ds-vertical-label-text {
+  font: 13px monospace;
+  color: #333;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+/* Hover label for DS cells — vertical, above the cell, only visible on hover */
+/* Hovered cell needs to be its own positioning context so the absolutely
+   positioned hover wrapper anchors to it (transform alone is not reliable
+   across all stacking contexts). */
+.ds-cell-with-hover {
+  position: relative;
+}
+
+/* When the user hovers a cell, lift it above the SVG arrow overlay so the
+   hover label (inside this stacking context) is not occluded by arrows. */
+.ds-cell-with-hover:hover {
+  z-index: 20;
+}
+
+/* Wrapper sits directly above the cell; it grows upward to fit the rotated
+   label, regardless of label length. The label is bottom-aligned inside the
+   wrapper so its first character (after rotation) sits next to the cell. */
+.ds-cell-hover-wrapper {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 10;
+}
+
+.ds-cell-with-hover:hover .ds-cell-hover-wrapper {
+  opacity: 1;
+}
+
+.ds-cell-hover-label {
+  font: 13px monospace;
+  color: #333;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 4px 3px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+}

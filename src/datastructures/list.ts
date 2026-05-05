@@ -2,6 +2,7 @@ import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
 import { CELL_SIZE, CELL_GAP, ARRAY_LABEL_HEIGHT } from '../layout/constants.ts'
 import { rectEdgeIntersection } from './layout-utils.ts'
+import { parseNumberList } from './parse-utils.ts'
 
 // --- State ---
 
@@ -82,7 +83,8 @@ function getNodeAtPos(state: ListState, pos: number): DLLNode {
 
 type Step = DSSubstep<ListState>
 
-function createInitialState(values: number[]): ListState {
+function createInitialState(input: string): ListState {
+  const values = parseNumberList(input)
   if (values.length === 0) {
     return { nodes: [], headId: null, tailId: null, size: 0, nextNodeId: 0 }
   }
@@ -767,6 +769,7 @@ function emitNodeCells(
 
 export const listDS: DataStructure<ListState> = {
   name: 'list<T>',
+  defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'push_back', label: 'push_back(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },

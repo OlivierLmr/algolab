@@ -1,6 +1,7 @@
 import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, StructFieldData } from '../layout/types.ts'
 import { CELL_SIZE, CELL_GAP } from '../layout/constants.ts'
+import { parseNumberList } from './parse-utils.ts'
 
 // =============================================================================
 // State — Map-of-Chunks (real std::deque layout)
@@ -78,7 +79,8 @@ function isMapFull(state: DequeState): boolean {
 // Initial State
 // =============================================================================
 
-function createInitialState(values: number[]): DequeState {
+function createInitialState(input: string): DequeState {
+  const values = parseNumberList(input)
   const chunkCap = 4
   if (values.length === 0) {
     const mapCap = 4
@@ -631,6 +633,7 @@ function computeLayout(state: DequeState): DSLayout {
 
 export const dequeDS: DataStructure<DequeState> = {
   name: 'deque<T>',
+  defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'push_back', label: 'push_back(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },

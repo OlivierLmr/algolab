@@ -15,10 +15,14 @@ export interface CellData {
   gaugeRatio?: number
   /** Override the displayed text (e.g. "•" or "∅" for pointer cells). */
   displayOverride?: string
+  /** A short label shown above the cell on hover (e.g. struct field name). */
+  hoverLabel?: string
 }
 
 export interface LabelData {
   text: string
+  /** Render the text rotated 90° (used for struct field name headers). */
+  vertical?: boolean
 }
 
 export interface VariableData {
@@ -69,11 +73,16 @@ export interface StructFieldData {
   isPointer: boolean
 }
 
+/** A circle-with-label node, used for abstract tree visualizations. */
+export interface TreeCircleData {
+  label: string
+}
+
 export interface GroupData {
   role: 'array-row' | 'variables-row' | 'callstack' | 'heap-tree'
 }
 
-export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | TreeNodeData | StructFieldData | GroupData
+export type NodeData = CellData | LabelData | VariableData | FrameData | PointerData | TreeNodeData | StructFieldData | TreeCircleData | GroupData
 
 // --- Layout node ---
 
@@ -83,7 +92,7 @@ export interface LayoutNode {
   y: number
   width: number
   height: number
-  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'tree-node' | 'struct-field' | 'group'
+  kind: 'cell' | 'array-label' | 'variable' | 'frame' | 'pointer' | 'tree-node' | 'tree-circle' | 'struct-field' | 'group'
   data: NodeData
   children?: LayoutNode[]
 }

@@ -4,9 +4,10 @@ import { vectorDS } from './vector.ts'
 import { forwardListDS } from './forward-list.ts'
 import { listDS } from './list.ts'
 import { dequeDS } from './deque.ts'
+import { siblingTreeDS } from './sibling-tree.ts'
 
 // Registry of available data structures
-export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS, listDS, dequeDS]
+export const dataStructures: DataStructure<any>[] = [vectorDS, forwardListDS, listDS, dequeDS, siblingTreeDS]
 
 /** Derive a URL slug from a DS name (e.g. "vector<T>" → "vector"). */
 function dsSlug(ds: DataStructure<any>): string {
@@ -98,13 +99,14 @@ function cancelAnimation(): void {
 export function selectDS(index: number): void {
   cancelAnimation()
   currentDSIndex.value = index
-  initDS([1, 2, 3, 4, 5])
+  const ds = dataStructures[index]
+  initDS(ds.defaultInput ?? '')
 }
 
-export function initDS(values: number[]): void {
+export function initDS(input: string): void {
   cancelAnimation()
   const ds = currentDS.value
-  const state = ds.createInitialState(values)
+  const state = ds.createInitialState(input)
   dsHistory.value = [{
     label: 'initial',
     substeps: [{ state, description: 'Initial state' }],
@@ -236,7 +238,7 @@ export function dsGoToSubstep(substepIdx: number): void {
 export function enterDSMode(): void {
   isDSMode.value = true
   if (dsHistory.value.length === 0) {
-    initDS([1, 2, 3, 4, 5])
+    initDS(currentDS.value.defaultInput ?? '')
   }
 }
 
@@ -247,7 +249,7 @@ export function exitDSMode(): void {
 
 // Initialize DS state from hash on load
 if (initialDS !== null) {
-  initDS([1, 2, 3, 4, 5])
+  initDS(currentDS.value.defaultInput ?? '')
 }
 
 // Sync DS state to URL hash

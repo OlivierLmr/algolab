@@ -1,5 +1,5 @@
 import { currentDSLayout, currentDSOp, currentDSDescription, isIntermediateSubstep, dsSubstepIndex } from '../../datastructures/state.ts'
-import type { FlatElement, CellData, LabelData, StructFieldData } from '../../layout/types.ts'
+import type { FlatElement, CellData, LabelData, StructFieldData, TreeCircleData } from '../../layout/types.ts'
 import { CELL_SIZE, DIMMED_OPACITY } from '../../layout/constants.ts'
 import { DSArrowOverlay } from './DSArrowOverlay.tsx'
 
@@ -56,9 +56,29 @@ function DSElement({ el }: { el: FlatElement }) {
       return <DSCellElement el={el} />
     case 'array-label':
       return <DSArrayLabelElement el={el} />
+    case 'tree-circle':
+      return <TreeCircleElement el={el} />
     default:
       return null
   }
+}
+
+function TreeCircleElement({ el }: { el: FlatElement }) {
+  const data = el.data as TreeCircleData
+  return (
+    <div
+      class="ds-tree-circle"
+      style={{
+        position: 'absolute',
+        transform: `translate(${el.x}px, ${el.y}px)`,
+        width: el.width,
+        height: el.height,
+        opacity: el.opacity,
+      }}
+    >
+      <span class="ds-tree-circle-label">{data.label}</span>
+    </div>
+  )
 }
 
 function StructFieldElement({ el }: { el: FlatElement }) {
@@ -100,13 +120,18 @@ function DSCellElement({ el }: { el: FlatElement }) {
 
   return (
     <div
-      class="viz-cell-wrapper"
+      class={`viz-cell-wrapper${data.hoverLabel ? ' ds-cell-with-hover' : ''}`}
       style={{
         transform: `translate(${el.x}px, ${el.y}px)`,
         width: CELL_SIZE,
         opacity: data.dimmed ? DIMMED_OPACITY : el.opacity,
       }}
     >
+      {data.hoverLabel && (
+        <div class="ds-cell-hover-wrapper">
+          <span class="ds-cell-hover-label">{data.hoverLabel}</span>
+        </div>
+      )}
       <div
         class="viz-cell"
         style={{
@@ -128,6 +153,22 @@ function DSCellElement({ el }: { el: FlatElement }) {
 function DSArrayLabelElement({ el }: { el: FlatElement }) {
   const data = el.data as LabelData
   if (!data.text) return null
+  if (data.vertical) {
+    return (
+      <div
+        class="ds-vertical-label"
+        style={{
+          position: 'absolute',
+          transform: `translate(${el.x}px, ${el.y}px)`,
+          width: el.width,
+          height: el.height,
+          opacity: el.opacity,
+        }}
+      >
+        <span class="ds-vertical-label-text">{data.text}</span>
+      </div>
+    )
+  }
   return (
     <div
       class="viz-array-label"

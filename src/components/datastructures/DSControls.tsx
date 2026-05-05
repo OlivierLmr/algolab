@@ -1,4 +1,4 @@
-import { useSignal } from '@preact/signals'
+import { useSignal, useSignalEffect } from '@preact/signals'
 import type { OperationDef } from '../../datastructures/types.ts'
 import {
   currentDS, currentDSState,
@@ -8,7 +8,12 @@ import {
 export function DSControls() {
   const ds = currentDS.value
   const snapshot = currentDSState.value
-  const inputText = useSignal('1, 2, 3, 4, 5')
+  const inputText = useSignal(ds.defaultInput ?? '')
+
+  // Reset the input box when the user switches to a different DS.
+  useSignalEffect(() => {
+    inputText.value = currentDS.value.defaultInput ?? ''
+  })
 
   if (!snapshot) return null
 
@@ -26,21 +31,20 @@ export function DSControls() {
           />
           <button
             class="ds-controls-btn"
-            onClick={() => {
-              const nums = inputText.value.split(',').map(s => Number(s.trim())).filter(n => !isNaN(n))
-              initDS(nums)
-            }}
+            onClick={() => initDS(inputText.value)}
           >
             Reset
           </button>
         </div>
       </div>
 
-      <div class="ds-controls-ops">
-        {ds.operations.map(op => (
-          <OperationButton key={op.name} op={op} />
-        ))}
-      </div>
+      {ds.operations.length > 0 && (
+        <div class="ds-controls-ops">
+          {ds.operations.map(op => (
+            <OperationButton key={op.name} op={op} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -27,7 +27,7 @@ function values(state: ListState): number[] {
 
 describe('list: initial state', () => {
   it('empty input creates empty list', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     expect(state.size).toBe(0)
     expect(state.headId).toBeNull()
     expect(state.tailId).toBeNull()
@@ -35,7 +35,7 @@ describe('list: initial state', () => {
   })
 
   it('single element list', () => {
-    const state = listDS.createInitialState([42])
+    const state = listDS.createInitialState("42")
     expect(state.size).toBe(1)
     expect(state.headId).toBe(0)
     expect(state.tailId).toBe(0)
@@ -46,7 +46,7 @@ describe('list: initial state', () => {
   })
 
   it('multiple elements are linked correctly', () => {
-    const state = listDS.createInitialState([10, 20, 30])
+    const state = listDS.createInitialState("10, 20, 30")
     expect(state.size).toBe(3)
     expect(state.headId).toBe(0)
     expect(state.tailId).toBe(2)
@@ -63,7 +63,7 @@ describe('list: initial state', () => {
 
 describe('list: push_front', () => {
   it('push_front on empty list', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     const s2 = apply(state, 'push_front', { val: 5 })
     expect(s2.size).toBe(1)
     expect(values(s2)).toEqual([5])
@@ -71,14 +71,14 @@ describe('list: push_front', () => {
   })
 
   it('push_front on non-empty list', () => {
-    const state = listDS.createInitialState([2, 3])
+    const state = listDS.createInitialState("2, 3")
     const s2 = apply(state, 'push_front', { val: 1 })
     expect(s2.size).toBe(3)
     expect(values(s2)).toEqual([1, 2, 3])
   })
 
   it('multiple push_fronts maintain order', () => {
-    let s = listDS.createInitialState([])
+    let s = listDS.createInitialState("")
     s = apply(s, 'push_front', { val: 3 })
     s = apply(s, 'push_front', { val: 2 })
     s = apply(s, 'push_front', { val: 1 })
@@ -88,7 +88,7 @@ describe('list: push_front', () => {
 
 describe('list: push_back', () => {
   it('push_back on empty list', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     const s2 = apply(state, 'push_back', { val: 5 })
     expect(s2.size).toBe(1)
     expect(values(s2)).toEqual([5])
@@ -96,14 +96,14 @@ describe('list: push_back', () => {
   })
 
   it('push_back on non-empty list', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const s2 = apply(state, 'push_back', { val: 3 })
     expect(s2.size).toBe(3)
     expect(values(s2)).toEqual([1, 2, 3])
   })
 
   it('multiple push_backs maintain order', () => {
-    let s = listDS.createInitialState([])
+    let s = listDS.createInitialState("")
     s = apply(s, 'push_back', { val: 1 })
     s = apply(s, 'push_back', { val: 2 })
     s = apply(s, 'push_back', { val: 3 })
@@ -113,14 +113,14 @@ describe('list: push_back', () => {
 
 describe('list: pop_front', () => {
   it('removes first element', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'pop_front')
     expect(s2.size).toBe(2)
     expect(values(s2)).toEqual([2, 3])
   })
 
   it('pop_front on single element empties the list', () => {
-    const state = listDS.createInitialState([42])
+    const state = listDS.createInitialState("42")
     const s2 = apply(state, 'pop_front')
     expect(s2.size).toBe(0)
     expect(s2.headId).toBeNull()
@@ -128,21 +128,21 @@ describe('list: pop_front', () => {
   })
 
   it('pop_front on empty throws', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     expect(() => apply(state, 'pop_front')).toThrow()
   })
 })
 
 describe('list: pop_back', () => {
   it('removes last element', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'pop_back')
     expect(s2.size).toBe(2)
     expect(values(s2)).toEqual([1, 2])
   })
 
   it('pop_back on single element empties the list', () => {
-    const state = listDS.createInitialState([42])
+    const state = listDS.createInitialState("42")
     const s2 = apply(state, 'pop_back')
     expect(s2.size).toBe(0)
     expect(s2.headId).toBeNull()
@@ -150,39 +150,39 @@ describe('list: pop_back', () => {
   })
 
   it('pop_back on empty throws', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     expect(() => apply(state, 'pop_back')).toThrow()
   })
 })
 
 describe('list: insert', () => {
   it('insert at beginning (delegates to push_front)', () => {
-    const state = listDS.createInitialState([2, 3])
+    const state = listDS.createInitialState("2, 3")
     const s2 = apply(state, 'insert', { pos: 0, val: 1 })
     expect(values(s2)).toEqual([1, 2, 3])
   })
 
   it('insert at end (delegates to push_back)', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const s2 = apply(state, 'insert', { pos: 2, val: 3 })
     expect(values(s2)).toEqual([1, 2, 3])
   })
 
   it('insert in middle', () => {
-    const state = listDS.createInitialState([1, 3])
+    const state = listDS.createInitialState("1, 3")
     const s2 = apply(state, 'insert', { pos: 1, val: 2 })
     expect(s2.size).toBe(3)
     expect(values(s2)).toEqual([1, 2, 3])
   })
 
   it('insert at invalid position throws', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     expect(() => apply(state, 'insert', { pos: -1, val: 0 })).toThrow()
     expect(() => apply(state, 'insert', { pos: 3, val: 0 })).toThrow()
   })
 
   it('insert in middle preserves bidirectional links', () => {
-    const state = listDS.createInitialState([1, 3, 5])
+    const state = listDS.createInitialState("1, 3, 5")
     const s2 = apply(state, 'insert', { pos: 1, val: 2 })
     // Verify backward traversal
     const backValues: number[] = []
@@ -198,37 +198,37 @@ describe('list: insert', () => {
 
 describe('list: erase', () => {
   it('erase first (delegates to pop_front)', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 0 })
     expect(values(s2)).toEqual([2, 3])
   })
 
   it('erase last (delegates to pop_back)', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 2 })
     expect(values(s2)).toEqual([1, 2])
   })
 
   it('erase from middle', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const s2 = apply(state, 'erase', { pos: 1 })
     expect(s2.size).toBe(2)
     expect(values(s2)).toEqual([1, 3])
   })
 
   it('erase at invalid position throws', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     expect(() => apply(state, 'erase', { pos: -1 })).toThrow()
     expect(() => apply(state, 'erase', { pos: 2 })).toThrow()
   })
 
   it('erase on empty throws', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     expect(() => apply(state, 'erase', { pos: 0 })).toThrow()
   })
 
   it('erase from middle preserves bidirectional links', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const s2 = apply(state, 'erase', { pos: 2 })
     expect(values(s2)).toEqual([1, 2, 4, 5])
     // Verify backward traversal
@@ -245,7 +245,7 @@ describe('list: erase', () => {
 
 describe('list: substeps', () => {
   it('push_front on non-empty produces 4 substeps', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const steps = applySteps(state, 'push_front', { val: 0 })
     expect(steps.length).toBe(4)
     expect(steps[0].description).toContain('Create new node')
@@ -255,7 +255,7 @@ describe('list: substeps', () => {
   })
 
   it('push_front on empty produces 3 substeps (no prev update)', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     const steps = applySteps(state, 'push_front', { val: 1 })
     expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('Create')
@@ -264,7 +264,7 @@ describe('list: substeps', () => {
   })
 
   it('push_back on non-empty produces 4 substeps', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const steps = applySteps(state, 'push_back', { val: 3 })
     expect(steps.length).toBe(4)
     expect(steps[0].description).toContain('Create new node')
@@ -274,7 +274,7 @@ describe('list: substeps', () => {
   })
 
   it('pop_front on multi-element produces 3 substeps', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'pop_front')
     expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('begin')
@@ -283,7 +283,7 @@ describe('list: substeps', () => {
   })
 
   it('pop_front on single-element produces 2 substeps (no prev clear)', () => {
-    const state = listDS.createInitialState([42])
+    const state = listDS.createInitialState("42")
     const steps = applySteps(state, 'pop_front')
     expect(steps.length).toBe(2)
     expect(steps[0].description).toContain('begin')
@@ -291,7 +291,7 @@ describe('list: substeps', () => {
   })
 
   it('pop_back on multi-element produces 3 substeps', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'pop_back')
     expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('end')
@@ -300,7 +300,7 @@ describe('list: substeps', () => {
   })
 
   it('insert in middle produces 5 substeps', () => {
-    const state = listDS.createInitialState([1, 3])
+    const state = listDS.createInitialState("1, 3")
     const steps = applySteps(state, 'insert', { pos: 1, val: 2 })
     expect(steps.length).toBe(5)
     expect(steps[0].description).toContain('Create new node')
@@ -311,7 +311,7 @@ describe('list: substeps', () => {
   })
 
   it('erase from middle produces 3 substeps', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const steps = applySteps(state, 'erase', { pos: 1 })
     expect(steps.length).toBe(3)
     expect(steps[0].description).toContain('.next')
@@ -320,7 +320,7 @@ describe('list: substeps', () => {
   })
 
   it('all intermediate substeps have valid renderable state', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const ops = [
       { op: 'push_front', args: { val: 0 } },
       { op: 'push_back', args: { val: 4 } },
@@ -344,7 +344,7 @@ describe('list: substeps', () => {
 
 describe('list: layout', () => {
   it('produces struct header fields (size, begin, end)', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const layout = listDS.computeLayout(state)
 
     const fields = layout.elements.filter(e => e.kind === 'struct-field')
@@ -356,7 +356,7 @@ describe('list: layout', () => {
   })
 
   it('produces three cells per node (prev, value, next)', () => {
-    const state = listDS.createInitialState([10, 20, 30])
+    const state = listDS.createInitialState("10, 20, 30")
     const layout = listDS.computeLayout(state)
 
     const cells = layout.elements.filter(e => e.kind === 'cell')
@@ -364,7 +364,7 @@ describe('list: layout', () => {
   })
 
   it('pointer cells have displayOverride', () => {
-    const state = listDS.createInitialState([10, 20])
+    const state = listDS.createInitialState("10, 20")
     const layout = listDS.computeLayout(state)
     const prevCells = layout.elements.filter(e => e.id.endsWith(':prev'))
     const nextCells = layout.elements.filter(e => e.id.endsWith(':next'))
@@ -379,7 +379,7 @@ describe('list: layout', () => {
   })
 
   it('empty list shows empty label and struct header', () => {
-    const state = listDS.createInitialState([])
+    const state = listDS.createInitialState("")
     const layout = listDS.computeLayout(state)
 
     const fields = layout.elements.filter(e => e.kind === 'struct-field')
@@ -393,7 +393,7 @@ describe('list: layout', () => {
   })
 
   it('single node has 4 s-curve arrows (begin→node, end→node, prev→begin, next→end)', () => {
-    const state = listDS.createInitialState([42])
+    const state = listDS.createInitialState("42")
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
@@ -403,7 +403,7 @@ describe('list: layout', () => {
   })
 
   it('two nodes have 2 straight arrows (next+prev) plus 4 s-curves', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
@@ -413,7 +413,7 @@ describe('list: layout', () => {
   })
 
   it('three nodes have 4 straight arrows (2 pairs) plus 4 s-curves', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
@@ -423,7 +423,7 @@ describe('list: layout', () => {
   })
 
   it('sentinel arrows go from node row upward to struct header', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const layout = listDS.computeLayout(state)
 
     // Find arrows going upward (fromY > toY) — these are the sentinel arrows
@@ -432,7 +432,7 @@ describe('list: layout', () => {
   })
 
   it('sentinel arrows target box edge, not center', () => {
-    const state = listDS.createInitialState([1])
+    const state = listDS.createInitialState("1")
     const layout = listDS.computeLayout(state)
 
     const beginField = layout.elements.find(e => e.id === 'field:begin')!
@@ -454,7 +454,7 @@ describe('list: layout', () => {
   })
 
   it('bidirectional arrows are vertically offset', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
@@ -467,7 +467,7 @@ describe('list: layout', () => {
   })
 
   it('floating node in intermediate substep renders to the right', () => {
-    const state = listDS.createInitialState([1, 2])
+    const state = listDS.createInitialState("1, 2")
     const steps = applySteps(state, 'push_front', { val: 0 })
     // Step 0: new node is floating
     const layout = listDS.computeLayout(steps[0].state)
@@ -485,7 +485,7 @@ describe('list: splice', () => {
   it('moves a single node to front', () => {
     // [1, 2, 3, 4, 5] → splice(pos=0, first=3, last=4) → move [3,4) = node at 3 (val 4) before pos 0
     // Result: [4, 1, 2, 3, 5]
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const s2 = apply(state, 'splice', { pos: 0, first: 3, last: 4 })
     expect(values(s2)).toEqual([4, 1, 2, 3, 5])
     expect(s2.size).toBe(5)
@@ -494,7 +494,7 @@ describe('list: splice', () => {
   it('moves multiple nodes to front', () => {
     // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4) → move [2,4) = nodes 2,3 (val 3,4) before pos 0
     // Result: [3, 4, 1, 2, 5]
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const s2 = apply(state, 'splice', { pos: 0, first: 2, last: 4 })
     expect(values(s2)).toEqual([3, 4, 1, 2, 5])
   })
@@ -502,7 +502,7 @@ describe('list: splice', () => {
   it('moves range to end', () => {
     // [1, 2, 3, 4, 5] → splice(pos=5, first=1, last=3) → move [1,3) = nodes 1,2 (val 2,3) before pos 5 (end)
     // Result: [1, 4, 5, 2, 3]
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const s2 = apply(state, 'splice', { pos: 5, first: 1, last: 3 })
     expect(values(s2)).toEqual([1, 4, 5, 2, 3])
     expect(s2.size).toBe(5)
@@ -511,13 +511,13 @@ describe('list: splice', () => {
   it('moves range to middle', () => {
     // [1, 2, 3, 4, 5] → splice(pos=1, first=3, last=5) → move [3,5) = nodes 3,4 (val 4,5) before pos 1
     // Result: [1, 4, 5, 2, 3]
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const s2 = apply(state, 'splice', { pos: 1, first: 3, last: 5 })
     expect(values(s2)).toEqual([1, 4, 5, 2, 3])
   })
 
   it('has 5 substeps: visual + unlink + 2 bidirectional relink + visual cleanup', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     // Step 0: visual pre-step
     // Step 1: unlink (close the gap — both forward and backward)
@@ -533,7 +533,7 @@ describe('list: splice', () => {
   })
 
   it('floating nodes persist across all intermediate steps', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
 
     // Steps 0-3 should have floatingNodeIds set (nodes stay below)
@@ -558,7 +558,7 @@ describe('list: splice', () => {
   })
 
   it('floating nodes appear below their original position', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     const layout = listDS.computeLayout(steps[0].state)
     const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
@@ -572,18 +572,18 @@ describe('list: splice', () => {
   })
 
   it('throws on empty range', () => {
-    const state = listDS.createInitialState([1, 2, 3])
+    const state = listDS.createInitialState("1, 2, 3")
     expect(() => apply(state, 'splice', { pos: 0, first: 2, last: 2 })).toThrow()
   })
 
   it('throws when pos is inside the moved range', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4])
+    const state = listDS.createInitialState("1, 2, 3, 4")
     // Move [1,3) before pos 2 — pos 2 is inside [1,3)
     expect(() => apply(state, 'splice', { pos: 2, first: 1, last: 3 })).toThrow()
   })
 
   it('all substeps produce valid layouts', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 3, last: 5 })
     for (const step of steps) {
       const layout = listDS.computeLayout(step.state)
@@ -594,7 +594,7 @@ describe('list: splice', () => {
 
   it('step 0 shows moved nodes below without changing pointers', () => {
     // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4) moves [2,4) = nodes 2,3 (vals 3,4)
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     const step0 = steps[0]
 
@@ -626,7 +626,7 @@ describe('list: splice', () => {
     // In the visual pre-step, nodes 0,1,4 are in the top row but 1 and 4
     // are NOT connected (1.next→2 which is below, not →4). There should
     // be no arrow connecting nodes 1 and 4 directly.
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     const layout = listDS.computeLayout(steps[0].state)
 
@@ -652,7 +652,7 @@ describe('list: splice', () => {
   })
 
   it('step 0 floating nodes are spread horizontally', () => {
-    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const state = listDS.createInitialState("1, 2, 3, 4, 5")
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
     const layout = listDS.computeLayout(steps[0].state)
     const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))

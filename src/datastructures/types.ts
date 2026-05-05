@@ -11,6 +11,8 @@ export interface DSArrow {
   style?: 's-curve' | 'straight'
   /** Opacity for dimmed arrows (e.g. old map during reallocation). Default: 1.0. */
   opacity?: number
+  /** Suppress the arrowhead (e.g. for undirected tree edges). Default: false. */
+  noArrowhead?: boolean
 }
 
 /** Layout output for a data structure visualization. */
@@ -58,7 +60,10 @@ export interface DSOperation {
 export interface DataStructure<S> {
   name: string
   operations: OperationDef[]
-  createInitialState(values: number[]): S
+  /** Default text shown in the input field when this DS is selected. */
+  defaultInput?: string
+  /** Parse a user-provided input string into the initial state. */
+  createInitialState(input: string): S
   applyOperation(state: S, op: string, args: Record<string, number>): DSSubstep<S>[]
   computeLayout(state: S): DSLayout
 }

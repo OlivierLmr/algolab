@@ -2,6 +2,7 @@ import type { DataStructure, DSLayout, DSArrow, DSSubstep } from './types.ts'
 import type { FlatElement, CellData, LabelData, StructFieldData } from '../layout/types.ts'
 import { CELL_SIZE, CELL_GAP } from '../layout/constants.ts'
 import { rectEdgeIntersection } from './layout-utils.ts'
+import { parseNumberList } from './parse-utils.ts'
 
 // --- State ---
 
@@ -62,7 +63,8 @@ function getNodeAtPosition(state: ForwardListState, pos: number): FLNode | null 
 
 type Step = DSSubstep<ForwardListState>
 
-function createInitialState(values: number[]): ForwardListState {
+function createInitialState(input: string): ForwardListState {
+  const values = parseNumberList(input)
   if (values.length === 0) {
     return { nodes: [], headId: null, size: 0, nextNodeId: 0 }
   }
@@ -582,6 +584,7 @@ function emitNodeCells(elements: FlatElement[], node: FLNode, x: number, y: numb
 
 export const forwardListDS: DataStructure<ForwardListState> = {
   name: 'forward_list<T>',
+  defaultInput: '1, 2, 3, 4, 5',
   operations: [
     { name: 'push_front', label: 'push_front(val)', args: [{ name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'pop_front', label: 'pop_front()', args: [] },
