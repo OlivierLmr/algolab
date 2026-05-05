@@ -7,6 +7,10 @@ import {
   selectCustom,
   sidebarOpen,
 } from '../state.ts'
+import {
+  isDSMode, currentDSIndex, dataStructures,
+  enterDSMode, exitDSMode, selectDS,
+} from '../datastructures/state.ts'
 
 interface AlgorithmGroup {
   label: string
@@ -69,33 +73,66 @@ export function AlgorithmSidebar() {
   const open = sidebarOpen.value
   const custom = isCustomMode.value
   const selectedIndex = currentAlgoIndex.value
+  const dsMode = isDSMode.value
+  const dsIndex = currentDSIndex.value
 
   return (
     <nav class={`algo-sidebar${open ? '' : ' algo-sidebar-collapsed'}`}>
       <button
         class="algo-sidebar-toggle"
         onClick={() => { sidebarOpen.value = !sidebarOpen.value }}
-        title={open ? 'Collapse sidebar' : 'Show algorithms'}
+        title={open ? 'Collapse sidebar' : 'Show sidebar'}
       >
         {open ? '\u2039' : '\u203A'}
       </button>
       {open && (
         <div class="algo-sidebar-content">
-          {groups.map(group => (
-            <SidebarGroup
-              key={group.label}
-              group={group}
-              selectedIndex={custom ? -1 : selectedIndex}
-            />
-          ))}
-          <div class="algo-sidebar-custom">
+          <div class="algo-sidebar-mode-tabs">
             <button
-              class={`algo-sidebar-item${custom ? ' algo-sidebar-item-active' : ''}`}
-              onClick={selectCustom}
+              class={`algo-sidebar-mode-tab${!dsMode ? ' algo-sidebar-mode-tab-active' : ''}`}
+              onClick={() => { if (dsMode) exitDSMode() }}
             >
-              Custom
+              Algorithms
+            </button>
+            <button
+              class={`algo-sidebar-mode-tab${dsMode ? ' algo-sidebar-mode-tab-active' : ''}`}
+              onClick={() => { if (!dsMode) enterDSMode() }}
+            >
+              Structures
             </button>
           </div>
+
+          {dsMode ? (
+            <div class="algo-sidebar-ds-list">
+              {dataStructures.map((ds, i) => (
+                <button
+                  key={ds.name}
+                  class={`algo-sidebar-item${i === dsIndex ? ' algo-sidebar-item-active' : ''}`}
+                  onClick={() => selectDS(i)}
+                >
+                  {ds.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              {groups.map(group => (
+                <SidebarGroup
+                  key={group.label}
+                  group={group}
+                  selectedIndex={custom ? -1 : selectedIndex}
+                />
+              ))}
+              <div class="algo-sidebar-custom">
+                <button
+                  class={`algo-sidebar-item${custom ? ' algo-sidebar-item-active' : ''}`}
+                  onClick={selectCustom}
+                >
+                  Custom
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </nav>

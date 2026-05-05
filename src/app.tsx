@@ -13,6 +13,9 @@ import { DslDocs } from './components/DslDocs.tsx'
 import type { DescriptionSegment } from './types.ts'
 import { evaluateTooltip } from './tooltip.ts'
 import { currentStep, recentDescriptions, hoveredDescriptionLine, nextStep, prevStep, stepOver, stepOut, stepOverBack, stepOutBack, isCustomMode, isRunMode, codePanelWidth, sidebarOpen } from './state.ts'
+import { isDSMode } from './datastructures/state.ts'
+import { DSVisualizer } from './components/datastructures/DSVisualizer.tsx'
+import { DSControls } from './components/datastructures/DSControls.tsx'
 
 function renderSegments(segments: DescriptionSegment[], tooltips?: Record<string, string>, step?: import('./types.ts').Step | null) {
   return segments.map((seg, i) => {
@@ -85,11 +88,13 @@ function DescriptionPanel() {
 
 export function App() {
   const editMode = isCustomMode.value && !isRunMode.value
+  const dsMode = isDSMode.value
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (dsMode) return
       if (e.shiftKey && e.key === 'ArrowRight') { e.preventDefault(); stepOver() }
       else if (e.shiftKey && e.key === 'ArrowLeft') { e.preventDefault(); stepOverBack() }
       else if (e.shiftKey && e.key === 'ArrowUp') { e.preventDefault(); stepOut() }
@@ -99,7 +104,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [dsMode])
 
   const gridColumns = `${codePanelWidth.value}px 0px 1fr`
 
@@ -111,20 +116,31 @@ export function App() {
       <div class="app-main" style={{ marginLeft: sidebarWidth }}>
         <Header />
         <ChangelogBanner />
-        <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
-          {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
-          <ResizeHandle />
-          <div class={`right-column ${editMode ? 'dimmed' : ''}`}>
+        {dsMode ? (
+          <div class="ds-main">
+            <DSControls />
             <div class="canvas-wrapper">
-              <StepVisualizer />
-            </div>
-            <div class="description">
-              <DescriptionPanel />
+              <DSVisualizer />
             </div>
           </div>
-        </div>
-        <Controls />
-        {editMode && <DslDocs />}
+        ) : (
+          <>
+            <div class="main-layout" style={{ gridTemplateColumns: gridColumns }}>
+              {isCustomMode.value && !isRunMode.value ? <EditorPanel /> : <CodePanel />}
+              <ResizeHandle />
+              <div class={`right-column ${editMode ? 'dimmed' : ''}`}>
+                <div class="canvas-wrapper">
+                  <StepVisualizer />
+                </div>
+                <div class="description">
+                  <DescriptionPanel />
+                </div>
+              </div>
+            </div>
+            <Controls />
+            {editMode && <DslDocs />}
+          </>
+        )}
       </div>
     </>
   )

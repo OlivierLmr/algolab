@@ -828,3 +828,183 @@ body {
   font-size: 11px;
   color: #aaa;
 }
+
+/* Mode tabs in sidebar */
+.algo-sidebar-mode-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+.algo-sidebar-mode-tab {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.algo-sidebar-mode-tab:hover {
+  color: #555;
+}
+
+.algo-sidebar-mode-tab-active {
+  color: #333;
+  border-bottom-color: #333;
+}
+
+.algo-sidebar-ds-list {
+  padding: 4px 0;
+}
+
+/* Data structure mode layout */
+.ds-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* DS Controls */
+.ds-controls {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.ds-controls-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.ds-controls-title {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #333;
+}
+
+.ds-controls-init {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ds-controls-input {
+  font-family: monospace;
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 160px;
+}
+
+.ds-controls-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ds-controls-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.ds-controls-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ds-controls-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ds-op {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ds-op-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: #fafafa;
+  cursor: pointer;
+}
+
+.ds-op-btn:hover {
+  background: #eee;
+}
+
+.ds-op-arg {
+  width: 50px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ds-controls-history {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ds-controls-history-pos {
+  font-size: 12px;
+  color: #888;
+  font-family: monospace;
+}
+
+.ds-controls-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  font-family: monospace;
+  color: #aaa;
+}
+
+.ds-controls-log-entry {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #f5f5f5;
+}
+
+.ds-controls-log-current {
+  background: #e0e8f0;
+  color: #333;
+  font-weight: 600;
+}
+
+/* DS field pointer indicator */
+.ds-field-pointer .viz-cell-value {
+  font-size: 24px;
+  line-height: 1;
+}
