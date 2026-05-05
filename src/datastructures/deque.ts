@@ -429,12 +429,13 @@ function computeLayout(state: DequeState): DSLayout {
   }
 
   // --- Old map row (shown dimmed during growth, above new map) ---
-  let oldMapBottomY = STRUCT_Y + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_MAP_GAP
+  let oldMapRowY = STRUCT_Y + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_MAP_GAP
+  const oldMapRowX = STRUCT_X
+
+  // Determine if new map has chunks copied (step 2+) vs empty (step 1)
+  const newMapHasChunks = state.chunks.some(c => c !== null)
 
   if (hasOldMap) {
-    const oldMapRowY = oldMapBottomY
-    const oldMapRowX = STRUCT_X
-
     for (let i = 0; i < state.oldMapCap!; i++) {
       const cellX = oldMapRowX + i * (CELL_SIZE + CELL_GAP)
       const hasChunk = state.oldChunks![i] !== null
@@ -456,64 +457,11 @@ function computeLayout(state: DequeState): DSLayout {
         opacity: 0.4,
       })
     }
-
-    // Chunk columns below old map (dimmed, shows data is still there during transition)
-    const oldChunksTopY = oldMapRowY + CELL_SIZE + MAP_TO_CHUNKS_GAP
-    // Build a pseudo-state to compute active slots for the old map
-    const oldPseudo: DequeState = {
-      chunks: state.oldChunks!,
-      mapCap: state.oldMapCap!,
-      mapBeg: state.oldMapBeg!,
-      chunkCap: state.chunkCap,
-      chunkBeg: state.chunkBeg,
-      taille: state.taille,
-    }
-
-    for (let i = 0; i < state.oldMapCap!; i++) {
-      const chunk = state.oldChunks![i]
-      if (chunk === null) continue
-
-      const cellCenterX = oldMapRowX + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-      const chunkColX = oldMapRowX + i * (CELL_SIZE + CELL_GAP)
-
-      // Arrow from old map cell to old chunk column
-      arrows.push({
-        fromX: cellCenterX,
-        fromY: oldMapRowY + CELL_SIZE,
-        toX: cellCenterX,
-        toY: oldChunksTopY,
-        style: 's-curve',
-        opacity: 0.4,
-      })
-
-      for (let s = 0; s < state.chunkCap; s++) {
-        const cellY = oldChunksTopY + s * (CELL_SIZE + CHUNK_CELL_GAP)
-        const active = isSlotActive(oldPseudo, i, s)
-
-        elements.push({
-          id: `cell:oldchunk:${i}:${s}`,
-          x: chunkColX,
-          y: cellY,
-          width: CELL_SIZE,
-          height: CELL_SIZE,
-          kind: 'cell',
-          data: {
-            arrayName: `oldchunk${i}`,
-            index: s,
-            value: { num: chunk[s], arrays: [] },
-            dimmed: !active,
-          } as CellData,
-          opacity: 0.4,
-        })
-      }
-    }
-
-    const oldChunksBottomY = oldChunksTopY + state.chunkCap * (CELL_SIZE + CHUNK_CELL_GAP) - CHUNK_CELL_GAP
-    oldMapBottomY = oldChunksBottomY + 30 // gap between old chunks and new map
   }
 
   // --- New map row ---
-  const mapRowY = oldMapBottomY
+  // Position new map below old map (with gap for old map's chunk arrows in step 2)
+  const mapRowY = hasOldMap ? oldMapRowY + CELL_SIZE + 20 : oldMapRowY
   const mapRowX = STRUCT_X
 
   for (let i = 0; i < state.mapCap; i++) {
@@ -550,46 +498,119 @@ function computeLayout(state: DequeState): DSLayout {
     })
   }
 
-  // --- Chunk columns below new map ---
+  // --- Chunk columns ---
+  // Chunks are shared objects (pointers, not copies). They appear in ONE place:
+  // - Step 1 (new map empty): chunks below old map
+  // - Step 2+ (new map has chunks): chunks below new map, old map arrows point there too
   const chunksTopY = mapRowY + CELL_SIZE + MAP_TO_CHUNKS_GAP
 
-  for (let i = 0; i < state.mapCap; i++) {
-    const chunk = state.chunks[i]
-    if (chunk === null) continue
+  // Determine which chunks to render and their source
+  const chunksToRender: { mapIdx: number; chunk: number[] }[] = []
+  const chunkSourceState: DequeState = newMapHasChunks ? state : {
+    ...state,
+    chunks: state.oldChunks!,
+    mapCap: state.oldMapCap!,
+    mapBeg: state.oldMapBeg!,
+  }
 
-    const mapCellCenterX = mapRowX + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-    const chunkColX = mapRowX + i * (CELL_SIZE + CELL_GAP)
+  if (newMapHasChunks) {
+    // Chunks are below new map
+    for (let i = 0; i < state.mapCap; i++) {
+      if (state.chunks[i] !== null) {
+        chunksToRender.push({ mapIdx: i, chunk: state.chunks[i]! })
+      }
+    }
+  } else if (hasOldMap) {
+    // Step 1: Chunks are below old map (but positioned at new map's chunk area)
+    for (let i = 0; i < state.oldMapCap!; i++) {
+      if (state.oldChunks![i] !== null) {
+        chunksToRender.push({ mapIdx: i, chunk: state.oldChunks![i]! })
+      }
+    }
+  }
 
-    // Arrow from map cell to top of chunk column
-    arrows.push({
-      fromX: mapCellCenterX,
-      fromY: mapRowY + CELL_SIZE,
-      toX: mapCellCenterX,
-      toY: chunksTopY,
-      style: 's-curve',
-    })
+  // Render chunk columns
+  for (const { mapIdx, chunk } of chunksToRender) {
+    const chunkColX = mapRowX + mapIdx * (CELL_SIZE + CELL_GAP)
+    const mapCellCenterX = chunkColX + CELL_SIZE / 2
 
-    // Draw chunk cells vertically
+    // Arrow from relevant map cell to chunk
+    if (newMapHasChunks) {
+      // Arrow from new map cell to chunk
+      arrows.push({
+        fromX: mapCellCenterX,
+        fromY: mapRowY + CELL_SIZE,
+        toX: mapCellCenterX,
+        toY: chunksTopY,
+        style: 's-curve',
+      })
+    }
+
     for (let s = 0; s < state.chunkCap; s++) {
       const cellY = chunksTopY + s * (CELL_SIZE + CHUNK_CELL_GAP)
-      const active = isSlotActive(state, i, s)
-
-      const cellData: CellData = {
-        arrayName: `chunk${i}`,
-        index: s,
-        value: { num: chunk[s], arrays: [] },
-        dimmed: !active,
-      }
+      const active = isSlotActive(chunkSourceState, mapIdx, s)
 
       elements.push({
-        id: `cell:chunk:${i}:${s}`,
+        id: `cell:chunk:${mapIdx}:${s}`,
         x: chunkColX,
         y: cellY,
         width: CELL_SIZE,
         height: CELL_SIZE,
         kind: 'cell',
-        data: cellData,
+        data: {
+          arrayName: `chunk${mapIdx}`,
+          index: s,
+          value: { num: chunk[s], arrays: [] },
+          dimmed: !active,
+        } as CellData,
         opacity: 1.0,
+      })
+    }
+  }
+
+  // Old map arrows pointing to chunks (below new map) in step 2
+  if (hasOldMap && newMapHasChunks) {
+    // Old map entries that have chunks → arrows pointing to the chunk columns below new map
+    // We need to map old map indices to new map indices (same chunks, different positions)
+    for (let oldIdx = 0; oldIdx < state.oldMapCap!; oldIdx++) {
+      if (state.oldChunks![oldIdx] === null) continue
+      // Find this chunk in the new map (same data object)
+      const oldChunk = state.oldChunks![oldIdx]
+      let newIdx = -1
+      for (let ni = 0; ni < state.mapCap; ni++) {
+        if (state.chunks[ni] !== null &&
+            state.chunks[ni]!.length === oldChunk!.length &&
+            state.chunks[ni]!.every((v, vi) => v === oldChunk![vi])) {
+          newIdx = ni
+          break
+        }
+      }
+      if (newIdx >= 0) {
+        const oldCellCenterX = oldMapRowX + oldIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+        const targetChunkCenterX = mapRowX + newIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+        arrows.push({
+          fromX: oldCellCenterX,
+          fromY: oldMapRowY + CELL_SIZE,
+          toX: targetChunkCenterX,
+          toY: chunksTopY,
+          style: 's-curve',
+          opacity: 0.4,
+        })
+      }
+    }
+  } else if (hasOldMap && !newMapHasChunks) {
+    // Step 1: old map arrows point straight down to chunks below new map
+    for (let oldIdx = 0; oldIdx < state.oldMapCap!; oldIdx++) {
+      if (state.oldChunks![oldIdx] === null) continue
+      const oldCellCenterX = oldMapRowX + oldIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const targetChunkCenterX = mapRowX + oldIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      arrows.push({
+        fromX: oldCellCenterX,
+        fromY: oldMapRowY + CELL_SIZE,
+        toX: targetChunkCenterX,
+        toY: chunksTopY,
+        style: 's-curve',
+        opacity: 0.4,
       })
     }
   }
@@ -599,7 +620,7 @@ function computeLayout(state: DequeState): DSLayout {
     mapRowX + state.mapCap * (CELL_SIZE + CELL_GAP) - CELL_GAP,
     hasOldMap ? STRUCT_X + state.oldMapCap! * (CELL_SIZE + CELL_GAP) - CELL_GAP : 0,
   )
-  const hasChunks = state.chunks.some(c => c !== null)
+  const hasChunks = chunksToRender.length > 0
   const bottomEdge = hasChunks
     ? chunksTopY + state.chunkCap * (CELL_SIZE + CHUNK_CELL_GAP) - CHUNK_CELL_GAP
     : mapRowY + CELL_SIZE

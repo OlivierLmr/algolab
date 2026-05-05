@@ -528,7 +528,7 @@ describe('deque: layout', () => {
     }
   })
 
-  it('shows old map cells and chunk columns during growth substeps', () => {
+  it('shows old map cells and chunks during growth substeps', () => {
     // Force map growth: fill all slots then push
     let s = dequeDS.createInitialState([1, 2, 3, 4])
     // Fill all map slots by pushing
@@ -548,13 +548,31 @@ describe('deque: layout', () => {
     expect(newMapCells.length).toBe(s.mapCap * 2)
     // Old map cells should have reduced opacity
     expect(oldMapCells[0].opacity).toBeLessThan(1.0)
-    // Old chunk cells should also be visible (dimmed)
-    const oldChunkCells = layout.elements.filter(e => e.id.startsWith('cell:oldchunk:'))
-    expect(oldChunkCells.length).toBeGreaterThan(0)
-    expect(oldChunkCells[0].opacity).toBeLessThan(1.0)
+    // Chunks should be visible (below new map, full opacity — they are shared objects)
+    const chunkCells = layout.elements.filter(e => e.id.startsWith('cell:chunk:'))
+    expect(chunkCells.length).toBeGreaterThan(0)
+    expect(chunkCells[0].opacity).toBe(1.0)
   })
 
-  it('old map and chunks disappear after delete step', () => {
+  it('after copy step, old map arrows point to chunks below new map', () => {
+    let s = dequeDS.createInitialState([1, 2, 3, 4])
+    for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
+    for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
+    while (s.chunkBeg > 0) s = apply(s, 'push_front', { val: -99 })
+    const steps = applySteps(s, 'push_front', { val: -100 })
+    // Find the "Copy" step
+    const copyStep = steps.find(st => st.description.includes('Copy'))
+    expect(copyStep).toBeDefined()
+    const layout = dequeDS.computeLayout(copyStep!.state)
+    // Old map arrows (opacity < 1) should exist
+    const dimmedArrows = layout.arrows.filter(a => a.opacity !== undefined && a.opacity < 1.0)
+    expect(dimmedArrows.length).toBeGreaterThan(0)
+    // Chunks appear only once (below new map), not duplicated
+    const chunkCells = layout.elements.filter(e => e.id.startsWith('cell:chunk:'))
+    expect(chunkCells.length).toBeGreaterThan(0)
+  })
+
+  it('old map disappears after delete step', () => {
     let s = dequeDS.createInitialState([1, 2, 3, 4])
     for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
     for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
@@ -566,7 +584,5 @@ describe('deque: layout', () => {
     const layout = dequeDS.computeLayout(deleteStep!.state)
     const oldMapCells = layout.elements.filter(e => e.id.startsWith('cell:oldmap:'))
     expect(oldMapCells.length).toBe(0)
-    const oldChunkCells = layout.elements.filter(e => e.id.startsWith('cell:oldchunk:'))
-    expect(oldChunkCells.length).toBe(0)
   })
 })
