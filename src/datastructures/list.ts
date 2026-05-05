@@ -413,7 +413,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   const steps: Step[] = []
   let current = cloneState(state)
 
-  // --- Step 0: Visual-only — show the subchain below the main row (no pointer changes) ---
+  // --- Step 1: Visual-only — show the subchain below the main row (no pointer changes) ---
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
@@ -421,7 +421,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     steps.push({ state: s, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
   }
 
-  // --- Step 1: Unlink — close the gap left by the subchain ---
+  // --- Step 2: Unlink — close the gap left by the subchain ---
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
@@ -443,7 +443,6 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   }
 
   // --- Step 3: Connect tail side bidirectionally ---
-  // subchain_tail.next → insertBefore, insertBefore.prev → subchain_tail
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
@@ -466,7 +465,6 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   }
 
   // --- Step 4: Connect head side bidirectionally ---
-  // subchain_head.prev → insertAfter, insertAfter.next → subchain_head
   {
     const s = cloneState(current)
     s.floatingNodeIds = rangeNodeIds
@@ -488,7 +486,7 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
     current = s
   }
 
-  // --- Step 5: Visual cleanup — nodes return to ordered row (no pointer changes) ---
+  // --- Step 5: Visual cleanup — nodes return to ordered row ---
   {
     const s = cloneState(current)
     // No floatingNodeIds — all nodes rejoin the ordered row
@@ -536,12 +534,8 @@ function computeLayout(state: ListState): DSLayout {
   const fieldY = STRUCT_Y
   let beginFieldCenterX = 0
   let beginFieldCenterY = 0
-  let beginFieldBoxX = 0
-  let beginFieldBoxY = 0
   let endFieldCenterX = 0
   let endFieldCenterY = 0
-  let endFieldBoxX = 0
-  let endFieldBoxY = 0
 
   for (const field of fields) {
     const data: StructFieldData = {
@@ -564,14 +558,10 @@ function computeLayout(state: ListState): DSLayout {
     if (field.name === 'begin') {
       beginFieldCenterX = fieldX + CELL_SIZE / 2
       beginFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
-      beginFieldBoxX = fieldX
-      beginFieldBoxY = fieldY + FIELD_LABEL_HEIGHT
     }
     if (field.name === 'end') {
       endFieldCenterX = fieldX + CELL_SIZE / 2
       endFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
-      endFieldBoxX = fieldX
-      endFieldBoxY = fieldY + FIELD_LABEL_HEIGHT
     }
 
     fieldX += CELL_SIZE + FIELD_GAP
@@ -688,12 +678,10 @@ function computeLayout(state: ListState): DSLayout {
       const headPos = nodePositions.get(state.headId)!
       const prevDotX = headPos.x + CELL_SIZE / 2
       const prevDotY = headPos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
-      const edge = rectEdgeIntersection(prevDotX, prevDotY, beginFieldBoxX, beginFieldBoxY, CELL_SIZE, CELL_SIZE)
-      arrows.push({
-        fromX: prevDotX, fromY: prevDotY,
-        toX: edge.x, toY: edge.y,
-        style: 's-curve',
-      })
+      const boxX = beginFieldCenterX - CELL_SIZE / 2
+      const boxY = beginFieldCenterY - CELL_SIZE / 2
+      const edge = rectEdgeIntersection(prevDotX, prevDotY, boxX, boxY, CELL_SIZE, CELL_SIZE)
+      arrows.push({ fromX: prevDotX, fromY: prevDotY, toX: edge.x, toY: edge.y, style: 's-curve' })
     }
   }
   if (state.tailId !== null && nodePositions.has(state.tailId)) {
@@ -702,12 +690,10 @@ function computeLayout(state: ListState): DSLayout {
       const tailPos = nodePositions.get(state.tailId)!
       const nextDotX = tailPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const nextDotY = tailPos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
-      const edge = rectEdgeIntersection(nextDotX, nextDotY, endFieldBoxX, endFieldBoxY, CELL_SIZE, CELL_SIZE)
-      arrows.push({
-        fromX: nextDotX, fromY: nextDotY,
-        toX: edge.x, toY: edge.y,
-        style: 's-curve',
-      })
+      const boxX = endFieldCenterX - CELL_SIZE / 2
+      const boxY = endFieldCenterY - CELL_SIZE / 2
+      const edge = rectEdgeIntersection(nextDotX, nextDotY, boxX, boxY, CELL_SIZE, CELL_SIZE)
+      arrows.push({ fromX: nextDotX, fromY: nextDotY, toX: edge.x, toY: edge.y, style: 's-curve' })
     }
   }
 

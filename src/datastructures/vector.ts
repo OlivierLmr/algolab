@@ -159,7 +159,6 @@ function applyOperation(state: VectorState, op: string, args: Record<string, num
       if (state.size > pos) {
         const shifted = [...state.data]
         for (let i = state.size; i > pos; i--) shifted[i] = shifted[i - 1]
-        shifted[pos] = state.data[pos]  // still shows old value before overwrite
         const shiftState: VectorState = { data: shifted, size: state.size + 1, capacity: state.capacity }
         steps.push({ state: shiftState, description: `Shift elements [${pos}..${state.size - 1}] right` })
       }

@@ -295,7 +295,7 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       let currentNodes = state.nodes.map(n => ({ ...n }))
       let currentHeadId = state.headId
 
-      // --- Step 0: Visual pre-step — show subchain below (no pointer changes) ---
+      // --- Step 1: Visual pre-step — show subchain below (no pointer changes) ---
       steps.push({
         state: {
           nodes: currentNodes,
@@ -308,7 +308,7 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
         description: `Splicing nodes [${rangeStart}..${rangeEnd}]`,
       })
 
-      // --- Step 1: Unlink — first.next → last (or head → last) ---
+      // --- Step 2: Unlink — first.next → last (or head → last) ---
       {
         const nodes = currentNodes.map(n => ({ ...n }))
         let headId = currentHeadId
@@ -340,7 +340,7 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
       const posNodeNow = posNode ? currentNodes.find(n => n.id === posNode.id)! : null
       const afterPos = posNodeNow ? posNodeNow.nextId : currentHeadId
 
-      // --- Step 2: Connect tail — subchain_tail.next → afterPos ---
+      // --- Step 3: Connect tail — subchain_tail.next → afterPos ---
       {
         const nodes = currentNodes.map(n => ({ ...n }))
         const tailN = nodes.find(n => n.id === subchainTail.id)!
@@ -362,7 +362,7 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
         })
       }
 
-      // --- Step 3: Connect head — pos.next → subchain_head (or head → subchain_head) ---
+      // --- Step 4: Connect head — pos.next → subchain_head (or head → subchain_head) ---
       {
         const nodes = currentNodes.map(n => ({ ...n }))
         let headId = currentHeadId
@@ -390,7 +390,7 @@ function applyOperation(state: ForwardListState, op: string, args: Record<string
         })
       }
 
-      // --- Step 4: Visual cleanup — nodes return to ordered row ---
+      // --- Step 5: Visual cleanup — nodes return to ordered row ---
       steps.push({
         state: {
           nodes: currentNodes,

@@ -43,18 +43,6 @@ export function getAt(state: DequeState, i: number): number {
   return state.chunks[chunkIdx]![withinChunk]
 }
 
-/** Set the value at logical index i, returning a new state. */
-function setAt(state: DequeState, i: number, val: number): DequeState {
-  const chunkOffset = Math.floor((state.chunkBeg + i) / state.chunkCap)
-  const chunkIdx = chunkPhysical(state, chunkOffset)
-  const withinChunk = (state.chunkBeg + i) % state.chunkCap
-  const newChunks = state.chunks.map((c, idx) =>
-    idx === chunkIdx ? [...c!] : (c ? [...c] : null)
-  )
-  newChunks[chunkIdx]![withinChunk] = val
-  return { ...state, chunks: newChunks }
-}
-
 /** Deep-clone a state. */
 function cloneState(state: DequeState): DequeState {
   return {

@@ -435,19 +435,21 @@ describe('list: layout', () => {
     const state = listDS.createInitialState([1])
     const layout = listDS.computeLayout(state)
 
-    // The struct field boxes have a label above them. The cell starts at y + FIELD_LABEL_HEIGHT.
-    // Sentinel arrows going upward should hit the bottom edge of the cell (not its center).
+    const beginField = layout.elements.find(e => e.id === 'field:begin')!
+    const endField = layout.elements.find(e => e.id === 'field:end')!
+    // Sentinel arrows go upward from nodes to struct fields
     const upwardArrows = layout.arrows.filter(a => a.fromY > a.toY && a.style === 's-curve')
     expect(upwardArrows.length).toBe(2)
-    // Both arrow targets should be at the box bottom edge, not center
+
     for (const arrow of upwardArrows) {
-      // The box center would be at y + CELL_SIZE/2 from box top.
-      // The box bottom edge is at y + CELL_SIZE. Since arrow comes from below,
-      // rectEdgeIntersection should return the bottom edge (toY = boxY + CELL_SIZE).
-      // Just check it's not at the exact center of the field element
-      const fieldElement = layout.elements.find(e => e.kind === 'struct-field' && e.id.includes('begin'))
-        ?? layout.elements.find(e => e.kind === 'struct-field' && e.id.includes('end'))
-      expect(fieldElement).toBeDefined()
+      // The field's cell box bottom edge Y = field.y + field.height
+      // The center Y = field.y + field.height - CELL_SIZE/2
+      // Arrow comes from below, so rectEdgeIntersection should hit the bottom edge
+      const targetField = [beginField, endField].find(f =>
+        arrow.toX >= f.x && arrow.toX <= f.x + f.width
+      )!
+      // toY should be at the bottom edge of the cell box, not at the center
+      expect(arrow.toY).toBe(targetField.y + targetField.height)
     }
   })
 
