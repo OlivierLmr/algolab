@@ -398,13 +398,18 @@ describe('deque: insert', () => {
     expect(shiftStep!.description).toContain('right')
   })
 
-  it('insert has separate shift and write steps', () => {
+  it('insert has separate shift and write steps (no intermediate "Write 0")', () => {
     const state = dequeDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'insert', { pos: 4, val: 99 })
-    // Last step should be the write
+    // Last step should be the write of the actual value
     expect(steps[steps.length - 1].description).toContain('Write')
+    expect(steps[steps.length - 1].description).toContain('99')
     // Second to last should be the shift
     expect(steps[steps.length - 2].description).toContain('Shift')
+    // No step should write 0 (no placeholder insertion)
+    expect(steps.every(s => !s.description.includes('Write 0'))).toBe(true)
+    // Should only be 2 steps: shift + write (no realloc needed)
+    expect(steps.length).toBe(2)
   })
 
   it('insert at pos=0 delegates to push_front', () => {

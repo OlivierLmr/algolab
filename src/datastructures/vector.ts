@@ -13,6 +13,8 @@ export interface VectorState {
   pointerTarget?: 'old' | 'new'
   /** During reallocation: how many cells in the new array have been written to. */
   newUsed?: number
+  /** During insert-with-gap: index of the gap cell that should appear dimmed. */
+  gapIndex?: number
 }
 
 // --- Layout constants ---
@@ -82,16 +84,24 @@ function growStepsWithGap(state: VectorState, newCap: number, gapPos: number): S
   const copied: VectorState = {
     data: copyData, size: state.size, capacity: newCap,
     oldData, oldCapacity: oldCap, pointerTarget: 'old', newUsed,
+    ...(hasGap ? { gapIndex: gapPos } : {}),
   }
 
   // Step 3: switch pointer to new, old array still visible (dimmed)
   const switched: VectorState = {
     data: [...copyData], size: state.size, capacity: newCap,
     oldData, oldCapacity: oldCap, pointerTarget: 'new', newUsed,
+    ...(hasGap ? { gapIndex: gapPos } : {}),
   }
 
-  // Step 4: delete old array
-  const deleted: VectorState = { data: [...copyData], size: state.size, capacity: newCap }
+  // Step 4: delete old array — when there's a gap, size increases to reflect
+  // the space reserved for the upcoming insert (prevents the last copied element
+  // from appearing dimmed once newUsed is no longer available).
+  const deletedSize = hasGap ? state.size + 1 : state.size
+  const deleted: VectorState = {
+    data: [...copyData], size: deletedSize, capacity: newCap,
+    ...(hasGap ? { gapIndex: gapPos } : {}),
+  }
 
   const copyDesc = hasGap
     ? `Copy ${state.size} element${state.size !== 1 ? 's' : ''}, leaving gap at position ${gapPos}`
@@ -139,8 +149,9 @@ function applyOperation(state: VectorState, op: string, args: Record<string, num
         const base = reallocSteps[reallocSteps.length - 1].state
         const data = [...base.data]
         data[pos] = val
-        const finalState: VectorState = { data, size: base.size + 1, capacity: base.capacity }
-        return [...reallocSteps, { state: finalState, description: `Write ${val} at position ${pos}, increment size` }]
+        // Size already incremented in the delete-old step; just write the value
+        const finalState: VectorState = { data, size: base.size, capacity: base.capacity }
+        return [...reallocSteps, { state: finalState, description: `Write ${val} at position ${pos}` }]
       }
 
       // No realloc: shift right then write
@@ -307,7 +318,7 @@ function computeLayout(state: VectorState): DSLayout {
 
   for (let i = 0; i < state.capacity; i++) {
     const cellX = arrayX + i * (CELL_SIZE + CELL_GAP)
-    const isDimmed = i >= newArrayUsed
+    const isDimmed = i >= newArrayUsed || i === state.gapIndex
 
     const cellData: CellData = {
       arrayName: 'data',

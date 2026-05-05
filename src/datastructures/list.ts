@@ -536,8 +536,12 @@ function computeLayout(state: ListState): DSLayout {
   const fieldY = STRUCT_Y
   let beginFieldCenterX = 0
   let beginFieldCenterY = 0
+  let beginFieldBoxX = 0
+  let beginFieldBoxY = 0
   let endFieldCenterX = 0
   let endFieldCenterY = 0
+  let endFieldBoxX = 0
+  let endFieldBoxY = 0
 
   for (const field of fields) {
     const data: StructFieldData = {
@@ -560,10 +564,14 @@ function computeLayout(state: ListState): DSLayout {
     if (field.name === 'begin') {
       beginFieldCenterX = fieldX + CELL_SIZE / 2
       beginFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
+      beginFieldBoxX = fieldX
+      beginFieldBoxY = fieldY + FIELD_LABEL_HEIGHT
     }
     if (field.name === 'end') {
       endFieldCenterX = fieldX + CELL_SIZE / 2
       endFieldCenterY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE / 2
+      endFieldBoxX = fieldX
+      endFieldBoxY = fieldY + FIELD_LABEL_HEIGHT
     }
 
     fieldX += CELL_SIZE + FIELD_GAP
@@ -673,16 +681,17 @@ function computeLayout(state: ListState): DSLayout {
     emitArrow(endFieldCenterX, endFieldCenterY, nodePositions.get(state.tailId)!, 's-curve')
   }
 
-  // Sentinel arrows: head.prev → begin field, tail.next → end field
+  // Sentinel arrows: head.prev → begin field box edge, tail.next → end field box edge
   if (state.headId !== null && nodePositions.has(state.headId)) {
     const headNode = getNode(state, state.headId)
     if (headNode.prevId === null) {
       const headPos = nodePositions.get(state.headId)!
       const prevDotX = headPos.x + CELL_SIZE / 2
       const prevDotY = headPos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
+      const edge = rectEdgeIntersection(prevDotX, prevDotY, beginFieldBoxX, beginFieldBoxY, CELL_SIZE, CELL_SIZE)
       arrows.push({
         fromX: prevDotX, fromY: prevDotY,
-        toX: beginFieldCenterX, toY: beginFieldCenterY,
+        toX: edge.x, toY: edge.y,
         style: 's-curve',
       })
     }
@@ -693,9 +702,10 @@ function computeLayout(state: ListState): DSLayout {
       const tailPos = nodePositions.get(state.tailId)!
       const nextDotX = tailPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const nextDotY = tailPos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
+      const edge = rectEdgeIntersection(nextDotX, nextDotY, endFieldBoxX, endFieldBoxY, CELL_SIZE, CELL_SIZE)
       arrows.push({
         fromX: nextDotX, fromY: nextDotY,
-        toX: endFieldCenterX, toY: endFieldCenterY,
+        toX: edge.x, toY: edge.y,
         style: 's-curve',
       })
     }

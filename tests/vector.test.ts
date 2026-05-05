@@ -372,6 +372,31 @@ describe('vector: substeps', () => {
     expect(copyState.data[4]).toBe(4)
     // newUsed should mark the gap range as initialized for display
     expect(copyState.newUsed).toBe(5) // size + 1
+    // gapIndex marks the gap cell as dimmed
+    expect(copyState.gapIndex).toBe(2)
+  })
+
+  it('insert with realloc: gap stays dimmed until value is written', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 2, val: 99 })
+    // Steps 1-3 (copy, switch, delete) should have gapIndex set
+    expect(steps[1].state.gapIndex).toBe(2)
+    expect(steps[2].state.gapIndex).toBe(2)
+    expect(steps[3].state.gapIndex).toBe(2)
+    // Final step (write) should not have gapIndex
+    expect(steps[4].state.gapIndex).toBeUndefined()
+  })
+
+  it('insert with realloc: size increases at delete-old step', () => {
+    const state = vectorDS.createInitialState([1, 2, 3, 4])
+    const steps = applySteps(state, 'insert', { pos: 2, val: 99 })
+    // Original size is 4, copy/switch steps keep size 4
+    expect(steps[1].state.size).toBe(4)
+    expect(steps[2].state.size).toBe(4)
+    // Delete-old step bumps size to 5 (space reserved for insert)
+    expect(steps[3].state.size).toBe(5)
+    // Final write step keeps size 5
+    expect(steps[4].state.size).toBe(5)
   })
 
   it('insert at pos=0 with realloc: gap at beginning', () => {
