@@ -673,6 +673,34 @@ function computeLayout(state: ListState): DSLayout {
     emitArrow(endFieldCenterX, endFieldCenterY, nodePositions.get(state.tailId)!, 's-curve')
   }
 
+  // Sentinel arrows: head.prev → begin field, tail.next → end field
+  if (state.headId !== null && nodePositions.has(state.headId)) {
+    const headNode = getNode(state, state.headId)
+    if (headNode.prevId === null) {
+      const headPos = nodePositions.get(state.headId)!
+      const prevDotX = headPos.x + CELL_SIZE / 2
+      const prevDotY = headPos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
+      arrows.push({
+        fromX: prevDotX, fromY: prevDotY,
+        toX: beginFieldCenterX, toY: beginFieldCenterY,
+        style: 's-curve',
+      })
+    }
+  }
+  if (state.tailId !== null && nodePositions.has(state.tailId)) {
+    const tailNode = getNode(state, state.tailId)
+    if (tailNode.nextId === null) {
+      const tailPos = nodePositions.get(state.tailId)!
+      const nextDotX = tailPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const nextDotY = tailPos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
+      arrows.push({
+        fromX: nextDotX, fromY: nextDotY,
+        toX: endFieldCenterX, toY: endFieldCenterY,
+        style: 's-curve',
+      })
+    }
+  }
+
   // Compute total dimensions
   let rightEdge = fieldX
   let bottomY = nodesY + CELL_SIZE
@@ -699,7 +727,8 @@ function emitNodeCells(
 ): void {
   const node = getNode(state, nodeId)
 
-  // Prev pointer cell
+  // Prev pointer cell — show '•' for actual pointers AND sentinel (head's prev → begin)
+  const prevIsSentinel = node.prevId === null && node.id === state.headId && state.size > 0
   elements.push({
     id: `cell:node:${nodeId}:prev`,
     x,
@@ -712,7 +741,7 @@ function emitNodeCells(
       index: -1,
       value: { num: node.prevId ?? 0, arrays: [] },
       dimmed: false,
-      displayOverride: node.prevId !== null ? '•' : '×',
+      displayOverride: node.prevId !== null || prevIsSentinel ? '•' : '×',
     } as CellData,
     opacity: 1.0,
   })
@@ -735,7 +764,8 @@ function emitNodeCells(
     opacity: 1.0,
   })
 
-  // Next pointer cell
+  // Next pointer cell — show '•' for actual pointers AND sentinel (tail's next → end)
+  const nextIsSentinel = node.nextId === null && node.id === state.tailId && state.size > 0
   const nextX = x + 2 * (CELL_SIZE + CELL_GAP)
   elements.push({
     id: `cell:node:${nodeId}:next`,
@@ -749,7 +779,7 @@ function emitNodeCells(
       index: -1,
       value: { num: node.nextId ?? 0, arrays: [] },
       dimmed: false,
-      displayOverride: node.nextId !== null ? '•' : '×',
+      displayOverride: node.nextId !== null || nextIsSentinel ? '•' : '×',
     } as CellData,
     opacity: 1.0,
   })

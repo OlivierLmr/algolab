@@ -370,12 +370,12 @@ describe('list: layout', () => {
     const nextCells = layout.elements.filter(e => e.id.endsWith(':next'))
     expect(prevCells.length).toBe(2)
     expect(nextCells.length).toBe(2)
-    // First node's prev should be "∅" (null)
-    expect((prevCells[0].data as any).displayOverride).toBe('×')
+    // First node's prev should be "•" (sentinel → begin)
+    expect((prevCells[0].data as any).displayOverride).toBe('•')
     // First node's next should be "•"
     expect((nextCells[0].data as any).displayOverride).toBe('•')
-    // Last node's next should be "∅"
-    expect((nextCells[1].data as any).displayOverride).toBe('×')
+    // Last node's next should be "•" (sentinel → end)
+    expect((nextCells[1].data as any).displayOverride).toBe('•')
   })
 
   it('empty list shows empty label and struct header', () => {
@@ -392,34 +392,43 @@ describe('list: layout', () => {
     expect(layout.arrows.length).toBe(0)
   })
 
-  it('single node has 2 s-curve arrows (begin and end) and no straight arrows', () => {
+  it('single node has 4 s-curve arrows (begin→node, end→node, prev→begin, next→end)', () => {
     const state = listDS.createInitialState([42])
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
     expect(straightArrows.length).toBe(0)
-    expect(sCurveArrows.length).toBe(2) // begin→node, end→node
+    expect(sCurveArrows.length).toBe(4)
   })
 
-  it('two nodes have 2 straight arrows (next+prev) plus 2 s-curves', () => {
+  it('two nodes have 2 straight arrows (next+prev) plus 4 s-curves', () => {
     const state = listDS.createInitialState([1, 2])
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
     expect(straightArrows.length).toBe(2)
-    expect(sCurveArrows.length).toBe(2)
+    expect(sCurveArrows.length).toBe(4)
   })
 
-  it('three nodes have 4 straight arrows (2 pairs) plus 2 s-curves', () => {
+  it('three nodes have 4 straight arrows (2 pairs) plus 4 s-curves', () => {
     const state = listDS.createInitialState([1, 2, 3])
     const layout = listDS.computeLayout(state)
 
     const straightArrows = layout.arrows.filter(a => a.style === 'straight')
     const sCurveArrows = layout.arrows.filter(a => a.style === 's-curve')
     expect(straightArrows.length).toBe(4)
-    expect(sCurveArrows.length).toBe(2)
+    expect(sCurveArrows.length).toBe(4)
+  })
+
+  it('sentinel arrows go from node row upward to struct header', () => {
+    const state = listDS.createInitialState([1, 2])
+    const layout = listDS.computeLayout(state)
+
+    // Find arrows going upward (fromY > toY) — these are the sentinel arrows
+    const upwardArrows = layout.arrows.filter(a => a.fromY > a.toY && a.style === 's-curve')
+    expect(upwardArrows.length).toBe(2) // head.prev→begin, tail.next→end
   })
 
   it('bidirectional arrows are vertically offset', () => {
