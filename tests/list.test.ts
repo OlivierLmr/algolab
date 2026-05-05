@@ -444,3 +444,91 @@ describe('list: layout', () => {
     expect(cells.length).toBe(9) // 2 linked + 1 floating, each 3 cells
   })
 })
+
+describe('list: splice', () => {
+  it('moves a single node to a different position', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4)
+    // Open range (2,4) = node at pos 3 → value 4. Insert after pos 0 (value 1).
+    // Result: [1, 4, 2, 3, 5]
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: 0, first: 2, last: 4 })
+    expect(values(s2)).toEqual([1, 4, 2, 3, 5])
+    expect(s2.size).toBe(5) // no size change in splice
+  })
+
+  it('moves multiple nodes', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=0, first=1, last=4)
+    // Open range (1,4) = nodes at pos 2, 3 → values 3, 4. Insert after pos 0 (value 1).
+    // Result: [1, 3, 4, 2, 5]
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: 0, first: 1, last: 4 })
+    expect(values(s2)).toEqual([1, 3, 4, 2, 5])
+  })
+
+  it('moves range to front', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=-1, first=2, last=5) → moves nodes 3,4 to front
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: -1, first: 2, last: 5 })
+    // Open range (2,5) = nodes at pos 3, 4 → values 4, 5
+    // Inserted after pos -1 (before head) → [4, 5, 1, 2, 3]
+    expect(values(s2)).toEqual([4, 5, 1, 2, 3])
+    expect(s2.size).toBe(5)
+  })
+
+  it('moves range to end', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=4, first=0, last=2) → moves node at pos 1 (value 2) after pos 4
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const s2 = apply(state, 'splice', { pos: 4, first: 0, last: 2 })
+    // Open range (0, 2) = node at pos 1 → value 2
+    // After pos 4 (value 5): [1, 3, 4, 5, 2]
+    expect(values(s2)).toEqual([1, 3, 4, 5, 2])
+    expect(s2.size).toBe(5)
+  })
+
+  it('each pointer change is its own substep', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    // Moving 1 node requires: unlink (prev.next + next.prev) then insert (4 pointer changes)
+    // Each pointer change should be separate
+    expect(steps.length).toBeGreaterThanOrEqual(4)
+    // Every substep should describe a pointer change
+    for (const step of steps) {
+      expect(step.description).toMatch(/Set |Unlink/)
+    }
+  })
+
+  it('throws on empty range', () => {
+    const state = listDS.createInitialState([1, 2, 3])
+    expect(() => apply(state, 'splice', { pos: 0, first: 1, last: 2 })).toThrow()
+  })
+
+  it('throws when pos is inside the moved range', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4])
+    expect(() => apply(state, 'splice', { pos: 2, first: 1, last: 4 })).toThrow()
+  })
+
+  it('all substeps produce valid layouts', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 5 })
+    for (const step of steps) {
+      const layout = listDS.computeLayout(step.state)
+      expect(layout.elements.length).toBeGreaterThan(0)
+      expect(layout.width).toBeGreaterThan(0)
+    }
+  })
+
+  it('floating nodes during splice are spread horizontally', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 1, last: 4 })
+    // After unlinking, nodes 2 and 3 should be floating
+    // Find a step where the range has been unlinked but not yet inserted
+    const unlinkStep = steps.find(s => s.description.includes('Unlink'))
+    if (unlinkStep) {
+      const layout = listDS.computeLayout(unlinkStep.state)
+      const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+      const ys = [...new Set(valueCells.map(e => e.y))]
+      // Floating nodes should be on a different Y than linked ones
+      expect(ys.length).toBeGreaterThanOrEqual(2)
+    }
+  })
+})

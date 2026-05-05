@@ -357,6 +357,122 @@ function erase(state: ListState, pos: number): Step[] {
   return steps
 }
 
+function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: number): Step[] {
+  // C++ semantics: splice(pos, first, last) moves nodes in open range (first, last).
+  // pos = -1 means before begin. first = -1 means before begin (range starts at head).
+  // last = size means end (range goes to tail).
+  if (posIdx < -1 || posIdx >= state.size) {
+    throw new Error(`splice pos ${posIdx} out of range [-1, ${state.size - 1}]`)
+  }
+  if (firstIdx < -1 || firstIdx >= state.size) {
+    throw new Error(`splice first ${firstIdx} out of range [-1, ${state.size - 1}]`)
+  }
+  if (lastIdx < 0 || lastIdx > state.size) {
+    throw new Error(`splice last ${lastIdx} out of range [0, ${state.size}]`)
+  }
+  if (firstIdx + 1 >= lastIdx) {
+    throw new Error(`splice: empty range (first=${firstIdx}, last=${lastIdx})`)
+  }
+
+  const rangeStart = firstIdx + 1
+  const rangeEnd = lastIdx - 1
+
+  // Validate pos is not inside the range being moved
+  if (posIdx >= rangeStart && posIdx <= rangeEnd) {
+    throw new Error(`splice: pos ${posIdx} is inside the range being moved [${rangeStart}, ${rangeEnd}]`)
+  }
+
+  const ordered = orderedNodeIds(state)
+  const subchainHeadId = ordered[rangeStart]
+  const subchainTailId = ordered[rangeEnd]
+  const firstNodeId = firstIdx >= 0 ? ordered[firstIdx] : null     // node before range
+  const lastNodeId = lastIdx < state.size ? ordered[lastIdx] : null // node after range
+  const posNodeId = posIdx >= 0 ? ordered[posIdx] : null
+
+  const steps: Step[] = []
+  let current = cloneState(state)
+
+  // --- Phase 1: Unlink the subchain from its current position ---
+
+  // Step: Set first.next = last (or head = last if first is before_begin)
+  if (firstNodeId !== null) {
+    const s = cloneState(current)
+    getNode(s, firstNodeId).nextId = lastNodeId
+    steps.push({ state: s, description: `Set node[${firstIdx}].next → node[${lastIdx}]` })
+    current = s
+  } else {
+    const s = cloneState(current)
+    s.headId = lastNodeId
+    steps.push({ state: s, description: `Set begin → node[${lastIdx}]` })
+    current = s
+  }
+
+  // Step: Set last.prev = first (or tail = first if last is end)
+  if (lastNodeId !== null) {
+    const s = cloneState(current)
+    getNode(s, lastNodeId).prevId = firstNodeId
+    steps.push({ state: s, description: `Set node[${lastIdx}].prev → node[${firstIdx}]` })
+    current = s
+  } else {
+    const s = cloneState(current)
+    s.tailId = firstNodeId
+    steps.push({ state: s, description: `Set end → node[${firstIdx}]` })
+    current = s
+  }
+
+  // --- Phase 2: Insert subchain after pos ---
+
+  // The node currently after pos
+  const afterPosId = posNodeId !== null ? getNode(current, posNodeId).nextId : current.headId
+
+  // Step: Set subchain_head.prev = pos (or null if pos is before_begin)
+  {
+    const s = cloneState(current)
+    getNode(s, subchainHeadId).prevId = posNodeId
+    const posLabel = posNodeId !== null ? `node[${posIdx}]` : 'null'
+    steps.push({ state: s, description: `Set subchain_head.prev → ${posLabel}` })
+    current = s
+  }
+
+  // Step: Set subchain_tail.next = afterPos
+  {
+    const s = cloneState(current)
+    getNode(s, subchainTailId).nextId = afterPosId
+    const afterLabel = afterPosId !== null ? `node[${ordered.indexOf(afterPosId)}]` : 'null'
+    steps.push({ state: s, description: `Set subchain_tail.next → ${afterLabel}` })
+    current = s
+  }
+
+  // Step: Set pos.next = subchain_head (or head = subchain_head if pos is before_begin)
+  if (posNodeId !== null) {
+    const s = cloneState(current)
+    getNode(s, posNodeId).nextId = subchainHeadId
+    steps.push({ state: s, description: `Set node[${posIdx}].next → subchain_head` })
+    current = s
+  } else {
+    const s = cloneState(current)
+    s.headId = subchainHeadId
+    steps.push({ state: s, description: `Set begin → subchain_head` })
+    current = s
+  }
+
+  // Step: Set afterPos.prev = subchain_tail (or tail = subchain_tail if afterPos is null)
+  if (afterPosId !== null) {
+    const s = cloneState(current)
+    getNode(s, afterPosId).prevId = subchainTailId
+    const afterLabel = ordered.indexOf(afterPosId)
+    steps.push({ state: s, description: `Set node[${afterLabel}].prev → subchain_tail` })
+    current = s
+  } else {
+    const s = cloneState(current)
+    s.tailId = subchainTailId
+    steps.push({ state: s, description: `Set end → subchain_tail` })
+    current = s
+  }
+
+  return steps
+}
+
 function applyOperation(state: ListState, op: string, args: Record<string, number>): Step[] {
   switch (op) {
     case 'push_front':
@@ -371,6 +487,8 @@ function applyOperation(state: ListState, op: string, args: Record<string, numbe
       return insert(state, args.pos ?? 0, args.val ?? 0)
     case 'erase':
       return erase(state, args.pos ?? 0)
+    case 'splice':
+      return splice(state, args.pos ?? 0, args.first ?? 0, args.last ?? state.size)
     default:
       throw new Error(`Unknown operation: ${op}`)
   }
@@ -466,16 +584,18 @@ function computeLayout(state: ListState): DSLayout {
     currentX += NODE_WIDTH + NODE_GAP
   }
 
-  // Position floating nodes BELOW the anchor position
+  // Position floating nodes BELOW the anchor position, spread horizontally
   const FLOATING_Y_GAP = 20
   const floatingY = nodesY + CELL_SIZE + FLOATING_Y_GAP
+  const anchorIdx = state.floatingAnchorIdx ?? 0
+  const clampedAnchor = Math.min(anchorIdx, Math.max(0, orderedIds.length - 1))
+  const floatingStartX = orderedIds.length > 0
+    ? STRUCT_X + clampedAnchor * (NODE_WIDTH + NODE_GAP)
+    : STRUCT_X
 
-  for (const nodeId of floatingIds) {
-    const anchorIdx = state.floatingAnchorIdx ?? 0
-    const clampedAnchor = Math.min(anchorIdx, Math.max(0, orderedIds.length - 1))
-    const floatX = orderedIds.length > 0
-      ? STRUCT_X + clampedAnchor * (NODE_WIDTH + NODE_GAP)
-      : STRUCT_X
+  for (let fi = 0; fi < floatingIds.length; fi++) {
+    const nodeId = floatingIds[fi]
+    const floatX = floatingStartX + fi * (NODE_WIDTH + NODE_GAP)
     nodePositions.set(nodeId, { x: floatX, y: floatingY })
     emitNodeCells(elements, state, nodeId, floatX, floatingY)
   }
@@ -652,6 +772,7 @@ export const listDS: DataStructure<ListState> = {
     { name: 'pop_back', label: 'pop_back()', args: [] },
     { name: 'insert', label: 'insert(pos, val)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }, { name: 'val', label: 'Value', defaultValue: 0 }] },
     { name: 'erase', label: 'erase(pos)', args: [{ name: 'pos', label: 'Position', defaultValue: 0 }] },
+    { name: 'splice', label: 'splice(pos, first, last)', args: [{ name: 'pos', label: 'pos', defaultValue: 0 }, { name: 'first', label: 'first', defaultValue: 1 }, { name: 'last', label: 'last', defaultValue: 3 }] },
   ],
   createInitialState,
   applyOperation,
