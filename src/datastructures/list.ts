@@ -34,6 +34,25 @@ const NODE_WIDTH = 3 * CELL_SIZE + 2 * CELL_GAP
 
 // --- Helpers ---
 
+/**
+ * Compute where a line from (fromX, fromY) toward a rectangle's center
+ * intersects the rectangle boundary. Used to terminate arrows at box edges.
+ */
+function rectEdgeIntersection(
+  fromX: number, fromY: number,
+  rectX: number, rectY: number, rectW: number, rectH: number,
+): { x: number; y: number } {
+  const cx = rectX + rectW / 2
+  const cy = rectY + rectH / 2
+  const dx = fromX - cx
+  const dy = fromY - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const scaleX = dx !== 0 ? (rectW / 2) / Math.abs(dx) : Infinity
+  const scaleY = dy !== 0 ? (rectH / 2) / Math.abs(dy) : Infinity
+  const scale = Math.min(scaleX, scaleY)
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
 function getNode(state: ListState, id: number): DLLNode {
   const node = state.nodes.find(n => n.id === id)
   if (!node) throw new Error(`Node ${id} not found`)
@@ -461,90 +480,50 @@ function computeLayout(state: ListState): DSLayout {
     emitNodeCells(elements, state, nodeId, floatX, floatingY)
   }
 
+  // Helper: emit an arrow from a dot center to a target node's bounding box edge
+  function emitArrow(fromX: number, fromY: number, targetPos: { x: number; y: number }, style: 'straight' | 's-curve' = 'straight') {
+    const edge = rectEdgeIntersection(fromX, fromY, targetPos.x, targetPos.y, NODE_WIDTH, CELL_SIZE)
+    arrows.push({ fromX, fromY, toX: edge.x, toY: edge.y, style })
+  }
+
   // Bidirectional arrows between consecutive ordered nodes
   const ARROW_OFFSET_Y = 4
   for (let i = 0; i < orderedIds.length - 1; i++) {
     const fromPos = nodePositions.get(orderedIds[i])!
     const toPos = nodePositions.get(orderedIds[i + 1])!
 
-    // Forward arrow: next cell (3rd) center → next node's prev cell (1st) center
-    const fromNextCellCenterX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-    const toPrevCellCenterX = toPos.x + CELL_SIZE / 2
+    // Forward: from node[i]'s next-ptr dot → node[i+1]'s box edge
+    const nextDotX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+    const nextDotY = fromPos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
 
-    if (fromPos.y === toPos.y) {
-      // Same row: straight horizontal arrows with vertical offset
-      // Arrows start/end at dot centers in the pointer cells
-      const cellCenterY = fromPos.y + CELL_SIZE / 2
-      const nextDotX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2  // center of next-ptr cell
-      const prevDotX = toPos.x + CELL_SIZE / 2  // center of prev-ptr cell
-      arrows.push({
-        fromX: nextDotX,
-        fromY: cellCenterY - ARROW_OFFSET_Y,
-        toX: prevDotX,
-        toY: cellCenterY - ARROW_OFFSET_Y,
-        style: 'straight',
-      })
-      arrows.push({
-        fromX: prevDotX,
-        fromY: cellCenterY + ARROW_OFFSET_Y,
-        toX: nextDotX,
-        toY: cellCenterY + ARROW_OFFSET_Y,
-        style: 'straight',
-      })
-    } else {
-      // Different rows: s-curve arrows
-      arrows.push({
-        fromX: fromNextCellCenterX,
-        fromY: fromPos.y + CELL_SIZE,
-        toX: toPrevCellCenterX,
-        toY: toPos.y,
-        style: 's-curve',
-      })
-      arrows.push({
-        fromX: toPrevCellCenterX,
-        fromY: toPos.y + CELL_SIZE,
-        toX: fromNextCellCenterX,
-        toY: fromPos.y,
-        style: 's-curve',
-      })
-    }
+    // Backward: from node[i+1]'s prev-ptr dot → node[i]'s box edge
+    const prevDotX = toPos.x + CELL_SIZE / 2
+    const prevDotY = toPos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
+
+    const fwdEdge = rectEdgeIntersection(nextDotX, nextDotY, toPos.x, toPos.y, NODE_WIDTH, CELL_SIZE)
+    const bwdEdge = rectEdgeIntersection(prevDotX, prevDotY, fromPos.x, fromPos.y, NODE_WIDTH, CELL_SIZE)
+
+    arrows.push({ fromX: nextDotX, fromY: nextDotY, toX: fwdEdge.x, toY: fwdEdge.y, style: 'straight' })
+    arrows.push({ fromX: prevDotX, fromY: prevDotY, toX: bwdEdge.x, toY: bwdEdge.y, style: 'straight' })
   }
 
-  // Arrows from/to floating nodes (straight diagonal, like forward-list)
+  // Arrows from/to floating nodes
   for (const floatId of floatingIds) {
     const floatNode = getNode(state, floatId)
     const floatPos = nodePositions.get(floatId)!
 
-    // Arrow from floating's next-ptr dot to target node's value cell center
     if (floatNode.nextId !== null && nodePositions.has(floatNode.nextId)) {
       const targetPos = nodePositions.get(floatNode.nextId)!
       const nextDotX = floatPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const nextDotY = floatPos.y + CELL_SIZE / 2
-      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-      const targetCenterY = targetPos.y + CELL_SIZE / 2
-      arrows.push({
-        fromX: nextDotX,
-        fromY: nextDotY,
-        toX: targetCenterX,
-        toY: targetCenterY,
-        style: 'straight',
-      })
+      emitArrow(nextDotX, nextDotY, targetPos)
     }
 
-    // Arrow from floating's prev-ptr dot to target node's value cell center
     if (floatNode.prevId !== null && nodePositions.has(floatNode.prevId)) {
       const targetPos = nodePositions.get(floatNode.prevId)!
       const prevDotX = floatPos.x + CELL_SIZE / 2
       const prevDotY = floatPos.y + CELL_SIZE / 2
-      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-      const targetCenterY = targetPos.y + CELL_SIZE / 2
-      arrows.push({
-        fromX: prevDotX,
-        fromY: prevDotY,
-        toX: targetCenterX,
-        toY: targetCenterY,
-        style: 'straight',
-      })
+      emitArrow(prevDotX, prevDotY, targetPos)
     }
   }
 
@@ -557,57 +536,27 @@ function computeLayout(state: ListState): DSLayout {
       const targetPos = nodePositions.get(ordNode.nextId)!
       const nextDotX = ordPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
       const nextDotY = ordPos.y + CELL_SIZE / 2
-      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-      const targetCenterY = targetPos.y + CELL_SIZE / 2
-      arrows.push({
-        fromX: nextDotX,
-        fromY: nextDotY,
-        toX: targetCenterX,
-        toY: targetCenterY,
-        style: 'straight',
-      })
+      emitArrow(nextDotX, nextDotY, targetPos)
     }
 
     if (ordNode.prevId !== null && floatingIds.includes(ordNode.prevId) && nodePositions.has(ordNode.prevId)) {
       const targetPos = nodePositions.get(ordNode.prevId)!
       const prevDotX = ordPos.x + CELL_SIZE / 2
       const prevDotY = ordPos.y + CELL_SIZE / 2
-      const targetCenterX = targetPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-      const targetCenterY = targetPos.y + CELL_SIZE / 2
-      arrows.push({
-        fromX: prevDotX,
-        fromY: prevDotY,
-        toX: targetCenterX,
-        toY: targetCenterY,
-        style: 'straight',
-      })
+      emitArrow(prevDotX, prevDotY, targetPos)
     }
   }
 
-  // S-curve arrow from begin field to first node's value cell (center, top)
+  // Arrow from begin field to first node's box edge
   if (state.headId !== null && orderedIds.length > 0) {
     const firstPos = nodePositions.get(orderedIds[0])!
-    const valueCellCenterX = firstPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-    arrows.push({
-      fromX: beginFieldCenterX,
-      fromY: beginFieldCenterY,
-      toX: valueCellCenterX,
-      toY: firstPos.y,
-      style: 's-curve',
-    })
+    emitArrow(beginFieldCenterX, beginFieldCenterY, firstPos, 's-curve')
   }
 
-  // S-curve arrow from end field to last node's value cell (center, top)
+  // Arrow from end field to last node's box edge
   if (state.tailId !== null && orderedIds.length > 0) {
     const lastPos = nodePositions.get(orderedIds[orderedIds.length - 1])!
-    const valueCellCenterX = lastPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
-    arrows.push({
-      fromX: endFieldCenterX,
-      fromY: endFieldCenterY,
-      toX: valueCellCenterX,
-      toY: lastPos.y,
-      style: 's-curve',
-    })
+    emitArrow(endFieldCenterX, endFieldCenterY, lastPos, 's-curve')
   }
 
   // Compute total dimensions

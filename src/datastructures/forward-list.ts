@@ -33,6 +33,25 @@ const NODE_GAP = 40
 
 // --- Helpers ---
 
+/**
+ * Compute where a line from (fromX, fromY) toward a rectangle's center
+ * intersects the rectangle boundary. Used to terminate arrows at box edges.
+ */
+function rectEdgeIntersection(
+  fromX: number, fromY: number,
+  rectX: number, rectY: number, rectW: number, rectH: number,
+): { x: number; y: number } {
+  const cx = rectX + rectW / 2
+  const cy = rectY + rectH / 2
+  const dx = fromX - cx
+  const dy = fromY - cy
+  if (dx === 0 && dy === 0) return { x: cx, y: cy }
+  const scaleX = dx !== 0 ? (rectW / 2) / Math.abs(dx) : Infinity
+  const scaleY = dy !== 0 ? (rectH / 2) / Math.abs(dy) : Infinity
+  const scale = Math.min(scaleX, scaleY)
+  return { x: cx + dx * scale, y: cy + dy * scale }
+}
+
 /** Get the ordered list of nodes by following the linked list from head. */
 function getOrderedNodes(state: ForwardListState): FLNode[] {
   const result: FLNode[] = []
@@ -397,7 +416,7 @@ function computeLayout(state: ForwardListState): DSLayout {
     emitNodeCells(elements, node, nodeX, floatingY)
   }
 
-  // Arrows: from each node's pointer cell center to next node
+  // Arrows: from each node's pointer cell center to next node's bounding box edge
   const allNodes = [...orderedNodes, ...floatingNodes]
   for (const node of allNodes) {
     if (node.nextId === null) continue
@@ -407,39 +426,34 @@ function computeLayout(state: ForwardListState): DSLayout {
 
     const ptrCellCenterX = fromPos.x + CELL_SIZE + CELL_GAP + CELL_SIZE / 2
     const ptrCellCenterY = fromPos.y + CELL_SIZE / 2
-    const targetLeft = toPos.x
-    const targetCenterY = toPos.y + CELL_SIZE / 2
 
-    const sameRow = fromPos.y === toPos.y
-    if (sameRow) {
-      // Horizontal straight arrow from dot to left edge of next node
-      arrows.push({
-        fromX: ptrCellCenterX,
-        fromY: ptrCellCenterY,
-        toX: targetLeft,
-        toY: targetCenterY,
-        style: 'straight',
-      })
-    } else {
-      // Cross-row arrow (floating ↔ linked): straight diagonal to target center
-      arrows.push({
-        fromX: ptrCellCenterX,
-        fromY: ptrCellCenterY,
-        toX: targetLeft + CELL_SIZE / 2,
-        toY: targetCenterY,
-        style: 'straight',
-      })
-    }
+    // Intersection of line from dot to target node's bounding box
+    const edge = rectEdgeIntersection(
+      ptrCellCenterX, ptrCellCenterY,
+      toPos.x, toPos.y, NODE_WIDTH, CELL_SIZE,
+    )
+
+    arrows.push({
+      fromX: ptrCellCenterX,
+      fromY: ptrCellCenterY,
+      toX: edge.x,
+      toY: edge.y,
+      style: 'straight',
+    })
   }
 
-  // S-curve arrow from head field to first linked node (or floating if head points there)
+  // Arrow from head field to first linked node's bounding box edge
   if (state.headId !== null && nodePositions.has(state.headId)) {
     const headPos = nodePositions.get(state.headId)!
+    const edge = rectEdgeIntersection(
+      headFieldCenterX, headFieldBottomY,
+      headPos.x, headPos.y, NODE_WIDTH, CELL_SIZE,
+    )
     arrows.push({
       fromX: headFieldCenterX,
       fromY: headFieldBottomY,
-      toX: headPos.x + CELL_SIZE / 2,
-      toY: headPos.y,
+      toX: edge.x,
+      toY: edge.y,
       style: 's-curve',
     })
   }
