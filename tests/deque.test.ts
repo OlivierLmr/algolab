@@ -554,7 +554,7 @@ describe('deque: layout', () => {
     expect(chunkCells[0].opacity).toBe(1.0)
   })
 
-  it('after copy step, old map arrows point to chunks below new map', () => {
+  it('after copy step, old map arrows point to valid chunk positions below new map', () => {
     let s = dequeDS.createInitialState([1, 2, 3, 4])
     for (let i = 5; i <= 12; i++) s = apply(s, 'push_back', { val: i })
     for (let i = 0; i >= -3; i--) s = apply(s, 'push_front', { val: i })
@@ -567,9 +567,12 @@ describe('deque: layout', () => {
     // Old map arrows (opacity < 1) should exist
     const dimmedArrows = layout.arrows.filter(a => a.opacity !== undefined && a.opacity < 1.0)
     expect(dimmedArrows.length).toBeGreaterThan(0)
-    // Chunks appear only once (below new map), not duplicated
+    // Each dimmed arrow's target X should match a rendered chunk column's X
     const chunkCells = layout.elements.filter(e => e.id.startsWith('cell:chunk:'))
-    expect(chunkCells.length).toBeGreaterThan(0)
+    const chunkXs = new Set(chunkCells.map(e => e.x + e.width / 2))
+    for (const arrow of dimmedArrows) {
+      expect(chunkXs.has(arrow.toX)).toBe(true)
+    }
   })
 
   it('old map disappears after delete step', () => {

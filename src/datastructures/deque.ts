@@ -570,22 +570,14 @@ function computeLayout(state: DequeState): DSLayout {
 
   // Old map arrows pointing to chunks (below new map) in step 2
   if (hasOldMap && newMapHasChunks) {
-    // Old map entries that have chunks → arrows pointing to the chunk columns below new map
-    // We need to map old map indices to new map indices (same chunks, different positions)
+    // The growth operation unwraps circular old map to linear new map:
+    // Old active chunk at offset i → new map at mapBeg + i
     for (let oldIdx = 0; oldIdx < state.oldMapCap!; oldIdx++) {
       if (state.oldChunks![oldIdx] === null) continue
-      // Find this chunk in the new map (same data object)
-      const oldChunk = state.oldChunks![oldIdx]
-      let newIdx = -1
-      for (let ni = 0; ni < state.mapCap; ni++) {
-        if (state.chunks[ni] !== null &&
-            state.chunks[ni]!.length === oldChunk!.length &&
-            state.chunks[ni]!.every((v, vi) => v === oldChunk![vi])) {
-          newIdx = ni
-          break
-        }
-      }
-      if (newIdx >= 0) {
+      // Compute active offset of this old chunk
+      const activeOffset = (oldIdx - state.oldMapBeg! + state.oldMapCap!) % state.oldMapCap!
+      const newIdx = state.mapBeg + activeOffset
+      if (newIdx < state.mapCap && state.chunks[newIdx] !== null) {
         const oldCellCenterX = oldMapRowX + oldIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
         const targetChunkCenterX = mapRowX + newIdx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
         arrows.push({
