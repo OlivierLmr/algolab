@@ -457,7 +457,59 @@ function computeLayout(state: DequeState): DSLayout {
       })
     }
 
-    oldMapBottomY = oldMapRowY + CELL_SIZE + 20 // gap between old and new map
+    // Chunk columns below old map (dimmed, shows data is still there during transition)
+    const oldChunksTopY = oldMapRowY + CELL_SIZE + MAP_TO_CHUNKS_GAP
+    // Build a pseudo-state to compute active slots for the old map
+    const oldPseudo: DequeState = {
+      chunks: state.oldChunks!,
+      mapCap: state.oldMapCap!,
+      mapBeg: state.oldMapBeg!,
+      chunkCap: state.chunkCap,
+      chunkBeg: state.chunkBeg,
+      taille: state.taille,
+    }
+
+    for (let i = 0; i < state.oldMapCap!; i++) {
+      const chunk = state.oldChunks![i]
+      if (chunk === null) continue
+
+      const cellCenterX = oldMapRowX + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const chunkColX = oldMapRowX + i * (CELL_SIZE + CELL_GAP)
+
+      // Arrow from old map cell to old chunk column
+      arrows.push({
+        fromX: cellCenterX,
+        fromY: oldMapRowY + CELL_SIZE,
+        toX: cellCenterX,
+        toY: oldChunksTopY,
+        style: 's-curve',
+        opacity: 0.4,
+      })
+
+      for (let s = 0; s < state.chunkCap; s++) {
+        const cellY = oldChunksTopY + s * (CELL_SIZE + CHUNK_CELL_GAP)
+        const active = isSlotActive(oldPseudo, i, s)
+
+        elements.push({
+          id: `cell:oldchunk:${i}:${s}`,
+          x: chunkColX,
+          y: cellY,
+          width: CELL_SIZE,
+          height: CELL_SIZE,
+          kind: 'cell',
+          data: {
+            arrayName: `oldchunk${i}`,
+            index: s,
+            value: { num: chunk[s], arrays: [] },
+            dimmed: !active,
+          } as CellData,
+          opacity: 0.4,
+        })
+      }
+    }
+
+    const oldChunksBottomY = oldChunksTopY + state.chunkCap * (CELL_SIZE + CHUNK_CELL_GAP) - CHUNK_CELL_GAP
+    oldMapBottomY = oldChunksBottomY + 30 // gap between old chunks and new map
   }
 
   // --- New map row ---

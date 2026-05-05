@@ -9,6 +9,8 @@ export interface DSArrow {
   color?: string
   /** 's-curve' for vertical struct→array arrows, 'straight' for horizontal node→node. Default: 's-curve'. */
   style?: 's-curve' | 'straight'
+  /** Opacity for dimmed arrows (e.g. old map during reallocation). Default: 1.0. */
+  opacity?: number
 }
 
 /** Layout output for a data structure visualization. */

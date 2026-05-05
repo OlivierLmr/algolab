@@ -50,6 +50,7 @@ export function DSArrowOverlay({ arrows, width, height }: Props) {
       </defs>
       {arrows.map((arrow, i) => {
         const color = arrow.color ?? '#666'
+        const opacity = arrow.opacity ?? 1.0
         return (
           <path
             key={i}
@@ -57,6 +58,7 @@ export function DSArrowOverlay({ arrows, width, height }: Props) {
             fill="none"
             stroke={color}
             stroke-width="1.5"
+            opacity={opacity}
             marker-end="url(#ds-arrowhead)"
           />
         )
