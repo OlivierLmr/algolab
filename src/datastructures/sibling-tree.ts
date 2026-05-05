@@ -129,29 +129,6 @@ function getNode(state: SiblingTreeState, id: number): SiblingNode {
   return node
 }
 
-/** Compute tree depths via BFS from root. Returns a map id → depth. */
-function nodeDepths(state: SiblingTreeState): Map<number, number> {
-  const depth = new Map<number, number>()
-  if (state.rootId === null) return depth
-  depth.set(state.rootId, 0)
-  let frontier = [state.rootId]
-  while (frontier.length > 0) {
-    const next: number[] = []
-    for (const id of frontier) {
-      const node = getNode(state, id)
-      const d = depth.get(id)!
-      let childId = node.firstChildId
-      while (childId !== null) {
-        depth.set(childId, d + 1)
-        next.push(childId)
-        childId = getNode(state, childId).siblingId
-      }
-    }
-    frontier = next
-  }
-  return depth
-}
-
 /**
  * Compute abstract-tree positions using a simple subtree-width algorithm.
  * Each leaf has width = CIRCLE_DIAMETER. An internal node has width = sum of
