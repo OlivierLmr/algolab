@@ -485,17 +485,44 @@ describe('list: splice', () => {
     expect(values(s2)).toEqual([1, 4, 5, 2, 3])
   })
 
-  it('each pointer change is its own substep', () => {
+  it('has 5 substeps: visual + 2 unlink + 2 relink', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
-    const steps = applySteps(state, 'splice', { pos: 0, first: 3, last: 4 })
-    // Step 0 is visual-only, then unlink (2 ptrs) + insert (4 ptrs) = 6 pointer changes
-    expect(steps.length).toBeGreaterThanOrEqual(5)
-    // First step is a visual hint (no pointer change)
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    // Step 0: visual pre-step
+    // Step 1: unlink forward (beforeRange.next → afterRange)
+    // Step 2: unlink backward (afterRange.prev → beforeRange)
+    // Step 3: subchain → new neighbours (2 pointers)
+    // Step 4: new neighbours → subchain (2 pointers, final)
+    expect(steps.length).toBe(5)
     expect(steps[0].description).toContain('Splicing')
-    // Remaining steps are all pointer changes
     for (const step of steps.slice(1)) {
       expect(step.description).toMatch(/Set/)
     }
+  })
+
+  it('floating nodes persist across all intermediate steps', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+
+    // Steps 0-3 should have floatingNodeIds set (nodes stay below)
+    for (let i = 0; i < 4; i++) {
+      const layout = listDS.computeLayout(steps[i].state)
+      const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+      const nodeYs = new Map<number, number>()
+      for (const cell of valueCells) {
+        const parts = cell.id.split(':')
+        nodeYs.set(Number(parts[2]), cell.y)
+      }
+      const topY = nodeYs.get(0)!
+      expect(nodeYs.get(2)!).toBeGreaterThan(topY) // node 2 below
+      expect(nodeYs.get(3)!).toBeGreaterThan(topY) // node 3 below
+    }
+
+    // Final step (4): all nodes back in one row
+    const finalLayout = listDS.computeLayout(steps[4].state)
+    const finalValueCells = finalLayout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    const finalYs = new Set(finalValueCells.map(c => c.y))
+    expect(finalYs.size).toBe(1) // all at same y
   })
 
   it('throws on empty range', () => {
@@ -547,6 +574,35 @@ describe('list: splice', () => {
     expect(nodeYs.get(4)).toBe(topY) // node 4 same row
     expect(nodeYs.get(2)!).toBeGreaterThan(topY) // node 2 below
     expect(nodeYs.get(3)!).toBeGreaterThan(topY) // node 3 below
+  })
+
+  it('step 0 arrows are pointer-based, not position-based', () => {
+    // In the visual pre-step, nodes 0,1,4 are in the top row but 1 and 4
+    // are NOT connected (1.next→2 which is below, not →4). There should
+    // be no arrow connecting nodes 1 and 4 directly.
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    const layout = listDS.computeLayout(steps[0].state)
+
+    // Get positions
+    const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    const nodeXs = new Map<number, number>()
+    for (const cell of valueCells) {
+      const parts = cell.id.split(':')
+      nodeXs.set(Number(parts[2]), cell.x)
+    }
+    const node1X = nodeXs.get(1)!
+    const node4X = nodeXs.get(4)!
+
+    // There should be arrows from node 1's next-ptr cell going DOWN (to node 2 below),
+    // not RIGHT to node 4. Check no arrow starts from node 1's next zone and ends at node 4's zone.
+    const node1NextDotXApprox = node1X + 100 // rough: past value and next cells
+    const suspectArrows = layout.arrows.filter(a =>
+      Math.abs(a.fromX - node1NextDotXApprox) < 50 &&
+      Math.abs(a.toX - node4X) < 50 &&
+      Math.abs(a.fromY - a.toY) < 5 // same-row horizontal arrow
+    )
+    expect(suspectArrows.length).toBe(0)
   })
 
   it('step 0 floating nodes are spread horizontally', () => {

@@ -386,112 +386,105 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   }
 
   const ordered = orderedNodeIds(state)
+  const rangeNodeIds = ordered.slice(rangeStart, lastIdx)
   const subchainHeadId = ordered[rangeStart]
   const subchainTailId = ordered[rangeEnd]
   // Node before the range (null if range starts at head)
   const beforeRangeId = rangeStart > 0 ? ordered[rangeStart - 1] : null
   // Node after the range (null if range ends at tail)
   const afterRangeId = lastIdx < state.size ? ordered[lastIdx] : null
-  // Node before which we insert (null if inserting at end)
-  const posNodeId = posIdx < state.size ? ordered[posIdx] : null
-  // Node after which we insert (null if inserting at front)
-  const beforePosId = posIdx > 0 ? ordered[posIdx - 1] : null
+
+  // Compute insertion point in the remaining list (after range removal)
+  const remaining = [...ordered.slice(0, rangeStart), ...ordered.slice(lastIdx)]
+  const adjPos = posIdx <= rangeStart ? posIdx : posIdx - (lastIdx - rangeStart)
+  const insertAfterNodeId = adjPos > 0 ? remaining[adjPos - 1] : null
+  const insertBeforeNodeId = adjPos < remaining.length ? remaining[adjPos] : null
+
+  // Label helper: describe a node by its original position
+  const nodeLabel = (id: number | null) => {
+    if (id === null) return 'null'
+    const idx = ordered.indexOf(id)
+    return idx >= 0 ? `node[${idx}]` : `node(id=${id})`
+  }
 
   const steps: Step[] = []
-
-  // --- Step 0: Visual-only — show the subchain below the main row (no pointer changes) ---
-  // This makes it clear which nodes are about to be moved.
-  const rangeNodeIds = ordered.slice(rangeStart, lastIdx)
-  {
-    const s0 = cloneState(state)
-    s0.floatingNodeIds = rangeNodeIds
-    s0.floatingAnchorIdx = rangeStart
-    steps.push({ state: s0, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
-  }
-
   let current = cloneState(state)
 
-  // --- Phase 1: Unlink the subchain from its current position ---
-
-  // Step: Set beforeRange.next = afterRange (or head = afterRange if range starts at head)
-  if (beforeRangeId !== null) {
-    const s = cloneState(current)
-    getNode(s, beforeRangeId).nextId = afterRangeId
-    steps.push({ state: s, description: `Set node[${rangeStart - 1}].next → node[${lastIdx}]` })
-    current = s
-  } else {
-    const s = cloneState(current)
-    s.headId = afterRangeId
-    steps.push({ state: s, description: `Set begin → node[${lastIdx}]` })
-    current = s
-  }
-
-  // Step: Set afterRange.prev = beforeRange (or tail = beforeRange if range ends at tail)
-  if (afterRangeId !== null) {
-    const s = cloneState(current)
-    getNode(s, afterRangeId).prevId = beforeRangeId
-    steps.push({ state: s, description: `Set node[${lastIdx}].prev → node[${rangeStart - 1}]` })
-    current = s
-  } else {
-    const s = cloneState(current)
-    s.tailId = beforeRangeId
-    steps.push({ state: s, description: `Set end → node[${rangeStart - 1}]` })
-    current = s
-  }
-
-  // --- Phase 2: Insert subchain before pos ---
-  // "Insert before pos" means: after beforePos (or at front if pos=0)
-
-  // Determine the actual node currently at pos position (accounting for already unlinked state)
-  const insertAfterNodeId = posIdx === 0 ? null :
-    posIdx <= rangeStart ? beforePosId :
-    // If pos was after the range, we use the node at pos in the original order
-    // But since range was removed, adjust: beforePos = ordered[posIdx - 1] which is now afterRange's position
-    beforePosId
-  const insertBeforeNodeId = posNodeId
-
-  // Step: Set subchain_head.prev = insertAfter (or null if inserting at front)
+  // --- Step 0: Visual-only — show the subchain below the main row (no pointer changes) ---
   {
     const s = cloneState(current)
+    s.floatingNodeIds = rangeNodeIds
+    s.floatingAnchorIdx = rangeStart
+    steps.push({ state: s, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
+  }
+
+  // --- Step 1: Unlink forward — beforeRange.next → afterRange (or begin → afterRange) ---
+  {
+    const s = cloneState(current)
+    s.floatingNodeIds = rangeNodeIds
+    s.floatingAnchorIdx = rangeStart
+    if (beforeRangeId !== null) {
+      getNode(s, beforeRangeId).nextId = afterRangeId
+      steps.push({ state: s, description: `Set ${nodeLabel(beforeRangeId)}.next → ${nodeLabel(afterRangeId)}` })
+    } else {
+      s.headId = afterRangeId
+      steps.push({ state: s, description: `Set begin → ${nodeLabel(afterRangeId)}` })
+    }
+    current = s
+  }
+
+  // --- Step 2: Unlink backward — afterRange.prev → beforeRange (or end → beforeRange) ---
+  {
+    const s = cloneState(current)
+    s.floatingNodeIds = rangeNodeIds
+    s.floatingAnchorIdx = rangeStart
+    if (afterRangeId !== null) {
+      getNode(s, afterRangeId).prevId = beforeRangeId
+      steps.push({ state: s, description: `Set ${nodeLabel(afterRangeId)}.prev → ${nodeLabel(beforeRangeId)}` })
+    } else {
+      s.tailId = beforeRangeId
+      steps.push({ state: s, description: `Set end → ${nodeLabel(beforeRangeId)}` })
+    }
+    current = s
+  }
+
+  // --- Step 3: Subchain points to new neighbours ---
+  // subchain_head.prev → insertAfter, subchain_tail.next → insertBefore
+  {
+    const s = cloneState(current)
+    s.floatingNodeIds = rangeNodeIds
+    s.floatingAnchorIdx = rangeStart
     getNode(s, subchainHeadId).prevId = insertAfterNodeId
-    const label = insertAfterNodeId !== null ? `node[${ordered.indexOf(insertAfterNodeId)}]` : 'null'
-    steps.push({ state: s, description: `Set subchain_head.prev → ${label}` })
+    getNode(s, subchainTailId).nextId = insertBeforeNodeId
+    steps.push({
+      state: s,
+      description: `Set subchain_head.prev → ${nodeLabel(insertAfterNodeId)}, subchain_tail.next → ${nodeLabel(insertBeforeNodeId)}`,
+    })
     current = s
   }
 
-  // Step: Set subchain_tail.next = insertBefore (or null if inserting at end)
+  // --- Step 4: New neighbours point to subchain (final — nodes return to ordered row) ---
+  // insertAfter.next → subchain_head (or begin → subchain_head)
+  // insertBefore.prev → subchain_tail (or end → subchain_tail)
   {
     const s = cloneState(current)
-    getNode(s, subchainTailId).nextId = insertBeforeNodeId
-    const label = insertBeforeNodeId !== null ? `node[${ordered.indexOf(insertBeforeNodeId)}]` : 'null'
-    steps.push({ state: s, description: `Set subchain_tail.next → ${label}` })
-    current = s
-  }
-
-  // Step: Set insertAfter.next = subchain_head (or head = subchain_head if inserting at front)
-  if (insertAfterNodeId !== null) {
-    const s = cloneState(current)
-    getNode(s, insertAfterNodeId).nextId = subchainHeadId
-    steps.push({ state: s, description: `Set node[${ordered.indexOf(insertAfterNodeId)}].next → subchain_head` })
-    current = s
-  } else {
-    const s = cloneState(current)
-    s.headId = subchainHeadId
-    steps.push({ state: s, description: `Set begin → subchain_head` })
-    current = s
-  }
-
-  // Step: Set insertBefore.prev = subchain_tail (or tail = subchain_tail if inserting at end)
-  if (insertBeforeNodeId !== null) {
-    const s = cloneState(current)
-    getNode(s, insertBeforeNodeId).prevId = subchainTailId
-    steps.push({ state: s, description: `Set node[${ordered.indexOf(insertBeforeNodeId)}].prev → subchain_tail` })
-    current = s
-  } else {
-    const s = cloneState(current)
-    s.tailId = subchainTailId
-    steps.push({ state: s, description: `Set end → subchain_tail` })
-    current = s
+    // No floatingNodeIds — all nodes rejoin the ordered row
+    if (insertAfterNodeId !== null) {
+      getNode(s, insertAfterNodeId).nextId = subchainHeadId
+    } else {
+      s.headId = subchainHeadId
+    }
+    if (insertBeforeNodeId !== null) {
+      getNode(s, insertBeforeNodeId).prevId = subchainTailId
+    } else {
+      s.tailId = subchainTailId
+    }
+    const afterLabel = insertAfterNodeId !== null ? `${nodeLabel(insertAfterNodeId)}.next` : 'begin'
+    const beforeLabel = insertBeforeNodeId !== null ? `${nodeLabel(insertBeforeNodeId)}.prev` : 'end'
+    steps.push({
+      state: s,
+      description: `Set ${afterLabel} → subchain_head, ${beforeLabel} → subchain_tail`,
+    })
   }
 
   return steps
@@ -636,77 +629,40 @@ function computeLayout(state: ListState): DSLayout {
     arrows.push({ fromX, fromY, toX: edge.x, toY: edge.y, style })
   }
 
-  // Bidirectional arrows between consecutive ordered nodes
+  // Draw arrows based on actual pointer connections for ALL nodes.
+  // This correctly handles intermediate splice states where ordered-row
+  // nodes may point to floating nodes (and vice versa) rather than
+  // their display neighbours.
   const ARROW_OFFSET_Y = 4
-  for (let i = 0; i < orderedIds.length - 1; i++) {
-    const fromPos = nodePositions.get(orderedIds[i])!
-    const toPos = nodePositions.get(orderedIds[i + 1])!
+  for (const node of state.nodes) {
+    const pos = nodePositions.get(node.id)
+    if (!pos) continue
 
-    // Forward: from node[i]'s next-ptr dot → node[i+1]'s box edge
-    const nextDotX = fromPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-    const nextDotY = fromPos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
-
-    // Backward: from node[i+1]'s prev-ptr dot → node[i]'s box edge
-    const prevDotX = toPos.x + CELL_SIZE / 2
-    const prevDotY = toPos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
-
-    const fwdEdge = rectEdgeIntersection(nextDotX, nextDotY, toPos.x, toPos.y, NODE_WIDTH, CELL_SIZE)
-    const bwdEdge = rectEdgeIntersection(prevDotX, prevDotY, fromPos.x, fromPos.y, NODE_WIDTH, CELL_SIZE)
-
-    arrows.push({ fromX: nextDotX, fromY: nextDotY, toX: fwdEdge.x, toY: fwdEdge.y, style: 'straight' })
-    arrows.push({ fromX: prevDotX, fromY: prevDotY, toX: bwdEdge.x, toY: bwdEdge.y, style: 'straight' })
-  }
-
-  // Arrows from/to floating nodes
-  for (const floatId of floatingIds) {
-    const floatNode = getNode(state, floatId)
-    const floatPos = nodePositions.get(floatId)!
-
-    if (floatNode.nextId !== null && nodePositions.has(floatNode.nextId)) {
-      const targetPos = nodePositions.get(floatNode.nextId)!
-      const nextDotX = floatPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-      const nextDotY = floatPos.y + CELL_SIZE / 2
+    // Forward arrow: next pointer
+    if (node.nextId !== null && nodePositions.has(node.nextId)) {
+      const targetPos = nodePositions.get(node.nextId)!
+      const nextDotX = pos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
+      const nextDotY = pos.y + CELL_SIZE / 2 - ARROW_OFFSET_Y
       emitArrow(nextDotX, nextDotY, targetPos)
     }
 
-    if (floatNode.prevId !== null && nodePositions.has(floatNode.prevId)) {
-      const targetPos = nodePositions.get(floatNode.prevId)!
-      const prevDotX = floatPos.x + CELL_SIZE / 2
-      const prevDotY = floatPos.y + CELL_SIZE / 2
+    // Backward arrow: prev pointer
+    if (node.prevId !== null && nodePositions.has(node.prevId)) {
+      const targetPos = nodePositions.get(node.prevId)!
+      const prevDotX = pos.x + CELL_SIZE / 2
+      const prevDotY = pos.y + CELL_SIZE / 2 + ARROW_OFFSET_Y
       emitArrow(prevDotX, prevDotY, targetPos)
     }
   }
 
-  // Arrows from ordered nodes pointing to floating nodes
-  for (const ordId of orderedIds) {
-    const ordNode = getNode(state, ordId)
-    const ordPos = nodePositions.get(ordId)!
-
-    if (ordNode.nextId !== null && floatingIds.includes(ordNode.nextId) && nodePositions.has(ordNode.nextId)) {
-      const targetPos = nodePositions.get(ordNode.nextId)!
-      const nextDotX = ordPos.x + 2 * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2
-      const nextDotY = ordPos.y + CELL_SIZE / 2
-      emitArrow(nextDotX, nextDotY, targetPos)
-    }
-
-    if (ordNode.prevId !== null && floatingIds.includes(ordNode.prevId) && nodePositions.has(ordNode.prevId)) {
-      const targetPos = nodePositions.get(ordNode.prevId)!
-      const prevDotX = ordPos.x + CELL_SIZE / 2
-      const prevDotY = ordPos.y + CELL_SIZE / 2
-      emitArrow(prevDotX, prevDotY, targetPos)
-    }
+  // Arrow from begin field to the node headId points to
+  if (state.headId !== null && nodePositions.has(state.headId)) {
+    emitArrow(beginFieldCenterX, beginFieldCenterY, nodePositions.get(state.headId)!, 's-curve')
   }
 
-  // Arrow from begin field to first node's box edge
-  if (state.headId !== null && orderedIds.length > 0) {
-    const firstPos = nodePositions.get(orderedIds[0])!
-    emitArrow(beginFieldCenterX, beginFieldCenterY, firstPos, 's-curve')
-  }
-
-  // Arrow from end field to last node's box edge
-  if (state.tailId !== null && orderedIds.length > 0) {
-    const lastPos = nodePositions.get(orderedIds[orderedIds.length - 1])!
-    emitArrow(endFieldCenterX, endFieldCenterY, lastPos, 's-curve')
+  // Arrow from end field to the node tailId points to
+  if (state.tailId !== null && nodePositions.has(state.tailId)) {
+    emitArrow(endFieldCenterX, endFieldCenterY, nodePositions.get(state.tailId)!, 's-curve')
   }
 
   // Compute total dimensions
