@@ -19,6 +19,8 @@ export interface ListState {
   nextNodeId: number
   /** Hint for layout: position of the anchor node that a floating node should appear below. */
   floatingAnchorIdx?: number
+  /** Hint for layout: node IDs to render in the floating row regardless of linkage. */
+  floatingNodeIds?: number[]
 }
 
 // --- Layout constants ---
@@ -396,6 +398,17 @@ function splice(state: ListState, posIdx: number, firstIdx: number, lastIdx: num
   const beforePosId = posIdx > 0 ? ordered[posIdx - 1] : null
 
   const steps: Step[] = []
+
+  // --- Step 0: Visual-only — show the subchain below the main row (no pointer changes) ---
+  // This makes it clear which nodes are about to be moved.
+  const rangeNodeIds = ordered.slice(rangeStart, lastIdx)
+  {
+    const s0 = cloneState(state)
+    s0.floatingNodeIds = rangeNodeIds
+    s0.floatingAnchorIdx = rangeStart
+    steps.push({ state: s0, description: `Splicing nodes [${rangeStart}..${rangeEnd}]` })
+  }
+
   let current = cloneState(state)
 
   // --- Phase 1: Unlink the subchain from its current position ---
@@ -559,9 +572,15 @@ function computeLayout(state: ListState): DSLayout {
   const nodesY = fieldY + FIELD_LABEL_HEIGHT + CELL_SIZE + STRUCT_TO_ARRAY_GAP
   const nodesX = STRUCT_X
 
-  const orderedIds = orderedNodeIds(state)
+  const allOrderedIds = orderedNodeIds(state)
+  const forcedFloating = new Set(state.floatingNodeIds ?? [])
+  // Nodes forced to float are removed from the ordered row, even if still linked
+  const orderedIds = allOrderedIds.filter(id => !forcedFloating.has(id))
   const orderedSet = new Set(orderedIds)
-  const floatingIds = state.nodes.filter(n => !orderedSet.has(n.id)).map(n => n.id)
+  // Floating = forced floating + structurally unreachable nodes
+  const floatingIds = state.nodes
+    .filter(n => !orderedSet.has(n.id))
+    .map(n => n.id)
 
   if (orderedIds.length === 0 && floatingIds.length === 0) {
     // Show empty label

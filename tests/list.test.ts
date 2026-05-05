@@ -488,9 +488,12 @@ describe('list: splice', () => {
   it('each pointer change is its own substep', () => {
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'splice', { pos: 0, first: 3, last: 4 })
-    // Moving 1 node: unlink (2 ptrs) + insert (4 ptrs) = 6 pointer changes
-    expect(steps.length).toBeGreaterThanOrEqual(4)
-    for (const step of steps) {
+    // Step 0 is visual-only, then unlink (2 ptrs) + insert (4 ptrs) = 6 pointer changes
+    expect(steps.length).toBeGreaterThanOrEqual(5)
+    // First step is a visual hint (no pointer change)
+    expect(steps[0].description).toContain('Splicing')
+    // Remaining steps are all pointer changes
+    for (const step of steps.slice(1)) {
       expect(step.description).toMatch(/Set/)
     }
   })
@@ -516,15 +519,44 @@ describe('list: splice', () => {
     }
   })
 
-  it('floating nodes during splice are spread horizontally', () => {
+  it('step 0 shows moved nodes below without changing pointers', () => {
+    // [1, 2, 3, 4, 5] → splice(pos=0, first=2, last=4) moves [2,4) = nodes 2,3 (vals 3,4)
     const state = listDS.createInitialState([1, 2, 3, 4, 5])
     const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
-    // After unlinking nodes 2,3: they become floating
-    // Find a step where the range has been unlinked but not yet fully relinked
-    const layout = listDS.computeLayout(steps[1].state) // after both unlink steps
+    const step0 = steps[0]
+
+    // Pointers are unchanged from original state
+    expect(step0.state.headId).toBe(state.headId)
+    expect(step0.state.tailId).toBe(state.tailId)
+    const node2 = step0.state.nodes.find((n: any) => n.id === 2)
+    expect(node2.nextId).toBe(3) // still linked to node 3
+    expect(node2.prevId).toBe(1) // still linked to node 1
+
+    // Layout: nodes 2,3 should be below the main row
+    const layout = listDS.computeLayout(step0.state)
     const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
-    const ys = [...new Set(valueCells.map(e => e.y))]
-    // Floating nodes should be on a different Y than linked ones
-    expect(ys.length).toBeGreaterThanOrEqual(2)
+    const nodeYs = new Map<number, number>()
+    for (const cell of valueCells) {
+      // Extract node ID from cell id like "cell:node:2:value"
+      const parts = cell.id.split(':')
+      nodeYs.set(Number(parts[2]), cell.y)
+    }
+    // Nodes 0, 1, 4 should be in the top row; nodes 2, 3 below
+    const topY = nodeYs.get(0)!
+    expect(nodeYs.get(1)).toBe(topY) // node 1 same row
+    expect(nodeYs.get(4)).toBe(topY) // node 4 same row
+    expect(nodeYs.get(2)!).toBeGreaterThan(topY) // node 2 below
+    expect(nodeYs.get(3)!).toBeGreaterThan(topY) // node 3 below
+  })
+
+  it('step 0 floating nodes are spread horizontally', () => {
+    const state = listDS.createInitialState([1, 2, 3, 4, 5])
+    const steps = applySteps(state, 'splice', { pos: 0, first: 2, last: 4 })
+    const layout = listDS.computeLayout(steps[0].state)
+    const valueCells = layout.elements.filter(e => e.kind === 'cell' && e.id.endsWith(':value'))
+    // Nodes 2 and 3 should have different X positions
+    const node2Cell = valueCells.find(e => e.id === 'cell:node:2:value')!
+    const node3Cell = valueCells.find(e => e.id === 'cell:node:3:value')!
+    expect(node2Cell.x).not.toBe(node3Cell.x)
   })
 })
