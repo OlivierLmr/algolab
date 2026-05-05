@@ -35,12 +35,19 @@ function chunkPhysical(state: DequeState, chunkOffset: number): number {
   return (state.mapBeg + chunkOffset) % state.mapCap
 }
 
+/** Map a logical element index to its physical (chunk map index, slot) pair. */
+function logicalToPhysical(state: DequeState, i: number): { chunk: number; slot: number } {
+  const chunkOffset = Math.floor((state.chunkBeg + i) / state.chunkCap)
+  return {
+    chunk: chunkPhysical(state, chunkOffset),
+    slot: (state.chunkBeg + i) % state.chunkCap,
+  }
+}
+
 /** Get the value at logical index i. */
 export function getAt(state: DequeState, i: number): number {
-  const chunkOffset = Math.floor((state.chunkBeg + i) / state.chunkCap)
-  const chunkIdx = chunkPhysical(state, chunkOffset)
-  const withinChunk = (state.chunkBeg + i) % state.chunkCap
-  return state.chunks[chunkIdx]![withinChunk]
+  const { chunk, slot } = logicalToPhysical(state, i)
+  return state.chunks[chunk]![slot]
 }
 
 /** Deep-clone a state. */
@@ -102,6 +109,55 @@ function createInitialState(values: number[]): DequeState {
 // =============================================================================
 
 type Step = DSSubstep<DequeState>
+
+/**
+ * Ensure there is room to expand at the back (new slot after last element).
+ * Returns substeps for any allocation needed and the resulting state.
+ */
+function ensureRoomAtBack(state: DequeState): { steps: Step[]; current: DequeState } {
+  const steps: Step[] = []
+  let current = cloneState(state)
+
+  const active = numActiveChunks(current)
+  const needsNewChunk = active === 0 || (current.chunkBeg + current.taille) % current.chunkCap === 0
+
+  if (needsNewChunk) {
+    if (isMapFull(current)) {
+      const growSteps = growMapSteps(current)
+      steps.push(...growSteps)
+      current = cloneState(growSteps[growSteps.length - 1].state)
+    }
+    const newChunkIdx = chunkPhysical(current, numActiveChunks(current))
+    current.chunks[newChunkIdx] = new Array(current.chunkCap).fill(0)
+    steps.push({ state: cloneState(current), description: `Allocate new chunk at map[${newChunkIdx}]` })
+  }
+
+  return { steps, current }
+}
+
+/**
+ * Ensure there is room to expand at the front (new slot before first element).
+ * Returns substeps for any allocation needed and the resulting state.
+ */
+function ensureRoomAtFront(state: DequeState): { steps: Step[]; current: DequeState } {
+  const steps: Step[] = []
+  let current = cloneState(state)
+
+  if (current.chunkBeg === 0) {
+    if (isMapFull(current)) {
+      const growSteps = growMapSteps(current)
+      steps.push(...growSteps)
+      current = cloneState(growSteps[growSteps.length - 1].state)
+    }
+    const newMapBeg = (current.mapBeg - 1 + current.mapCap) % current.mapCap
+    current.chunks[newMapBeg] = new Array(current.chunkCap).fill(0)
+    current.mapBeg = newMapBeg
+    current.chunkBeg = current.chunkCap
+    steps.push({ state: cloneState(current), description: `Allocate new chunk at map[${newMapBeg}]` })
+  }
+
+  return { steps, current }
+}
 
 /** Grow the map: allocate a new map of double size, unwrap circular pointers into linear layout. */
 function growMapSteps(state: DequeState): Step[] {
@@ -165,100 +221,44 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
   switch (op) {
     case 'push_back': {
       const val = args.val ?? 0
-      const steps: Step[] = []
-      let current = cloneState(state)
+      const { steps, current } = ensureRoomAtBack(state)
 
-      // Check if last chunk has room
-      const active = numActiveChunks(current)
-      const needsNewChunk = active === 0 || (current.chunkBeg + current.taille) % current.chunkCap === 0
-
-      if (needsNewChunk) {
-        // Need a new chunk — check if map is full (all slots occupied)
-        if (isMapFull(current)) {
-          const growSteps = growMapSteps(current)
-          steps.push(...growSteps)
-          current = cloneState(growSteps[growSteps.length - 1].state)
-        }
-        // Allocate new chunk at next slot (wraps circularly)
-        const newChunkIdx = chunkPhysical(current, numActiveChunks(current))
-        const newState = cloneState(current)
-        newState.chunks[newChunkIdx] = new Array(current.chunkCap).fill(0)
-        steps.push({ state: cloneState(newState), description: `Allocate new chunk at map[${newChunkIdx}]` })
-        current = newState
-      }
-
-      // Write value
-      const writeChunkOffset = Math.floor((current.chunkBeg + current.taille) / current.chunkCap)
-      const writeChunkIdx = chunkPhysical(current, writeChunkOffset)
-      const writeSlot = (current.chunkBeg + current.taille) % current.chunkCap
+      const { chunk, slot } = logicalToPhysical(current, current.taille)
       const finalState = cloneState(current)
-      finalState.chunks[writeChunkIdx]![writeSlot] = val
-      finalState.taille = current.taille + 1
-      steps.push({ state: finalState, description: `Write ${val} at chunk[${writeChunkIdx}][${writeSlot}]` })
+      finalState.chunks[chunk]![slot] = val
+      finalState.taille += 1
+      steps.push({ state: finalState, description: `Write ${val} at chunk[${chunk}][${slot}]` })
       return steps
     }
 
     case 'push_front': {
       const val = args.val ?? 0
-      const steps: Step[] = []
-      let current = cloneState(state)
+      const { steps, current } = ensureRoomAtFront(state)
 
-      if (current.chunkBeg > 0) {
-        // First chunk has room before chunkBeg
-        const firstChunkIdx = current.mapBeg
-        const finalState = cloneState(current)
-        finalState.chunkBeg -= 1
-        finalState.chunks[firstChunkIdx]![finalState.chunkBeg] = val
-        finalState.taille += 1
-        steps.push({ state: finalState, description: `Write ${val} at chunk[${firstChunkIdx}][${current.chunkBeg - 1}]` })
-      } else {
-        // chunkBeg == 0, need new chunk before mapBeg
-        if (isMapFull(current)) {
-          // All slots occupied — grow map
-          const growSteps = growMapSteps(current)
-          steps.push(...growSteps)
-          current = cloneState(growSteps[growSteps.length - 1].state)
-        }
-        // Allocate new chunk at slot before mapBeg (wraps circularly)
-        const newMapBeg = (current.mapBeg - 1 + current.mapCap) % current.mapCap
-        const newState = cloneState(current)
-        newState.chunks[newMapBeg] = new Array(current.chunkCap).fill(0)
-        newState.mapBeg = newMapBeg
-        newState.chunkBeg = current.chunkCap  // will be decremented next
-        steps.push({ state: cloneState(newState), description: `Allocate new chunk at map[${newMapBeg}]` })
-        current = newState
-
-        // Write val at end of new chunk
-        const finalState = cloneState(current)
-        finalState.chunkBeg -= 1
-        finalState.chunks[finalState.mapBeg]![finalState.chunkBeg] = val
-        finalState.taille += 1
-        steps.push({ state: finalState, description: `Write ${val} at chunk[${finalState.mapBeg}][${finalState.chunkBeg}]` })
-      }
+      const finalState = cloneState(current)
+      finalState.chunkBeg -= 1
+      finalState.taille += 1
+      const { chunk, slot } = logicalToPhysical(finalState, 0)
+      finalState.chunks[chunk]![slot] = val
+      steps.push({ state: finalState, description: `Write ${val} at chunk[${chunk}][${slot}]` })
       return steps
     }
 
     case 'pop_back': {
       if (state.taille === 0) throw new Error('pop_back on empty deque')
       const steps: Step[] = []
-      const current = cloneState(state)
 
-      // Remove last element (using circular chunk index)
-      const lastLogical = current.taille - 1
-      const chunkOffset = Math.floor((current.chunkBeg + lastLogical) / current.chunkCap)
-      const chunkIdx = chunkPhysical(current, chunkOffset)
-      const slot = (current.chunkBeg + lastLogical) % current.chunkCap
-
-      const removed = cloneState(current)
-      removed.chunks[chunkIdx]![slot] = 0
+      const { chunk, slot } = logicalToPhysical(state, state.taille - 1)
+      const removed = cloneState(state)
+      removed.chunks[chunk]![slot] = 0
       removed.taille -= 1
-      steps.push({ state: cloneState(removed), description: `Remove element at chunk[${chunkIdx}][${slot}]` })
+      steps.push({ state: cloneState(removed), description: `Remove element at chunk[${chunk}][${slot}]` })
 
-      // Check if chunk became empty (slot was 0 means this was its only element)
+      // Deallocate chunk if it became empty (slot 0 means it was the only element)
       if (slot === 0) {
         const dealloc = cloneState(removed)
-        dealloc.chunks[chunkIdx] = null
-        steps.push({ state: dealloc, description: `Deallocate empty chunk at map[${chunkIdx}]` })
+        dealloc.chunks[chunk] = null
+        steps.push({ state: dealloc, description: `Deallocate empty chunk at map[${chunk}]` })
       }
 
       return steps
@@ -267,25 +267,21 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
     case 'pop_front': {
       if (state.taille === 0) throw new Error('pop_front on empty deque')
       const steps: Step[] = []
-      const current = cloneState(state)
 
-      const chunkIdx = current.mapBeg
-      const slot = current.chunkBeg
-
-      // Remove first element
-      const removed = cloneState(current)
-      removed.chunks[chunkIdx]![slot] = 0
+      const { chunk, slot } = logicalToPhysical(state, 0)
+      const removed = cloneState(state)
+      removed.chunks[chunk]![slot] = 0
       removed.chunkBeg += 1
       removed.taille -= 1
-      steps.push({ state: cloneState(removed), description: `Remove element at chunk[${chunkIdx}][${slot}]` })
+      steps.push({ state: cloneState(removed), description: `Remove element at chunk[${chunk}][${slot}]` })
 
       // If chunkBeg reaches chunkCap, deallocate chunk and advance mapBeg circularly
       if (removed.chunkBeg >= removed.chunkCap) {
         const dealloc = cloneState(removed)
-        dealloc.chunks[chunkIdx] = null
-        dealloc.mapBeg = (chunkIdx + 1) % dealloc.mapCap
+        dealloc.chunks[chunk] = null
+        dealloc.mapBeg = (chunk + 1) % dealloc.mapCap
         dealloc.chunkBeg = 0
-        steps.push({ state: dealloc, description: `Deallocate empty chunk at map[${chunkIdx}], advance mapBeg` })
+        steps.push({ state: dealloc, description: `Deallocate empty chunk at map[${chunk}], advance mapBeg` })
       }
 
       return steps
@@ -304,25 +300,7 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
       const shiftLeft = pos < state.taille - pos
 
       if (shiftLeft) {
-        // Make room at front (allocate chunk if needed, no value written)
-        const steps: Step[] = []
-        let current = cloneState(state)
-
-        if (current.chunkBeg === 0) {
-          // Need new chunk before mapBeg
-          if (isMapFull(current)) {
-            const growSteps = growMapSteps(current)
-            steps.push(...growSteps)
-            current = cloneState(growSteps[growSteps.length - 1].state)
-          }
-          const newMapBeg = (current.mapBeg - 1 + current.mapCap) % current.mapCap
-          const newState = cloneState(current)
-          newState.chunks[newMapBeg] = new Array(current.chunkCap).fill(0)
-          newState.mapBeg = newMapBeg
-          newState.chunkBeg = current.chunkCap
-          steps.push({ state: cloneState(newState), description: `Allocate new chunk at map[${newMapBeg}]` })
-          current = newState
-        }
+        const { steps, current } = ensureRoomAtFront(state)
 
         // Expand logical range at front (decrement chunkBeg, increment taille)
         const expanded = cloneState(current)
@@ -331,44 +309,20 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
 
         // Shift elements [0..pos-1] left by one (into the newly available slot)
         for (let i = 0; i < pos; i++) {
-          const srcOffset = Math.floor((expanded.chunkBeg + i + 1) / expanded.chunkCap)
-          const srcChunk = chunkPhysical(expanded, srcOffset)
-          const srcSlot = (expanded.chunkBeg + i + 1) % expanded.chunkCap
-          const dstOffset = Math.floor((expanded.chunkBeg + i) / expanded.chunkCap)
-          const dstChunk = chunkPhysical(expanded, dstOffset)
-          const dstSlot = (expanded.chunkBeg + i) % expanded.chunkCap
-          expanded.chunks[dstChunk]![dstSlot] = expanded.chunks[srcChunk]![srcSlot]
+          const src = logicalToPhysical(expanded, i + 1)
+          const dst = logicalToPhysical(expanded, i)
+          expanded.chunks[dst.chunk]![dst.slot] = expanded.chunks[src.chunk]![src.slot]
         }
         steps.push({ state: cloneState(expanded), description: `Shift elements [0..${pos - 1}] left` })
 
         // Write value at position pos
-        const wOffset = Math.floor((expanded.chunkBeg + pos) / expanded.chunkCap)
-        const wChunk = chunkPhysical(expanded, wOffset)
-        const wSlot = (expanded.chunkBeg + pos) % expanded.chunkCap
-        expanded.chunks[wChunk]![wSlot] = val
+        const w = logicalToPhysical(expanded, pos)
+        expanded.chunks[w.chunk]![w.slot] = val
         steps.push({ state: cloneState(expanded), description: `Write ${val} at position ${pos}` })
 
         return steps
       } else {
-        // Make room at back (allocate chunk if needed, no value written)
-        const steps: Step[] = []
-        let current = cloneState(state)
-
-        const active = numActiveChunks(current)
-        const needsNewChunk = active === 0 || (current.chunkBeg + current.taille) % current.chunkCap === 0
-
-        if (needsNewChunk) {
-          if (isMapFull(current)) {
-            const growSteps = growMapSteps(current)
-            steps.push(...growSteps)
-            current = cloneState(growSteps[growSteps.length - 1].state)
-          }
-          const newChunkIdx = chunkPhysical(current, numActiveChunks(current))
-          const newState = cloneState(current)
-          newState.chunks[newChunkIdx] = new Array(current.chunkCap).fill(0)
-          steps.push({ state: cloneState(newState), description: `Allocate new chunk at map[${newChunkIdx}]` })
-          current = newState
-        }
+        const { steps, current } = ensureRoomAtBack(state)
 
         // Expand logical range at back (increment taille)
         const expanded = cloneState(current)
@@ -376,20 +330,15 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
 
         // Shift elements [pos..taille-2] right by one (into the newly available slot)
         for (let i = expanded.taille - 1; i > pos; i--) {
-          const srcOffset = Math.floor((expanded.chunkBeg + i - 1) / expanded.chunkCap)
-          const srcChunk = chunkPhysical(expanded, srcOffset)
-          const srcSlot = (expanded.chunkBeg + i - 1) % expanded.chunkCap
-          const dstOffset = Math.floor((expanded.chunkBeg + i) / expanded.chunkCap)
-          const dstChunk = chunkPhysical(expanded, dstOffset)
-          const dstSlot = (expanded.chunkBeg + i) % expanded.chunkCap
-          expanded.chunks[dstChunk]![dstSlot] = expanded.chunks[srcChunk]![srcSlot]
+          const src = logicalToPhysical(expanded, i - 1)
+          const dst = logicalToPhysical(expanded, i)
+          expanded.chunks[dst.chunk]![dst.slot] = expanded.chunks[src.chunk]![src.slot]
         }
         steps.push({ state: cloneState(expanded), description: `Shift elements [${pos}..${state.taille - 1}] right` })
 
         // Write value at position pos
-        const wChunk = chunkPhysical(expanded, Math.floor((expanded.chunkBeg + pos) / expanded.chunkCap))
-        const wSlot = (expanded.chunkBeg + pos) % expanded.chunkCap
-        expanded.chunks[wChunk]![wSlot] = val
+        const w = logicalToPhysical(expanded, pos)
+        expanded.chunks[w.chunk]![w.slot] = val
         steps.push({ state: cloneState(expanded), description: `Write ${val} at position ${pos}` })
 
         return steps
@@ -403,20 +352,16 @@ function applyOperation(state: DequeState, op: string, args: Record<string, numb
 
       const steps: Step[] = []
 
-      // Shift elements left (using circular chunk addressing)
+      // Shift elements left (overwrite erased position)
       const shifted = cloneState(state)
       for (let i = pos; i < shifted.taille - 1; i++) {
-        const srcOffset = Math.floor((shifted.chunkBeg + i + 1) / shifted.chunkCap)
-        const srcChunk = chunkPhysical(shifted, srcOffset)
-        const srcSlot = (shifted.chunkBeg + i + 1) % shifted.chunkCap
-        const dstOffset = Math.floor((shifted.chunkBeg + i) / shifted.chunkCap)
-        const dstChunk = chunkPhysical(shifted, dstOffset)
-        const dstSlot = (shifted.chunkBeg + i) % shifted.chunkCap
-        shifted.chunks[dstChunk]![dstSlot] = shifted.chunks[srcChunk]![srcSlot]
+        const src = logicalToPhysical(shifted, i + 1)
+        const dst = logicalToPhysical(shifted, i)
+        shifted.chunks[dst.chunk]![dst.slot] = shifted.chunks[src.chunk]![src.slot]
       }
       steps.push({ state: cloneState(shifted), description: `Shift elements left from position ${pos + 1}` })
 
-      // Now pop_back on the shifted state
+      // Pop the now-redundant last element
       const popSteps = applyOperation(shifted, 'pop_back', {})
       steps.push(...popSteps)
 
