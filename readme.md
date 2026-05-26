@@ -1,18 +1,24 @@
-This project aims to be a webapp which
+# AlgoLab
 
-- lets you write simple algorithms in a simple language, which can handle limited types of objects. For now, tables of integers or characters.
-- visualizes the execution of that algorithm step by step, on a canvas where
-  - the tables are shown visually,
-  - iterators on the tables are shown as well
-  - the user can go through the algorithm step by step, forward and backward.
+A web app for visualizing classic algorithms and data structures, step by step.
 
-How the algorithms are written is unclear for now. Maybe simple typescript code that is then validated to only use objects that the tool knows how to visualize. Maybe also have special comments or tags or something that indicate to the tool "breakpoints" delimitting one step, or "hide" to not show some iterators or values in the visualisation.
+Live: https://olivierlmr.github.io/algolab/
 
-## Todo
+## What it does
 
-- [x] Online code editor
-  - Enter that mode, so that it shows also the hidden lines. Have something telling you if there is a syntax error (inline or simply in some card somewhere)
-  - Have the ability to export and import pieces of code in a ".algolab" format.
-- [x] Store current state (algo, step, input) in the url for easy sharing.
-- [x] Show previous 3 steps in the lower "description" div.
-- [ ] Animations
+- **Algorithms.** Write algorithms in a small built-in DSL (loops, functions, array indexing, swaps). The app runs them step by step, drawing arrays, variables, iterators, pointers, gauges, and the call stack on a canvas. Includes built-in implementations for sorts (bubble, selection, insertion, merge, quick, semi-recursive quick, heap), selection (quickselect), counting sort, radix sort (LSD), and heap operations (make-heap O(n log n) and O(n), heap sort).
+- **Data structures.** Operate on `vector`, `singly-linked list`, `doubly-linked list`, `deque`, and a `tree (sibling-node)` representation. Each operation is broken into theoretical substeps (allocate, copy, switch pointer, shift, ...) and animated.
+- **Editor.** Write your own algorithms, set breakpoints, step over and out (forward and backward), import/export `.algolab` files.
+
+## Running locally
+
+```sh
+pnpm install
+pnpm dev      # dev server
+pnpm test     # unit tests (vitest)
+pnpm build    # type-check + production build
+```
+
+## Stack
+
+Preact + Signals, TypeScript, Vite, Vitest, Playwright. No runtime dependencies beyond Preact.
