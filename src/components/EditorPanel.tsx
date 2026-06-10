@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'preact/hooks'
-import { customSource, customInput, isRunMode, currentStepIndex, tryParseCustom } from '../state.ts'
+import { customSource, customInput, isRunMode, currentStepIndex, tryParseCustom, scalarInputs, currentScalarParams, scalarDefault } from '../state.ts'
 import { buildColorMap, colorizeToHtml } from './colorize.ts'
 import { signal, computed } from '@preact/signals'
 
@@ -136,6 +136,23 @@ export function EditorPanel() {
             customInput.value = (e.target as HTMLInputElement).value
           }}
         />
+        {currentScalarParams.value.map(name => (
+          <span class="code-scalar-input" key={name}>
+            <span class="editor-input-label">{name}:</span>
+            <input
+              class="editor-input code-scalar-input-field"
+              type="number"
+              value={scalarInputs.value[name] ?? scalarDefault(name)}
+              onInput={(e) => {
+                const v = Number((e.target as HTMLInputElement).value)
+                scalarInputs.value = {
+                  ...scalarInputs.value,
+                  [name]: Number.isNaN(v) ? scalarDefault(name) : v,
+                }
+              }}
+            />
+          </span>
+        ))}
       </div>
       {error && <div class="editor-error">{error}</div>}
     </div>

@@ -1,4 +1,4 @@
-import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine, inputText } from '../state.ts'
+import { currentAlgo, currentStep, isCustomMode, isRunMode, toggleRunMode, editBuiltIn, disabledLines, toggleBreakpoint, pipelineColorMap, pipelineDisplayInfo, hoveredDescriptionLine, inputText, scalarInputs, currentScalarParams, scalarDefault } from '../state.ts'
 import { colorizeTokens, isDirectiveLine } from './colorize.ts'
 import { useMemo, useCallback } from 'preact/hooks'
 import { useTooltip } from '../hooks/useTooltip.ts'
@@ -10,12 +10,16 @@ export function CodePanel() {
   const colorMap = pipelineColorMap.value
   const displayInfo = pipelineDisplayInfo.value
 
+  // In custom edit mode, show the raw source (with directives) so the user can
+  // edit them. In all other modes (built-in, or custom running), hide
+  // directives by using the preprocessed displayInfo.
+  const editingCustom = custom && !isRunMode.value
   const { lines, lineMap } = useMemo(() => {
-    if (custom || !displayInfo) {
+    if (editingCustom || !displayInfo) {
       return { lines: algo.source.split('\n'), lineMap: null }
     }
     return { lines: displayInfo.lines, lineMap: displayInfo.lineMap }
-  }, [algo.source, custom, displayInfo])
+  }, [algo.source, editingCustom, displayInfo])
 
   const activeLine = step
     ? (lineMap ? lineMap.get(step.currentLine) : step.currentLine)
@@ -95,11 +99,28 @@ export function CodePanel() {
             value={inputText.value}
             onInput={(e) => { inputText.value = (e.target as HTMLInputElement).value }}
           />
+          {currentScalarParams.value.map(name => (
+            <span class="code-scalar-input" key={name}>
+              <span class="code-input-label">{name}:</span>
+              <input
+                class="code-input code-scalar-input-field"
+                type="number"
+                value={scalarInputs.value[name] ?? scalarDefault(name)}
+                onInput={(e) => {
+                  const v = Number((e.target as HTMLInputElement).value)
+                  scalarInputs.value = {
+                    ...scalarInputs.value,
+                    [name]: Number.isNaN(v) ? scalarDefault(name) : v,
+                  }
+                }}
+              />
+            </span>
+          ))}
         </div>
       )}
       <pre>
         {lines.map((line, i) => {
-          const directive = custom && isDirectiveLine(line)
+          const directive = editingCustom && isDirectiveLine(line)
           const sourceLine = reverseLineMap ? (reverseLineMap.get(i) ?? i) : i
           const isDisabled = disabledDisplayLines.has(i)
           const isEmpty = line.trim() === ''

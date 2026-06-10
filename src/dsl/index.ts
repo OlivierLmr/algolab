@@ -21,7 +21,12 @@ export interface PipelineResult {
 }
 
 /** Full pipeline: source → preprocess → lex → parse → analyze → interpret → PipelineResult */
-export function compilePipeline(source: string, paramName: string, input: number[]): PipelineResult {
+export function compilePipeline(
+  source: string,
+  paramName: string,
+  input: number[],
+  scalars: Record<string, number> = {},
+): PipelineResult {
   const { stripped, directiveLines, displayInfo } = preprocessSource(source)
 
   const tokens = lex(stripped)
@@ -48,7 +53,8 @@ export function compilePipeline(source: string, paramName: string, input: number
   // Run interpreter with shared colorMap and type context
   const runner = createRunner(ast, colorMap, typeContext)
   const inputMap = new Map([[paramName, input]])
-  const steps = runner(inputMap)
+  const scalarMap = new Map(Object.entries(scalars))
+  const steps = runner(inputMap, scalarMap)
 
   // Compute default disabled lines from skip directives
   const defaultDisabledLines = getDefaultDisabledLines(ast, blockRanges)
@@ -57,8 +63,8 @@ export function compilePipeline(source: string, paramName: string, input: number
 }
 
 /** Convenience wrapper: returns just the steps (for tryParseCustom etc.) */
-export function runAlgorithm(source: string, paramName: string, input: number[]): Step[] {
-  return compilePipeline(source, paramName, input).steps
+export function runAlgorithm(source: string, paramName: string, input: number[], scalars: Record<string, number> = {}): Step[] {
+  return compilePipeline(source, paramName, input, scalars).steps
 }
 
 // --- Comment template pre-parsing ---

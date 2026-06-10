@@ -64,6 +64,44 @@ export const customInput = signal(
   initial?.algo === 'custom' ? (initial?.input ?? '5, 3, 8, 1, 2') : '5, 3, 8, 1, 2'
 )
 
+/**
+ * Extract the parameter list from an algo signature like `algo Name(arr[], k, m)`.
+ * Tolerant of whitespace; returns an empty list if the signature can't be parsed.
+ */
+export function extractAlgoParams(source: string): { name: string; isArray: boolean }[] {
+  const match = source.match(/algo\s+\w+\s*\(([^)]*)\)/)
+  if (!match) return []
+  const inside = match[1].trim()
+  if (inside.length === 0) return []
+  return inside.split(',').map(s => {
+    const tok = s.trim()
+    const isArray = tok.endsWith('[]')
+    const name = isArray ? tok.slice(0, -2).trim() : tok
+    return { name, isArray }
+  }).filter(p => /^\w+$/.test(p.name))
+}
+
+/** User-provided values for scalar inputs, keyed by param name. Stale entries are
+ *  harmless: the runner ignores any name not declared in the current algo signature. */
+export const scalarInputs = signal<Record<string, number>>(
+  Object.fromEntries(
+    (algorithmList[currentAlgoIndex.value]?.scalarInputs ?? []).map(s => [s.name, s.defaultValue])
+  )
+)
+
+/** Scalar param names declared in the current algorithm's source, in order. */
+export const currentScalarParams = computed<string[]>(() => {
+  const src = isCustomMode.value ? customSource.value : currentAlgo.value.source
+  return extractAlgoParams(src).filter(p => !p.isArray).map(p => p.name)
+})
+
+/** Resolve a default value for a scalar param: from the algo's declared defaults, else 0. */
+export function scalarDefault(paramName: string): number {
+  const algo = currentAlgo.value
+  const def = algo.scalarInputs?.find(s => s.name === paramName)
+  return def?.defaultValue ?? 0
+}
+
 export const currentAlgo = computed<AlgorithmDefinition>(() => {
   if (isCustomMode.value) {
     return {
@@ -92,7 +130,7 @@ const pipelineResult = computed<{ result: PipelineResult | null; error: string |
   try {
     const match = algo.source.match(/algo \w+\((\w+):/)
     const paramName = match ? match[1] : 'arr'
-    const result = compilePipeline(algo.source, paramName, parsedInput.value)
+    const result = compilePipeline(algo.source, paramName, parsedInput.value, scalarInputs.value)
     return { result, error: null }
   } catch (e) {
     return { result: null, error: e instanceof Error ? e.message : String(e) }
@@ -268,6 +306,9 @@ export function selectAlgorithm(index: number): void {
   currentAlgoIndex.value = index
   currentStepIndex.value = 0
   inputText.value = algorithmList[index].defaultInput.join(', ')
+  scalarInputs.value = Object.fromEntries(
+    (algorithmList[index].scalarInputs ?? []).map(s => [s.name, s.defaultValue])
+  )
   disabledLines.value = new Set(pipelineDefaultDisabledLines.value)
 }
 
@@ -275,6 +316,8 @@ export function selectCustom(): void {
   isCustomMode.value = true
   isRunMode.value = false
   currentStepIndex.value = 0
+  // Leave scalarInputs alone — the user's current edits may already declare
+  // scalar params, and the runner ignores stale entries.
   disabledLines.value = new Set()
 }
 
@@ -282,6 +325,8 @@ export function editBuiltIn(): void {
   const algo = algorithmList[currentAlgoIndex.value]
   customSource.value = algo.source
   customInput.value = inputText.value
+  // scalarInputs already holds whatever values the user picked for this algo;
+  // they carry over into the custom editor (its signature is the same to start).
   isCustomMode.value = true
   isRunMode.value = false
   currentStepIndex.value = 0

@@ -660,6 +660,19 @@ body {
   min-width: 0;
 }
 
+/* Scalar inputs sit next to the array input but stay compact. */
+.code-scalar-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.code-scalar-input-field {
+  flex: 0 0 auto;
+  width: 60px;
+}
+
 /* Run button */
 .run-btn {
   padding: 4px 14px;

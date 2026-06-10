@@ -80,8 +80,16 @@ export function segmentsToString(parts: DescriptionSegment[]): string {
   }).join('')
 }
 
+export interface ScalarInputDef {
+  name: string           // matches a top-level param in the algo signature
+  label?: string         // optional UI label (defaults to name)
+  defaultValue: number
+}
+
 export interface AlgorithmDefinition {
   name: string
   source: string
   defaultInput: number[]
+  /** Extra scalar inputs (besides the main array). Each must match a top-level param. */
+  scalarInputs?: ScalarInputDef[]
 }

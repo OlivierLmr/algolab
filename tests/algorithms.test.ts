@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { runAlgorithm } from '../src/dsl/index.ts'
 import { algorithms } from '../src/algorithms/index.ts'
+import type { AlgorithmDefinition } from '../src/types.ts'
+
+function defaultScalars(algo: AlgorithmDefinition): Record<string, number> {
+  return Object.fromEntries((algo.scalarInputs ?? []).map(s => [s.name, s.defaultValue]))
+}
 
 describe('All built-in algorithms run without errors', () => {
   for (const algo of algorithms) {
     it(`${algo.name} completes successfully`, () => {
-      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput)
+      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput, defaultScalars(algo))
       expect(steps.length).toBeGreaterThan(0)
       // Every step should have valid structure
       for (const step of steps) {
@@ -28,7 +33,7 @@ describe('Algorithms produce sorted output', () => {
 
   for (const algo of sortAlgos) {
     it(`${algo.name} sorts the array correctly`, () => {
-      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput)
+      const steps = runAlgorithm(algo.source, 'arr', algo.defaultInput, defaultScalars(algo))
       const lastStep = steps[steps.length - 1]
       const arrData = lastStep.arrays.find(a => a.name === 'arr')
       expect(arrData).toBeDefined()
@@ -156,7 +161,7 @@ describe('Quick Select: finds k-th element', () => {
   const qs = algorithms.find(a => a.name === 'Quick Select')!
 
   it('arr[k] is the k-th smallest element', () => {
-    const steps = runAlgorithm(qs.source, 'arr', [5, 3, 4, 1, 2])
+    const steps = runAlgorithm(qs.source, 'arr', [5, 3, 4, 1, 2], defaultScalars(qs))
     const lastStep = steps[steps.length - 1]
     const arrData = lastStep.arrays.find(a => a.name === 'arr')!
     const k = lastStep.variables['k'].num

@@ -2,8 +2,9 @@ import type { AlgorithmDefinition } from '../types.ts'
 
 export const quickSelect: AlgorithmDefinition = {
   name: 'Quick Select',
-  source: `algo QuickSelect(arr[])
+  source: `algo QuickSelect(arr[], k)
   #: gauge arr
+  #: pointer k on arr at k
 
   #: describe "Partitioning arr[{$=lo}..{$=hi}] with pivot {$=arr[hi]} (in the last position, {$=hi})"
   def partition(lo, hi)
@@ -37,9 +38,6 @@ export const quickSelect: AlgorithmDefinition = {
     #: comment "Pivot is now at index {$=i}"
     return i
 
-  #: tooltip "target rank (0-based): looking for the (k+1)-th smallest"
-  let k = 2
-  #: pointer k on arr at k
   #: tooltip "left boundary of search range"
   let lo = 0
   #: tooltip "right boundary of search range"
@@ -71,4 +69,5 @@ export const quickSelect: AlgorithmDefinition = {
         found = 1
   #: comment "Result: the {k + 1}-th smallest element is {$*arr[k]}"`,
   defaultInput: [5, 3, 4, 1, 2],
+  scalarInputs: [{ name: 'k', defaultValue: 2 }],
 }

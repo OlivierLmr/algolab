@@ -78,6 +78,7 @@ class ExecutionContext {
     colorMap: Map<string, string>,
     typeContext: TypeContext,
     input: Map<string, number[]>,
+    scalars: Map<string, number> = new Map(),
   ) {
     this.algo = algo
     this.colorMap = colorMap
@@ -87,6 +88,15 @@ class ExecutionContext {
       this.arrays.set(name, values.map(v =>
         elemType.length > 0 ? { num: v, arrays: [...elemType] } : plainVal(v)
       ))
+    }
+    // Seed scalar inputs as variables in the global scope, but only for
+    // names that actually appear as scalar params in the algo signature.
+    // This prevents stale UI state from polluting an algo that doesn't use them.
+    const scalarParamNames = new Set(algo.params.filter(p => !p.isArray).map(p => p.name))
+    for (const [name, value] of scalars) {
+      if (!scalarParamNames.has(name)) continue
+      const t = this.staticVarType(name, algo.line)
+      this.scopeStack[0].set(name, t.length > 0 ? { num: value, arrays: [...t] } : plainVal(value))
     }
   }
 
@@ -913,10 +923,14 @@ class ExecutionContext {
  * colorMap is computed once in the pipeline and shared.
  * typeContext provides statically inferred iterator types.
  */
-export function createRunner(algo: AlgoNode, colorMap: Map<string, string>, typeContext: TypeContext): (input: Map<string, number[]>) => Step[] {
+export function createRunner(
+  algo: AlgoNode,
+  colorMap: Map<string, string>,
+  typeContext: TypeContext,
+): (input: Map<string, number[]>, scalars?: Map<string, number>) => Step[] {
 
-  return function run(input: Map<string, number[]>): Step[] {
-    const ctx = new ExecutionContext(algo, colorMap, typeContext, input)
+  return function run(input: Map<string, number[]>, scalars?: Map<string, number>): Step[] {
+    const ctx = new ExecutionContext(algo, colorMap, typeContext, input, scalars)
     return ctx.execute()
   }
 }
